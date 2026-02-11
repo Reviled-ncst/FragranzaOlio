@@ -7,8 +7,12 @@
  * Control Panel → MySQL Databases
  */
 
-// Check if we're in production (InfinityFree) or local (XAMPP)
-$isProduction = !in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']);
+// Check if we're in production (InfinityFree) or local (XAMPP/ngrok)
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$isLocal = in_array($serverName, ['localhost', '127.0.0.1']) || 
+           strpos($serverName, 'ngrok') !== false ||
+           strpos($serverName, 'ngrok-free.app') !== false;
+$isProduction = !$isLocal;
 
 if ($isProduction) {
     // ============================================

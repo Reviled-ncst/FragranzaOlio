@@ -1,12 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const BACKEND_URL = 'https://fragranza-api.free.nf';
+// Backend URL - Use environment variable or default to ngrok URL
+const BACKEND_URL = process.env.BACKEND_URL || 'https://8e9b-136-158-49-118.ngrok-free.app';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin, ngrok-skip-browser-warning');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -29,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }, {} as Record<string, string>)
   ).toString();
   
-  const targetUrl = `${BACKEND_URL}/api/${pathStr}${queryString ? `?${queryString}` : ''}`;
+  const targetUrl = `${BACKEND_URL}/backend/api/${pathStr}${queryString ? `?${queryString}` : ''}`;
 
   try {
     // Prepare fetch options
@@ -39,6 +40,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
       },
     };
 
@@ -47,13 +49,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     }
 
-    // Make the request to InfinityFree
+    // Make the request to backend
     const response = await fetch(targetUrl, fetchOptions);
     
     // Get response text
     const responseText = await response.text();
     
-    // Check if response is the anti-bot challenge page
+    // Check if response is the anti-bot challenge page (InfinityFree)
     if (responseText.includes('aes.js') || responseText.includes('toNumbers')) {
       // InfinityFree is blocking the request with anti-bot challenge
       return res.status(503).json({
