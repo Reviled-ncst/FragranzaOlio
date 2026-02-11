@@ -3,7 +3,7 @@
  * Handles audit trail and activity log operations
  */
 
-const API_BASE_URL = 'http://localhost/FragranzaWeb/backend/api';
+import { API_BASE_URL } from './api';
 
 // Get token from localStorage - check multiple possible keys
 const getToken = (): string | null => {

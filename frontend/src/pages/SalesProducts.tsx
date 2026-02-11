@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getImageUrl, IMAGE_BASE_URL } from '../services/api';
 import { 
   Plus, 
   Search, 
@@ -414,12 +415,12 @@ const SalesProducts = () => {
   const handleEditProduct = (product: Product) => {
     setIsNewProduct(false);
     setActiveTab('basic');
-    setImagePreview(product.image_main ? `http://localhost/FragranzaWeb/backend${product.image_main}` : null);
+    setImagePreview(product.image_main ? `${IMAGE_BASE_URL}${product.image_main}` : null);
     setImageFile(null);
     // Load existing gallery images
     if (product.image_gallery && product.image_gallery.length > 0) {
       setGalleryPreviews(product.image_gallery.map(img => 
-        img.startsWith('http') ? img : `http://localhost/FragranzaWeb/backend${img}`
+        img.startsWith('http') ? img : `${IMAGE_BASE_URL}${img}`
       ));
     } else {
       setGalleryPreviews([]);
@@ -790,7 +791,7 @@ const SalesProducts = () => {
                           <div className="w-12 h-12 bg-black-700 rounded-lg overflow-hidden flex-shrink-0">
                             {product.image_main ? (
                               <img
-                                src={product.image_main.startsWith('http') ? product.image_main : `http://localhost/FragranzaWeb/backend${product.image_main}`}
+                                src={product.image_main.startsWith('http') ? product.image_main : `${IMAGE_BASE_URL}${product.image_main}`}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                               />
@@ -1154,7 +1155,7 @@ const SalesProducts = () => {
                                       <img 
                                         src={variation.image.startsWith('http') || variation.image.startsWith('data:') || variation.image.startsWith('blob:') 
                                           ? variation.image 
-                                          : `http://localhost/FragranzaWeb/backend${variation.image}`}
+                                          : `${IMAGE_BASE_URL}${variation.image}`}
                                         alt={variation.volume}
                                         className="w-full h-full object-cover"
                                       />
@@ -1466,7 +1467,7 @@ const SalesProducts = () => {
                                           <img 
                                             src={variation.image.startsWith('http') || variation.image.startsWith('data:') || variation.image.startsWith('blob:') 
                                               ? variation.image 
-                                              : `http://localhost/FragranzaWeb/backend${variation.image}`} 
+                                              : `${IMAGE_BASE_URL}${variation.image}`} 
                                             alt={variation.volume} 
                                             className="w-full h-full object-cover" 
                                           />
@@ -2217,7 +2218,7 @@ const SalesProducts = () => {
                         
                         return currentImage ? (
                           <img
-                            src={currentImage.startsWith('http') || currentImage.startsWith('data:') ? currentImage : `http://localhost/FragranzaWeb/backend${currentImage}`}
+                            src={currentImage.startsWith('http') || currentImage.startsWith('data:') ? currentImage : `${IMAGE_BASE_URL}${currentImage}`}
                             alt={viewingProduct.name}
                             className="w-full h-full object-cover"
                           />
@@ -2254,7 +2255,7 @@ const SalesProducts = () => {
                               }`}
                             >
                               <img
-                                src={img.startsWith('http') || img.startsWith('data:') ? img : `http://localhost/FragranzaWeb/backend${img}`}
+                                src={img.startsWith('http') || img.startsWith('data:') ? img : `${IMAGE_BASE_URL}${img}`}
                                 alt={`Gallery ${index + 1}`}
                                 className="w-full h-full object-cover"
                               />

@@ -5,18 +5,7 @@ import { Eye, Heart, ImageOff, ShoppingCart, Zap, Check, X, Loader2 } from 'luci
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { productService, ProductVariation } from '../../services/productServicePHP';
-
-// Helper to get full image URL
-const getImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) return '';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  if (imagePath.startsWith('/uploads')) {
-    return `http://localhost/FragranzaWeb/backend${imagePath}`;
-  }
-  return imagePath;
-};
+import { getImageUrl } from '../../services/api';
 
 interface ProductCardProps {
   id: number;

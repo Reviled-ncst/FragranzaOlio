@@ -2,7 +2,9 @@
  * Inventory Service - Handles all inventory management API calls
  */
 
-const API_URL = 'http://localhost/FragranzaWeb/backend/api';
+import { API_BASE_URL } from './api';
+
+const API_URL = API_BASE_URL;
 
 // Types
 export interface Branch {

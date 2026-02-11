@@ -8,6 +8,7 @@ import SectionHeader from '../components/ui/SectionHeader';
 import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
 import { productService, Product as APIProduct, Category } from '../services/productServicePHP';
+import { getImageUrl } from '../services/api';
 
 // Transform API product to ProductCard format
 interface ProductCardData {
@@ -20,21 +21,6 @@ interface ProductCardData {
   isFeatured?: boolean;
   inspiredBy?: string;
 }
-
-// Helper to get full image URL
-const getImageUrl = (imagePath: string | null): string => {
-  if (!imagePath) return '';
-  // If it's already a full URL, return as-is
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  // If it's an uploaded file (starts with /uploads), prepend backend URL
-  if (imagePath.startsWith('/uploads')) {
-    return `http://localhost/FragranzaWeb/backend${imagePath}`;
-  }
-  // Otherwise it's a static asset from frontend public folder
-  return imagePath;
-};
 
 const transformProduct = (product: APIProduct): ProductCardData => ({
   id: product.id,

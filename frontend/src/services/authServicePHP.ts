@@ -3,7 +3,7 @@
  * Fragranza Olio - User Authentication with XAMPP/MySQL
  */
 
-const API_BASE_URL = 'http://localhost/FragranzaWeb/backend/api';
+import { API_BASE_URL } from './api';
 
 export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'admin';
 

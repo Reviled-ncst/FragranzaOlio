@@ -3,7 +3,7 @@
  * Fragranza Olio - Products from Local MySQL
  */
 
-const API_BASE_URL = 'http://localhost/FragranzaWeb/backend/api';
+import { API_BASE_URL } from './api';
 
 export interface Category {
   id: number;

@@ -28,18 +28,7 @@ import Button from '../components/ui/Button';
 import { productService, Product as APIProduct, ProductVariation } from '../services/productServicePHP';
 import { useAuth } from '../context/AuthContext';
 import { useAuthModal } from '../context/AuthModalContext';
-
-// Helper to get full image URL
-const getImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) return '';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  if (imagePath.startsWith('/uploads')) {
-    return `http://localhost/FragranzaWeb/backend${imagePath}`;
-  }
-  return imagePath;
-};
+import { getImageUrl } from '../services/api';
 
 // Transform API product to display format
 interface DisplayProduct {

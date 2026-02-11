@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { API_BASE_URL } from '../services/api';
 import { 
   Users, 
   UserPlus,
@@ -279,7 +280,7 @@ const AdminUsers = () => {
   const fetchSupervisors = async () => {
     try {
       // Use the public auth endpoint to get supervisors
-      const response = await fetch('http://localhost/FragranzaWeb/backend/api/auth.php?action=get-supervisors');
+      const response = await fetch(`${API_BASE_URL}/auth.php?action=get-supervisors`);
       const result = await response.json();
       if (result.success && result.data) {
         setSupervisors(result.data.map((s: any) => ({ id: s.id, fullName: s.name })));

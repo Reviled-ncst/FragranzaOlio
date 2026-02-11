@@ -3,18 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight, ShoppingCart, Check, Square, CheckSquare } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-
-// Helper to get full image URL
-const getImageUrl = (imagePath: string | null | undefined): string => {
-  if (!imagePath) return '';
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  if (imagePath.startsWith('/uploads')) {
-    return `http://localhost/FragranzaWeb/backend${imagePath}`;
-  }
-  return imagePath;
-};
+import { getImageUrl } from '../services/api';
 
 const Cart = () => {
   const { items, updateQuantity, removeFromCart } = useCart();
