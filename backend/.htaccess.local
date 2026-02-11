@@ -1,9 +1,5 @@
 RewriteEngine On
-
-# Auto-detect base path
-# For InfinityFree: use /
-# For XAMPP: use /FragranzaWeb/backend/
-RewriteBase /
+RewriteBase /FragranzaWeb/backend/
 
 # Allow direct access to existing PHP files
 RewriteCond %{REQUEST_FILENAME} -f

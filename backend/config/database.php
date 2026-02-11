@@ -2,12 +2,32 @@
 /**
  * Database Configuration
  * Fragranza Olio - Database Connection Settings
+ * 
+ * For InfinityFree: Update these values from your control panel
+ * Control Panel → MySQL Databases
  */
 
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'fragranza_db');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+// Check if we're in production (InfinityFree) or local (XAMPP)
+$isProduction = !in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']);
+
+if ($isProduction) {
+    // ============================================
+    // INFINITYFREE PRODUCTION SETTINGS
+    // ============================================
+    define('DB_HOST', 'sql311.infinityfree.com');
+    define('DB_NAME', 'if0_41131668_fragranza');
+    define('DB_USER', 'if0_41131668');
+    define('DB_PASS', 'Revengeme1@');
+} else {
+    // ============================================
+    // LOCAL DEVELOPMENT (XAMPP)
+    // ============================================
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'fragranza_db');
+    define('DB_USER', 'root');
+    define('DB_PASS', '');
+}
+
 define('DB_CHARSET', 'utf8mb4');
 
 class Database {
