@@ -8,10 +8,7 @@
       "runtime": "@vercel/node@3.0.0"
     }
   },
-  "routes": [
-    { "src": "/api/proxy", "dest": "/api/proxy.ts" },
-    { "handle": "filesystem" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "rewrites": [
+    { "source": "/api/proxy", "destination": "/api/proxy.ts" }
   ]
 }
