@@ -1,0 +1,24 @@
+RewriteEngine On
+RewriteBase /FragranzaWeb/backend/
+
+# Allow direct access to existing PHP files
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(.*)$ - [L]
+
+# Handle clean URLs for API
+RewriteRule ^api/products/([0-9]+)$ api/products.php?id=$1 [L,QSA]
+RewriteRule ^api/products$ api/products.php [L,QSA]
+RewriteRule ^api/categories$ api/categories.php [L,QSA]
+RewriteRule ^api/contact$ api/contact.php [L,QSA]
+RewriteRule ^api/upload$ api/upload.php [L,QSA]
+RewriteRule ^api/newsletter$ api/newsletter.php [L,QSA]
+RewriteRule ^api/auth$ api/auth.php [L,QSA]
+RewriteRule ^api/sales$ api/sales.php [L,QSA]
+RewriteRule ^api/sales/(.*)$ api/sales.php/$1 [L,QSA]
+RewriteRule ^api/admin_users$ api/admin_users.php [L,QSA]
+RewriteRule ^api/admin_users/(.*)$ api/admin_users.php/$1 [L,QSA]
+
+# Default route for anything else
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]

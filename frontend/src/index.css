@@ -1,0 +1,442 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Styles */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-charcoal bg-white antialiased;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display font-semibold leading-tight;
+  }
+
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl lg:text-5xl;
+  }
+
+  h3 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h4 {
+    @apply text-xl md:text-2xl;
+  }
+
+  a {
+    @apply transition-colors duration-300;
+  }
+
+  img {
+    @apply max-w-full h-auto;
+  }
+}
+
+/* Component Styles */
+@layer components {
+  /* Button Styles */
+  .btn {
+    @apply inline-flex items-center justify-center px-6 py-3 font-accent font-medium text-sm tracking-wide rounded-sm transition-all duration-300 ease-in-out;
+  }
+
+  .btn-primary {
+    @apply bg-gold-500 text-white hover:bg-gold-600 hover:shadow-gold active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply bg-transparent border-2 border-gold-500 text-gold-500 hover:bg-gold-500 hover:text-white;
+  }
+
+  .btn-dark {
+    @apply bg-charcoal text-white hover:bg-gray-800;
+  }
+
+  .btn-outline {
+    @apply bg-transparent border border-charcoal text-charcoal hover:bg-charcoal hover:text-white;
+  }
+
+  /* Card Styles */
+  .card {
+    @apply bg-white rounded-sm shadow-elegant transition-all duration-300;
+  }
+
+  .card-hover {
+    @apply hover:shadow-elegant-lg hover:-translate-y-1;
+  }
+
+  /* Product Card */
+  .product-card {
+    @apply card card-hover overflow-hidden cursor-pointer;
+  }
+
+  .product-card-image {
+    @apply w-full aspect-square object-cover transition-transform duration-500;
+  }
+
+  /* Section Styles */
+  .section {
+    @apply py-16 md:py-24 lg:py-32;
+  }
+
+  .section-sm {
+    @apply py-12 md:py-16 lg:py-20;
+  }
+
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Text Styles */
+  .text-gradient-gold {
+    @apply bg-gradient-gold bg-clip-text text-transparent;
+  }
+
+  .section-title {
+    @apply font-display text-3xl md:text-4xl lg:text-5xl font-semibold text-charcoal mb-4;
+  }
+
+  .section-subtitle {
+    @apply text-gray-600 text-lg md:text-xl max-w-2xl;
+  }
+
+  /* Form Styles */
+  .input {
+    @apply w-full px-4 py-3 border border-gray-200 rounded-sm font-sans text-charcoal placeholder-gray-400 transition-all duration-300 focus:outline-none focus:border-gold-500 focus:ring-2 focus:ring-gold-500/20;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-charcoal mb-2;
+  }
+
+  /* Navigation */
+  .nav-link {
+    @apply font-accent text-sm font-medium text-charcoal hover:text-gold-500 transition-colors duration-300 relative;
+  }
+
+  .nav-link-active {
+    @apply text-gold-500;
+  }
+
+  .nav-link::after {
+    content: '';
+    @apply absolute left-0 bottom-0 w-0 h-0.5 bg-gold-500 transition-all duration-300;
+  }
+
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+
+  /* Skeleton Loading */
+  .skeleton {
+    @apply bg-black-700 rounded;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Divider */
+  .divider {
+    @apply w-16 h-1 bg-gold-500 mx-auto;
+  }
+
+  .divider-left {
+    @apply mx-0;
+  }
+}
+
+/* Utility Classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Gold gradient text */
+  .gold-shimmer {
+    background: linear-gradient(
+      90deg,
+      #D4AF37 0%,
+      #F4D03F 25%,
+      #D4AF37 50%,
+      #F4D03F 75%,
+      #D4AF37 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+  }
+
+  @keyframes shimmer {
+    to {
+      background-position: 200% center;
+    }
+  }
+
+  /* Black and Gold theme utilities */
+  .bg-dark-gradient {
+    background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 100%);
+  }
+
+  .gold-border {
+    border-color: #D4AF37;
+  }
+
+  .gold-glow {
+    box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  }
+
+  /* Aspect ratios */
+  .aspect-product {
+    aspect-ratio: 3/4;
+  }
+
+  .aspect-hero {
+    aspect-ratio: 16/9;
+  }
+
+  /* Line clamp */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* AOS Custom Animations */
+[data-aos="fade-up-custom"] {
+  transform: translateY(30px);
+  opacity: 0;
+  transition-property: transform, opacity;
+}
+
+[data-aos="fade-up-custom"].aos-animate {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Swiper Custom Styles */
+.swiper-pagination-bullet {
+  @apply bg-gray-300 opacity-100;
+}
+
+.swiper-pagination-bullet-active {
+  @apply bg-gold-500;
+}
+
+.swiper-button-next,
+.swiper-button-prev {
+  @apply text-gold-500;
+}
+
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  @apply text-xl;
+}
+
+/* Hero Carousel Styles */
+.hero-carousel .swiper-pagination {
+  @apply bottom-2;
+}
+
+.hero-carousel .swiper-pagination-bullet {
+  @apply bg-gold-400/50 opacity-100 w-2 h-2 transition-all duration-300;
+}
+
+.hero-carousel .swiper-pagination-bullet-active {
+  @apply bg-gold-400 w-8 rounded-full;
+}
+
+/* Cinematic fade transition */
+.hero-carousel .swiper-slide {
+  opacity: 0 !important;
+  transform: scale(1.05);
+  transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.hero-carousel .swiper-slide-active {
+  opacity: 1 !important;
+  transform: scale(1);
+}
+
+/* Ken Burns zoom effect on active slide */
+.hero-carousel .swiper-slide-active img {
+  animation: kenBurns 8s ease-in-out infinite alternate;
+}
+
+@keyframes kenBurns {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+/* Selection colors for black/gold theme */
+::selection {
+  background-color: rgba(212, 175, 55, 0.3);
+  color: #0A0A0A;
+}
+
+/* Leaflet Map Custom Styles */
+.leaflet-popup-content-wrapper {
+  background: #1a1a1a !important;
+  color: white !important;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px 16px !important;
+}
+
+.leaflet-popup-tip {
+  background: #1a1a1a !important;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.leaflet-popup-close-button {
+  color: rgba(212, 175, 55, 0.7) !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: rgba(212, 175, 55, 1) !important;
+}
+
+.leaflet-control-scale-line {
+  background: rgba(26, 26, 26, 0.9) !important;
+  border-color: rgba(212, 175, 55, 0.5) !important;
+  color: white !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(26, 26, 26, 0.8) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.leaflet-control-attribution a {
+  color: rgba(212, 175, 55, 0.7) !important;
+}
+
+/* Custom marker styles */
+.custom-marker,
+.poi-marker,
+.store-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Leaflet tile loading */
+.leaflet-tile-pane {
+  filter: brightness(1.1) contrast(1.05);
+}
+
+/* Print Styles for Invoice */
+@media print {
+  /* Reset body */
+  html, body {
+    background: #fff !important;
+    background-color: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
+  /* Hide everything marked as no-print */
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Hide everything by default */
+  body > *:not(.print-invoice) {
+    visibility: hidden !important;
+  }
+  
+  /* Show the print invoice and all its children */
+  .print-invoice,
+  .print-invoice *,
+  .print-invoice div,
+  .print-invoice p,
+  .print-invoice h1,
+  .print-invoice h2,
+  .print-invoice h3,
+  .print-invoice span,
+  .print-invoice table,
+  .print-invoice tr,
+  .print-invoice td,
+  .print-invoice th,
+  .print-invoice img {
+    visibility: visible !important;
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  .print-invoice {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 700px !important;
+    margin: 0 auto !important;
+    height: auto !important;
+    background: #fff !important;
+    background-color: #fff !important;
+    z-index: 999999 !important;
+    overflow: visible !important;
+    padding: 32px !important;
+  }
+  
+  /* Page settings */
+  @page {
+    margin: 0.5in;
+    size: letter;
+  }
+}

@@ -1,0 +1,614 @@
+<?php
+/**
+ * OJT Attendance API
+ * Handles clock in/out, breaks, overtime with photo, location, and face verification
+ */
+
+// Set timezone to Philippines
+date_default_timezone_set('Asia/Manila');
+
+require_once __DIR__ . '/../middleware/cors.php';
+require_once __DIR__ . '/../config/database.php';
+
+header('Content-Type: application/json');
+
+$method = $_SERVER['REQUEST_METHOD'];
+$path = isset($_SERVER['PATH_INFO']) ? $_SERVER['PATH_INFO'] : '';
+
+if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
+    $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if (preg_match('#/ojt_attendance\.php(/.*)?$#', $uri, $matches)) {
+        $path = isset($matches[1]) ? $matches[1] : '';
+    }
+}
+
+$path = trim($path, '/');
+
+try {
+    $conn = Database::getInstance()->getConnection();
+    
+    switch ($method) {
+        case 'GET':
+            handleGet($conn, $path);
+            break;
+        case 'POST':
+            handlePost($conn, $path);
+            break;
+        case 'PUT':
+            handlePut($conn, $path);
+            break;
+        default:
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+}
+
+function handleGet($conn, $path) {
+    switch ($path) {
+        case 'today':
+            getTodayAttendance($conn);
+            break;
+        case 'status':
+            getClockStatus($conn);
+            break;
+        case 'history':
+            getAttendanceHistory($conn);
+            break;
+        case 'pending-overtime':
+            getPendingOvertime($conn);
+            break;
+        default:
+            getAttendance($conn);
+    }
+}
+
+function handlePost($conn, $path) {
+    switch ($path) {
+        case 'clock-in':
+            clockIn($conn);
+            break;
+        case 'clock-out':
+            clockOut($conn);
+            break;
+        case 'break-start':
+            breakStart($conn);
+            break;
+        case 'break-end':
+            breakEnd($conn);
+            break;
+        default:
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid endpoint']);
+    }
+}
+
+function handlePut($conn, $path) {
+    switch ($path) {
+        case 'approve-overtime':
+            approveOvertime($conn);
+            break;
+        default:
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid endpoint']);
+    }
+}
+
+function getClockStatus($conn) {
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $today = date('Y-m-d');
+    
+    $stmt = $conn->prepare("
+        SELECT * FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$traineeId, $today]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    $status = [
+        'has_record' => !!$record,
+        'clocked_in' => $record && $record['time_in'] && !$record['time_out'],
+        'clocked_out' => $record && $record['time_out'],
+        'on_break' => $record && $record['break_start'] && !$record['break_end'],
+        'record' => $record
+    ];
+    
+    echo json_encode(['success' => true, 'data' => $status]);
+}
+
+function getTodayAttendance($conn) {
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    $supervisorId = isset($_GET['supervisor_id']) ? intval($_GET['supervisor_id']) : 0;
+    $today = date('Y-m-d');
+    
+    if ($supervisorId) {
+        // Get all trainees' attendance for supervisor
+        $stmt = $conn->prepare("
+            SELECT a.*, u.first_name, u.last_name, u.email
+            FROM ojt_attendance a
+            JOIN users u ON a.trainee_id = u.id
+            WHERE a.supervisor_id = ? AND a.attendance_date = ?
+            ORDER BY a.time_in DESC
+        ");
+        $stmt->execute([$supervisorId, $today]);
+    } else if ($traineeId) {
+        $stmt = $conn->prepare("
+            SELECT * FROM ojt_attendance 
+            WHERE trainee_id = ? AND attendance_date = ?
+        ");
+        $stmt->execute([$traineeId, $today]);
+    } else {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID or Supervisor ID required']);
+        return;
+    }
+    
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    echo json_encode(['success' => true, 'data' => $records]);
+}
+
+function getAttendanceHistory($conn) {
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    $startDate = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-01');
+    $endDate = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-t');
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("
+        SELECT * FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date BETWEEN ? AND ?
+        ORDER BY attendance_date DESC
+    ");
+    $stmt->execute([$traineeId, $startDate, $endDate]);
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'data' => $records]);
+}
+
+function getAttendance($conn) {
+    $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    
+    if ($id) {
+        $stmt = $conn->prepare("SELECT * FROM ojt_attendance WHERE id = ?");
+        $stmt->execute([$id]);
+        echo json_encode(['success' => true, 'data' => $stmt->fetch(PDO::FETCH_ASSOC)]);
+        return;
+    }
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'ID or Trainee ID required']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("
+        SELECT * FROM ojt_attendance 
+        WHERE trainee_id = ?
+        ORDER BY attendance_date DESC
+        LIMIT 30
+    ");
+    $stmt->execute([$traineeId]);
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+function getPendingOvertime($conn) {
+    $supervisorId = isset($_GET['supervisor_id']) ? intval($_GET['supervisor_id']) : 0;
+    
+    if (!$supervisorId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Supervisor ID required']);
+        return;
+    }
+    
+    // Get attendance records with overtime for trainees assigned to this supervisor
+    $stmt = $conn->prepare("
+        SELECT 
+            a.*,
+            u.first_name,
+            u.last_name,
+            u.email as trainee_email,
+            CONCAT(u.first_name, ' ', u.last_name) as trainee_name
+        FROM ojt_attendance a
+        JOIN users u ON a.trainee_id = u.id
+        JOIN ojt_assignments oa ON a.trainee_id = oa.trainee_id AND oa.supervisor_id = ?
+        WHERE a.overtime_hours > 0
+        ORDER BY a.overtime_approved ASC, a.attendance_date DESC
+    ");
+    $stmt->execute([$supervisorId]);
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+function clockIn($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    $supervisorId = intval($data['supervisor_id'] ?? 0);
+    $latitude = $data['latitude'] ?? null;
+    $longitude = $data['longitude'] ?? null;
+    $location = $data['location'] ?? null;
+    $photoBase64 = $data['photo'] ?? null;
+    $faceVerified = $data['face_verified'] ?? false;
+    $lateMinutes = intval($data['late_minutes'] ?? 0);
+    $penaltyHours = floatval($data['penalty_hours'] ?? 0);
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    // Get supervisor if not provided
+    if (!$supervisorId) {
+        $stmt = $conn->prepare("SELECT supervisor_id FROM ojt_assignments WHERE trainee_id = ? AND status = 'active' ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$traineeId]);
+        $assignment = $stmt->fetch(PDO::FETCH_ASSOC);
+        $supervisorId = $assignment['supervisor_id'] ?? null;
+    }
+    
+    // If still no supervisor, try to get from user's supervisor_id field
+    if (!$supervisorId) {
+        $stmt = $conn->prepare("SELECT supervisor_id FROM users WHERE id = ?");
+        $stmt->execute([$traineeId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $supervisorId = $user['supervisor_id'] ?? null;
+    }
+    
+    // Convert 0 to null for foreign key constraint
+    if ($supervisorId === 0 || $supervisorId === '0') {
+        $supervisorId = null;
+    }
+    
+    $today = date('Y-m-d');
+    
+    // Check if already clocked in today
+    $stmt = $conn->prepare("SELECT id FROM ojt_attendance WHERE trainee_id = ? AND attendance_date = ?");
+    $stmt->execute([$traineeId, $today]);
+    
+    if ($stmt->fetch()) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Already clocked in today']);
+        return;
+    }
+    
+    // Save photo if provided
+    $photoPath = null;
+    if ($photoBase64) {
+        $photoPath = saveAttendancePhoto($photoBase64, $traineeId, 'in');
+    }
+    
+    // Determine if late (after 8:00 AM - using penalty passed from frontend)
+    $status = $lateMinutes > 0 ? 'late' : 'present';
+    
+    $stmt = $conn->prepare("
+        INSERT INTO ojt_attendance (
+            trainee_id, supervisor_id, attendance_date, time_in, status,
+            photo_in, latitude_in, longitude_in, location_in, face_verified_in,
+            late_minutes, penalty_hours
+        ) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+    $stmt->execute([
+        $traineeId, $supervisorId, $today, $status,
+        $photoPath, $latitude, $longitude, $location, $faceVerified ? 1 : 0,
+        $lateMinutes, $penaltyHours
+    ]);
+    
+    $attendanceId = $conn->lastInsertId();
+    
+    // Create notification
+    createAttendanceNotification($conn, $traineeId, 'Clocked In', 
+        'You clocked in at ' . date('h:i A') . ($status === 'late' ? ' (Late)' : ''));
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Clock in successful',
+        'data' => [
+            'id' => $attendanceId,
+            'time_in' => date('Y-m-d H:i:s'),
+            'status' => $status
+        ]
+    ]);
+}
+
+function clockOut($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    $latitude = $data['latitude'] ?? null;
+    $longitude = $data['longitude'] ?? null;
+    $location = $data['location'] ?? null;
+    $photoBase64 = $data['photo'] ?? null;
+    $faceVerified = $data['face_verified'] ?? false;
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $today = date('Y-m-d');
+    
+    // Get today's record
+    $stmt = $conn->prepare("
+        SELECT id, time_in, break_start, break_end 
+        FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date = ? AND time_out IS NULL
+    ");
+    $stmt->execute([$traineeId, $today]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$record) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Not clocked in or already clocked out']);
+        return;
+    }
+    
+    // Check if on break
+    if ($record['break_start'] && !$record['break_end']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Please end your break first']);
+        return;
+    }
+    
+    // Save photo if provided
+    $photoPath = null;
+    if ($photoBase64) {
+        $photoPath = saveAttendancePhoto($photoBase64, $traineeId, 'out');
+    }
+    
+    // Calculate hours
+    $clockIn = new DateTime($record['time_in']);
+    $clockOut = new DateTime();
+    $totalMinutes = ($clockOut->getTimestamp() - $clockIn->getTimestamp()) / 60;
+    
+    // Calculate break hours
+    $breakMinutes = 0;
+    if ($record['break_start'] && $record['break_end']) {
+        $breakStart = new DateTime($record['break_start']);
+        $breakEnd = new DateTime($record['break_end']);
+        $breakMinutes = ($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60;
+    }
+    
+    $workMinutes = $totalMinutes - $breakMinutes;
+    $workHours = round($workMinutes / 60, 2);
+    $breakHours = round($breakMinutes / 60, 2);
+    
+    // Calculate overtime (after 8 hours of work)
+    $overtimeHours = max(0, $workHours - 8);
+    
+    $stmt = $conn->prepare("
+        UPDATE ojt_attendance SET
+            time_out = NOW(),
+            photo_out = ?,
+            latitude_out = ?,
+            longitude_out = ?,
+            location_out = ?,
+            face_verified_out = ?,
+            work_hours = ?,
+            break_hours = ?,
+            overtime_hours = ?
+        WHERE id = ?
+    ");
+    $stmt->execute([
+        $photoPath, $latitude, $longitude, $location,
+        $faceVerified ? 1 : 0, $workHours, $breakHours, $overtimeHours, $record['id']
+    ]);
+    
+    // Create notification
+    $message = sprintf('You clocked out at %s. Total work: %.1f hrs', date('h:i A'), $workHours);
+    if ($overtimeHours > 0) {
+        $message .= sprintf('. Overtime: %.1f hrs (pending approval)', $overtimeHours);
+    }
+    createAttendanceNotification($conn, $traineeId, 'Clocked Out', $message);
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Clock out successful',
+        'data' => [
+            'time_out' => date('Y-m-d H:i:s'),
+            'work_hours' => $workHours,
+            'break_hours' => $breakHours,
+            'overtime_hours' => $overtimeHours
+        ]
+    ]);
+}
+
+function breakStart($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $today = date('Y-m-d');
+    
+    $stmt = $conn->prepare("
+        SELECT id, break_start, break_end FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date = ? AND time_out IS NULL
+    ");
+    $stmt->execute([$traineeId, $today]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$record) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Not clocked in']);
+        return;
+    }
+    
+    // If currently on break (break_start set but no break_end), don't allow another
+    if ($record['break_start'] && !$record['break_end']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Already on break']);
+        return;
+    }
+    
+    // If previous break was completed, reset it to start a new break
+    if ($record['break_start'] && $record['break_end']) {
+        $stmt = $conn->prepare("UPDATE ojt_attendance SET break_start = NOW(), break_end = NULL WHERE id = ?");
+        $stmt->execute([$record['id']]);
+        
+        createAttendanceNotification($conn, $traineeId, 'Break Started', 'New break started at ' . date('h:i A'));
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'New break started (previous break reset)',
+            'data' => ['break_start' => date('Y-m-d H:i:s')]
+        ]);
+        return;
+    }
+    
+    $stmt = $conn->prepare("UPDATE ojt_attendance SET break_start = NOW() WHERE id = ?");
+    $stmt->execute([$record['id']]);
+    
+    createAttendanceNotification($conn, $traineeId, 'Break Started', 'Break started at ' . date('h:i A'));
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Break started',
+        'data' => ['break_start' => date('Y-m-d H:i:s')]
+    ]);
+}
+
+function breakEnd($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $today = date('Y-m-d');
+    
+    $stmt = $conn->prepare("
+        SELECT id, break_start, break_end FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date = ? AND time_out IS NULL
+    ");
+    $stmt->execute([$traineeId, $today]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$record || !$record['break_start']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Not on break']);
+        return;
+    }
+    
+    if ($record['break_end']) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Break already ended']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("UPDATE ojt_attendance SET break_end = NOW() WHERE id = ?");
+    $stmt->execute([$record['id']]);
+    
+    // Calculate break duration
+    $breakStart = new DateTime($record['break_start']);
+    $breakEnd = new DateTime();
+    $breakMinutes = round(($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60);
+    
+    createAttendanceNotification($conn, $traineeId, 'Break Ended', 
+        sprintf('Break ended at %s. Duration: %d minutes', date('h:i A'), $breakMinutes));
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Break ended',
+        'data' => [
+            'break_end' => date('Y-m-d H:i:s'),
+            'break_minutes' => $breakMinutes
+        ]
+    ]);
+}
+
+function approveOvertime($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    $attendanceId = intval($data['attendance_id'] ?? 0);
+    $approvedBy = intval($data['approved_by'] ?? 0);
+    $approved = $data['approved'] ?? true;
+    
+    if (!$attendanceId || !$approvedBy) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Attendance ID and approver ID required']);
+        return;
+    }
+    
+    if ($approved) {
+        $stmt = $conn->prepare("
+            UPDATE ojt_attendance SET
+                overtime_approved = 1,
+                approved_by = ?,
+                approved_at = NOW()
+            WHERE id = ?
+        ");
+        $stmt->execute([$approvedBy, $attendanceId]);
+    } else {
+        $stmt = $conn->prepare("
+            UPDATE ojt_attendance SET overtime_hours = 0 WHERE id = ?
+        ");
+        $stmt->execute([$attendanceId]);
+    }
+    
+    // Get trainee to notify
+    $stmt = $conn->prepare("SELECT trainee_id, overtime_hours FROM ojt_attendance WHERE id = ?");
+    $stmt->execute([$attendanceId]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($record) {
+        $message = $approved 
+            ? sprintf('Your overtime of %.1f hours has been approved', $record['overtime_hours'])
+            : 'Your overtime request was not approved';
+        createAttendanceNotification($conn, $record['trainee_id'], 
+            $approved ? 'Overtime Approved' : 'Overtime Rejected', $message);
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'message' => $approved ? 'Overtime approved' : 'Overtime rejected'
+    ]);
+}
+
+function saveAttendancePhoto($base64Data, $traineeId, $type) {
+    $uploadDir = __DIR__ . '/../uploads/attendance/';
+    if (!file_exists($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
+    
+    // Decode base64
+    $data = explode(',', $base64Data);
+    $imageData = isset($data[1]) ? base64_decode($data[1]) : base64_decode($data[0]);
+    
+    $filename = sprintf('%d_%s_%s.jpg', $traineeId, $type, date('Ymd_His'));
+    $filepath = $uploadDir . $filename;
+    
+    file_put_contents($filepath, $imageData);
+    
+    return 'uploads/attendance/' . $filename;
+}
+
+function createAttendanceNotification($conn, $userId, $title, $message) {
+    $stmt = $conn->prepare("
+        INSERT INTO ojt_notifications (user_id, type, title, message, link)
+        VALUES (?, 'attendance', ?, ?, '/ojt/timesheet')
+    ");
+    $stmt->execute([$userId, $title, $message]);
+}
+?>
