@@ -3,7 +3,13 @@
   "outputDirectory": "frontend/dist",
   "installCommand": "cd frontend && npm install",
   "framework": "vite",
+  "functions": {
+    "api/*.ts": {
+      "runtime": "@vercel/node@3.0.0"
+    }
+  },
   "routes": [
+    { "src": "/api/proxy", "dest": "/api/proxy.ts" },
     { "handle": "filesystem" },
     { "src": "/assets/(.*)", "dest": "/assets/$1" },
     { "src": "/(.*)", "dest": "/index.html" }

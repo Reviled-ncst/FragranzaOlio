@@ -3,7 +3,7 @@
  * Fragranza Olio - User Authentication with XAMPP/MySQL
  */
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 
 export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'admin';
 
@@ -99,7 +99,7 @@ export const authService = {
     console.log('📝 Starting registration for:', data.email);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/auth.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ export const authService = {
     console.log('🔐 Logging in:', data.email);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/auth.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ export const authService = {
     try {
       const token = localStorage.getItem(SESSION_KEY);
       
-      await fetch(`${API_BASE_URL}/auth.php`, {
+      await apiFetch(`${API_BASE_URL}/auth.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -275,7 +275,7 @@ export const authService = {
         };
       }
       
-      const response = await fetch(`${API_BASE_URL}/auth.php?action=current-user`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php?action=current-user`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -321,7 +321,7 @@ export const authService = {
     console.log('📝 Updating profile for user:', userId);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/auth.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -387,7 +387,7 @@ export const authService = {
    */
   async getSupervisors(): Promise<Array<{ id: number; name: string; email: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/auth.php?action=get-supervisors`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php?action=get-supervisors`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
