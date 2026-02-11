@@ -73,3 +73,5 @@ if (!empty($segments[0]) && $segments[0] === 'api' && isset($segments[1])) {
         ]
     ]);
 }
+
+// Deployed via GitHub Actions
