@@ -253,10 +253,10 @@ const Home = () => {
                 precision, and the finest ingredients from around the world.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Button href="/products" size="lg" rightIcon={<ArrowRight size={18} />}>
+                <Button href="/products" size="lg" rightIcon={<ArrowRight size={18} />} className="w-full sm:w-auto">
                   Explore Collection
                 </Button>
-                <Button href="/about" variant="outline" size="lg" className="border-gold-500 text-gold-400 hover:bg-gold-500 hover:text-black">
+                <Button href="/about" variant="outline" size="lg" className="border-gold-500 text-gold-400 hover:bg-gold-500 hover:text-black w-full sm:w-auto">
                   Our Story
                 </Button>
               </div>
