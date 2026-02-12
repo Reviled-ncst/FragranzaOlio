@@ -39,6 +39,16 @@ const SalesLayout = ({ children, title = 'Sales Dashboard' }: SalesLayoutProps) 
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(typeof window !== 'undefined' && window.innerWidth >= 1024);
+
+  // Handle window resize for responsive margin
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('salesSidebarCollapsed');
@@ -229,9 +239,9 @@ const SalesLayout = ({ children, title = 'Sales Dashboard' }: SalesLayoutProps) 
       {/* Main Content */}
       <motion.main
         initial={false}
-        animate={{ marginLeft: isCollapsed ? 80 : 280 }}
+        animate={{ marginLeft: isDesktop ? (isCollapsed ? 80 : 280) : 0 }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="min-h-screen lg:ml-0"
+        className="min-h-screen"
       >
         {/* Top Bar */}
         <div className="h-16 bg-black-900/50 backdrop-blur-sm border-b border-gold-500/20 flex items-center justify-between px-6 sticky top-0 z-30">
