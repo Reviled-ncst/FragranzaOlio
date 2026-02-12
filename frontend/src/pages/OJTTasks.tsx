@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
-import api, { API_BASE_URL, apiFetch } from '../services/api';
+import api, { uploadFile } from '../services/api';
 
 interface Task {
   id: number;
@@ -177,15 +177,10 @@ const OJTTasks = () => {
         });
       }
       
-      // Don't set Content-Type header - let browser set it with proper boundary for FormData
-      const response = await apiFetch(`${API_BASE_URL}/ojt_tasks.php/${selectedTask.id}/submit`, {
-        method: 'POST',
-        body: formData
-      });
+      // Use direct upload to bypass Vercel proxy (which doesn't handle FormData)
+      const data = await uploadFile(`/ojt_tasks.php/${selectedTask.id}/submit`, formData);
       
-      const data = await response.json();
-      
-      if (!response.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || 'Failed to submit task');
       }
       
