@@ -12,9 +12,11 @@ import {
   Loader2,
   X,
   RefreshCw,
-  User
+  User,
+  Shield
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../services/api';
+import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult } from '../services/faceRecognitionService';
 
 interface AttendanceClockProps {
   userId: number;
@@ -58,11 +60,36 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
   // Face detection state
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceConfidence, setFaceConfidence] = useState(0);
+  const [faceBox, setFaceBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const faceDetectionInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Load face detection models on mount
+  useEffect(() => {
+    const initModels = async () => {
+      if (!areModelsLoaded() && !modelsLoading) {
+        setModelsLoading(true);
+        try {
+          await loadModels();
+          setModelsLoaded(true);
+        } catch (err) {
+          console.error('Failed to load face detection models:', err);
+        } finally {
+          setModelsLoading(false);
+        }
+      } else if (areModelsLoaded()) {
+        setModelsLoaded(true);
+      }
+    };
+    initModels();
+  }, []);
 
   // Real-time clock update
   useEffect(() => {
@@ -169,53 +196,87 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     }
   };
 
-  // Face detection using canvas (simple face detection without external library)
+  // Face detection using face-api.js
   const startFaceDetection = () => {
-    // Simple face detection using brightness analysis
-    // For production, you can use face-api.js (free) for better detection
-    faceDetectionInterval.current = setInterval(() => {
-      if (videoRef.current && canvasRef.current) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
+    if (!modelsLoaded) {
+      console.warn('Face detection models not loaded yet');
+      return;
+    }
+    
+    const runDetection = async () => {
+      if (!videoRef.current || videoRef.current.readyState !== 4) {
+        animationFrameRef.current = requestAnimationFrame(runDetection);
+        return;
+      }
+      
+      try {
+        const result: FaceDetectionResult = await detectFace(videoRef.current);
         
-        if (ctx && video.readyState === 4) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
+        setFaceDetected(result.detected);
+        setFaceConfidence(result.confidence);
+        setFaceBox(result.box || null);
+        
+        // Draw overlay on canvas
+        if (overlayCanvasRef.current && videoRef.current) {
+          const canvas = overlayCanvasRef.current;
+          const video = videoRef.current;
+          const ctx = canvas.getContext('2d');
           
-          // Get image data from center of frame (where face should be)
-          const centerX = canvas.width / 2 - 100;
-          const centerY = canvas.height / 2 - 100;
-          const imageData = ctx.getImageData(centerX, centerY, 200, 200);
-          const data = imageData.data;
-          
-          // Simple skin tone detection for face presence
-          let skinPixels = 0;
-          const totalPixels = data.length / 4;
-          
-          for (let i = 0; i < data.length; i += 4) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
+          if (ctx) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Check for skin tone (simplified)
-            if (r > 60 && g > 40 && b > 20 &&
-                r > g && r > b &&
-                Math.abs(r - g) > 15 &&
-                r - b > 15) {
-              skinPixels++;
+            if (result.box) {
+              // Draw face bounding box
+              ctx.strokeStyle = result.detected ? '#22c55e' : '#ef4444';
+              ctx.lineWidth = 3;
+              ctx.strokeRect(result.box.x, result.box.y, result.box.width, result.box.height);
+              
+              // Draw corner accents
+              const cornerLength = 20;
+              ctx.lineWidth = 4;
+              ctx.strokeStyle = '#22c55e';
+              
+              // Top-left
+              ctx.beginPath();
+              ctx.moveTo(result.box.x, result.box.y + cornerLength);
+              ctx.lineTo(result.box.x, result.box.y);
+              ctx.lineTo(result.box.x + cornerLength, result.box.y);
+              ctx.stroke();
+              
+              // Top-right
+              ctx.beginPath();
+              ctx.moveTo(result.box.x + result.box.width - cornerLength, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + cornerLength);
+              ctx.stroke();
+              
+              // Bottom-left
+              ctx.beginPath();
+              ctx.moveTo(result.box.x, result.box.y + result.box.height - cornerLength);
+              ctx.lineTo(result.box.x, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + cornerLength, result.box.y + result.box.height);
+              ctx.stroke();
+              
+              // Bottom-right
+              ctx.beginPath();
+              ctx.moveTo(result.box.x + result.box.width - cornerLength, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + result.box.height - cornerLength);
+              ctx.stroke();
             }
           }
-          
-          const skinRatio = skinPixels / totalPixels;
-          const confidence = Math.min(100, Math.round(skinRatio * 300));
-          
-          setFaceDetected(skinRatio > 0.15);
-          setFaceConfidence(confidence);
         }
+      } catch (err) {
+        console.error('Face detection error:', err);
       }
-    }, 500);
+      
+      // Continue detection loop
+      animationFrameRef.current = requestAnimationFrame(runDetection);
+    };
+    
+    runDetection();
   };
 
   // Stop camera
@@ -223,10 +284,15 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     if (faceDetectionInterval.current) {
       clearInterval(faceDetectionInterval.current);
     }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+    setFaceBox(null);
     setShowCamera(false);
     setIsCameraReady(false);
     setCameraAction(null);
@@ -611,6 +677,21 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
                 </div>
               ) : (
                 <>
+                  {/* Model Loading Status */}
+                  {modelsLoading && (
+                    <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center gap-2">
+                      <Loader2 className="animate-spin text-blue-400" size={16} />
+                      <span className="text-blue-400 text-sm">Loading face detection AI...</span>
+                    </div>
+                  )}
+                  
+                  {modelsLoaded && (
+                    <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
+                      <Shield className="text-green-400" size={16} />
+                      <span className="text-green-400 text-sm">AI Face Recognition Active</span>
+                    </div>
+                  )}
+
                   {/* Camera View or Captured Photo */}
                   <div className="relative aspect-video bg-black rounded-xl overflow-hidden mb-4">
                     {!capturedPhoto ? (
@@ -622,18 +703,24 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
                           muted
                           className="w-full h-full object-cover"
                         />
-                        {/* Face detection overlay */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                          <div className={`w-48 h-48 border-4 rounded-full ${
-                            faceDetected ? 'border-green-500' : 'border-gray-500'
-                          } transition-colors`}>
-                            {faceDetected && (
-                              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-sm flex items-center gap-1">
-                                <User size={14} />
-                                Face Detected ({faceConfidence}%)
-                              </div>
-                            )}
-                          </div>
+                        {/* Face detection overlay canvas */}
+                        <canvas
+                          ref={overlayCanvasRef}
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                        />
+                        {/* Face detection status badge */}
+                        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
+                          {faceDetected ? (
+                            <div className="bg-green-500/90 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                              <CheckCircle size={16} />
+                              Face Detected ({faceConfidence}%)
+                            </div>
+                          ) : (
+                            <div className="bg-gray-700/90 text-gray-200 px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                              <User size={16} />
+                              Position your face in frame
+                            </div>
+                          )}
                         </div>
                       </>
                     ) : (
