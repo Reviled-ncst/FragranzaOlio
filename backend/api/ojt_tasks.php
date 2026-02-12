@@ -469,7 +469,7 @@ function handleTaskSubmission($conn, $method, $taskId) {
     ]);
     
     // Update task status to under_review and add submitted_at timestamp
-    $stmt = $conn->prepare("UPDATE ojt_tasks SET status = 'under_review', submission_text = ?, submitted_at = NOW() WHERE id = ?");
+    $stmt = $conn->prepare("UPDATE ojt_tasks SET status = 'under_review', submission_notes = ?, submitted_at = NOW() WHERE id = ?");
     $stmt->execute([$submissionText, $taskId]);
     
     // Get task details and supervisor info
