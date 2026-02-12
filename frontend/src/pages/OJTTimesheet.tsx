@@ -121,6 +121,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
       
       try {
         const result: FaceDetectionResult = await detectFace(videoRef.current);
+        const video = videoRef.current;
         
         // Debounce face detection state changes to reduce flickering
         if (result.detected !== lastFaceDetectedRef.current) {
@@ -141,18 +142,51 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
           detectionCountRef.current = 0;
         }
         
-        // Smooth confidence using rolling average (last 10 values)
-        if (result.detected) {
-          confidenceHistoryRef.current.push(result.confidence);
-          // Keep only last 10 values
-          if (confidenceHistoryRef.current.length > 10) {
-            confidenceHistoryRef.current.shift();
+        // Calculate quality score based on face size and position (not raw detection score)
+        if (result.detected && result.box && video) {
+          const frameWidth = video.videoWidth;
+          const frameHeight = video.videoHeight;
+          const faceWidth = result.box.width;
+          const faceHeight = result.box.height;
+          const faceCenterX = result.box.x + faceWidth / 2;
+          const faceCenterY = result.box.y + faceHeight / 2;
+          const frameCenterX = frameWidth / 2;
+          const frameCenterY = frameHeight / 2;
+          
+          // Size score: face should be 15-50% of frame width (ideal ~25%)
+          const sizeRatio = faceWidth / frameWidth;
+          let sizeScore = 0;
+          if (sizeRatio >= 0.15 && sizeRatio <= 0.50) {
+            // Peak at 25%, falls off toward edges
+            sizeScore = 1 - Math.abs(sizeRatio - 0.25) / 0.25;
+            sizeScore = Math.max(0, Math.min(1, sizeScore));
+          } else if (sizeRatio > 0.50) {
+            sizeScore = 0.7; // Too close but still okay
           }
-          // Calculate average
-          const avg = confidenceHistoryRef.current.reduce((a, b) => a + b, 0) / confidenceHistoryRef.current.length;
-          // Smooth transition - move 20% toward new average each frame
-          smoothedConfidenceRef.current = smoothedConfidenceRef.current + (avg - smoothedConfidenceRef.current) * 0.2;
-          setFaceConfidence(Math.round(smoothedConfidenceRef.current));
+          
+          // Position score: face should be centered
+          const maxDistX = frameWidth / 2;
+          const maxDistY = frameHeight / 2;
+          const distX = Math.abs(faceCenterX - frameCenterX) / maxDistX;
+          const distY = Math.abs(faceCenterY - frameCenterY) / maxDistY;
+          const positionScore = 1 - Math.sqrt(distX * distX + distY * distY) / Math.sqrt(2);
+          
+          // Combined score (size 60%, position 40%)
+          const qualityScore = (sizeScore * 0.6 + positionScore * 0.4) * 100;
+          
+          // Very slow smooth transition - only move 5% toward target per frame
+          const targetScore = Math.min(99, Math.max(30, qualityScore));
+          if (smoothedConfidenceRef.current === 0) {
+            smoothedConfidenceRef.current = targetScore; // Initialize
+          } else {
+            smoothedConfidenceRef.current = smoothedConfidenceRef.current + (targetScore - smoothedConfidenceRef.current) * 0.05;
+          }
+          
+          // Only update display when value changes by at least 1
+          const displayValue = Math.round(smoothedConfidenceRef.current);
+          if (displayValue !== faceConfidence) {
+            setFaceConfidence(displayValue);
+          }
         }
         
         setFaceBox(result.box || null);
