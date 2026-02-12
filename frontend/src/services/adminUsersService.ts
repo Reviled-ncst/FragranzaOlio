@@ -162,10 +162,20 @@ export const adminUsersService = {
         body: JSON.stringify(data),
       });
 
-      return await response.json();
+      const result = await response.json();
+      
+      // Handle specific error cases with user-friendly messages
+      if (!response.ok || !result.success) {
+        if (response.status === 409 || result.message?.includes('already')) {
+          return { success: false, message: 'This email is already registered. Please use a different email address.' };
+        }
+        return { success: false, message: result.message || 'Failed to create user' };
+      }
+      
+      return result;
     } catch (error) {
       console.error('Create user error:', error);
-      return { success: false, message: 'Failed to create user' };
+      return { success: false, message: 'Failed to create user. Please try again.' };
     }
   },
 
