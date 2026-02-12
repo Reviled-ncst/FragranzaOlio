@@ -173,6 +173,14 @@ function getProducts($db) {
             $product['price'] = (float)$product['price'];
             $product['rating'] = (float)$product['rating'];
             $product['stock_quantity'] = (int)$product['stock_quantity'];
+            // Add category object for frontend compatibility
+            if ($product['category_name']) {
+                $product['category'] = [
+                    'id' => $product['category_id'],
+                    'name' => $product['category_name'],
+                    'slug' => $product['category_slug'] ?? null
+                ];
+            }
         }
 
         // Fetch categories
@@ -226,6 +234,14 @@ function getProduct($db, $id) {
         $product['is_new'] = (bool)$product['is_new'];
         $product['price'] = (float)$product['price'];
         $product['rating'] = (float)$product['rating'];
+        // Add category object for frontend compatibility
+        if ($product['category_name']) {
+            $product['category'] = [
+                'id' => $product['category_id'],
+                'name' => $product['category_name'],
+                'slug' => $product['category_slug'] ?? null
+            ];
+        }
 
         // Get related products (same category, exclude current)
         $relatedSql = "SELECT id, name, price, image_main, is_featured, is_new 
