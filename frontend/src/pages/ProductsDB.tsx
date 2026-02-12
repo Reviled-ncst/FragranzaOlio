@@ -262,7 +262,7 @@ const ProductsPage = () => {
       {/* Search Results Info */}
       {searchQuery && (
         <section className="bg-black-900">
-          <div className="container-custom py-4">
+          <div className="container-custom px-4 sm:px-6 py-4">
             <div className="flex items-center gap-2 text-gray-400">
               <span>Search results for: </span>
               <span className="text-gold-500 font-medium">"{searchQuery}"</span>

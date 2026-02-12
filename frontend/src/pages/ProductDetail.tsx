@@ -652,7 +652,7 @@ const ProductDetail = () => {
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <section className="py-16">
-          <div className="container-custom">
+          <div className="container-custom px-4 sm:px-6">
             <h2 className="font-display text-2xl md:text-3xl font-bold text-white text-center mb-10">
               You May Also <span className="text-gold-500">Like</span>
             </h2>

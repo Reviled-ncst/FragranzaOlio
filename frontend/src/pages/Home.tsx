@@ -232,7 +232,7 @@ const Home = () => {
         {/* Gold gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-black-950 via-black-900/95 to-gold-900/20" />
 
-        <div className="container-custom relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0">
+        <div className="container-custom relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-4 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Hero Content */}
             <motion.div
@@ -373,7 +373,7 @@ const Home = () => {
 
       {/* Featured Products Section */}
       <section className="section bg-black-950">
-        <div className="container-custom">
+        <div className="container-custom px-4 sm:px-6">
           <SectionHeader
             title="Featured Products"
             subtitle="Discover our most popular and highly-rated luxury items"
@@ -460,7 +460,7 @@ const Home = () => {
 
       {/* Newsletter Section */}
       <section className="section-sm bg-black-900 border-t border-gold-500/20">
-        <div className="container-custom">
+        <div className="container-custom px-4 sm:px-6">
           <div className="max-w-2xl mx-auto text-center">
             <h2 className="font-display text-2xl md:text-3xl font-bold text-white mb-4">
               Stay Updated

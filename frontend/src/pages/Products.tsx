@@ -1082,7 +1082,7 @@ const Products = () => {
     <div className="pt-16 sm:pt-20">
       {/* Page Header */}
       <section className="bg-black-950 py-8 sm:py-12 lg:py-16 px-4 sm:px-0">
-        <div className="container-custom">
+        <div className="container-custom px-4 sm:px-6">
           <SectionHeader
             title="Our Products"
             subtitle="Explore our complete collection of premium fragrances and beauty essentials"
