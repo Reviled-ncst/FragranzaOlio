@@ -114,9 +114,11 @@ const SalesOrders = () => {
     orderNumber: string;
     customerName: string;
     total: number;
-    status: 'success' | 'error' | 'already_completed';
+    status: 'pending' | 'success' | 'error' | 'already_completed';
     message?: string;
+    orderId?: number;
   } | null>(null);
+  const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
@@ -519,29 +521,65 @@ const SalesOrders = () => {
     }
   };
 
-  // Complete transaction (mark as delivered + paid)
-  const completeTransaction = async (orderId: number) => {
-    if (!confirm('Complete this transaction? This will mark the order as delivered and payment as received.')) {
-      return;
+  // Show confirmation modal for completing transaction
+  const promptCompleteTransaction = (order: OrderDetail | Order) => {
+    let customerName = '';
+    if ('customer_first_name' in order) {
+      customerName = `${order.customer_first_name || ''} ${order.customer_last_name || ''}`.trim();
     }
+    if (!customerName && 'customer_name' in order && order.customer_name) {
+      customerName = order.customer_name;
+    }
+    if (!customerName) {
+      customerName = order.customer_email || 'Customer';
+    }
+    
+    setConfirmationData({
+      orderNumber: order.order_number,
+      customerName: customerName,
+      total: order.total_amount,
+      status: 'pending',
+      orderId: order.id
+    });
+    setShowConfirmation(true);
+  };
+
+  // Execute the transaction completion
+  const executeCompleteTransaction = async () => {
+    if (!confirmationData?.orderId) return;
+    
+    setIsProcessingTransaction(true);
     
     try {
       // Update order status to delivered
       await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: orderId, status: 'delivered', payment_status: 'paid' })
+        body: JSON.stringify({ id: confirmationData.orderId, status: 'delivered', payment_status: 'paid' })
       });
+      
+      // Show success state
+      setConfirmationData(prev => prev ? { ...prev, status: 'success' } : null);
       
       // Refresh orders
       fetchOrders();
       if (selectedOrder) {
-        fetchOrderDetail(orderId);
+        fetchOrderDetail(confirmationData.orderId);
       }
-      alert('Transaction completed successfully!');
     } catch (err) {
       console.error('Error completing transaction:', err);
-      alert('Failed to complete transaction');
+      setConfirmationData(prev => prev ? { ...prev, status: 'error', message: 'Failed to complete transaction' } : null);
+    } finally {
+      setIsProcessingTransaction(false);
+    }
+  };
+
+  // Legacy function - kept for backward compatibility
+  const completeTransaction = async (orderId: number) => {
+    // Find the order data
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      promptCompleteTransaction(order);
     }
   };
 
@@ -793,6 +831,71 @@ const SalesOrders = () => {
                 className="bg-gradient-to-b from-black-800 to-black-900 border border-gold-500/30 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Pending Confirmation State */}
+                {confirmationData.status === 'pending' && (
+                  <>
+                    <div className="pt-8 pb-4 px-6 text-center">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.1, type: "spring", damping: 15, stiffness: 300 }}
+                        className="w-20 h-20 mx-auto mb-4 bg-gold-500 rounded-full flex items-center justify-center shadow-lg shadow-gold-500/30"
+                      >
+                        <CheckCheck className="w-10 h-10 text-black" />
+                      </motion.div>
+                      <motion.h3
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="text-xl font-bold text-white mb-2"
+                      >
+                        Complete Transaction?
+                      </motion.h3>
+                      <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-gray-400 text-sm mb-2"
+                      >
+                        This will mark the order as delivered and payment as received.
+                      </motion.p>
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="bg-black-700/50 rounded-lg p-3 mt-3"
+                      >
+                        <p className="text-white font-medium">{confirmationData.orderNumber}</p>
+                        <p className="text-gray-400 text-sm">{confirmationData.customerName}</p>
+                        <p className="text-gold-400 font-bold text-lg mt-1">₱{confirmationData.total.toLocaleString()}</p>
+                      </motion.div>
+                    </div>
+                    <div className="p-4 flex gap-3">
+                      <button
+                        onClick={() => setShowConfirmation(false)}
+                        disabled={isProcessingTransaction}
+                        className="flex-1 px-4 py-3 bg-black-700 border border-gold-500/30 rounded-xl text-gray-300 font-semibold hover:bg-black-600 transition-colors disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={executeCompleteTransaction}
+                        disabled={isProcessingTransaction}
+                        className="flex-1 px-4 py-3 bg-gold-500 rounded-xl text-black font-semibold hover:bg-gold-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {isProcessingTransaction ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          'Confirm'
+                        )}
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 {/* Success State */}
                 {confirmationData.status === 'success' && (
                   <>
