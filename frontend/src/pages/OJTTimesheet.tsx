@@ -47,6 +47,9 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   const detectionCountRef = useRef(0);
   const autoCaptureTriggeredRef = useRef(false);
   const highConfidenceCountRef = useRef(0);
+  // Smoothing for confidence - rolling average of last 10 values
+  const confidenceHistoryRef = useRef<number[]>([]);
+  const smoothedConfidenceRef = useRef(0);
 
   // Load face detection models
   useEffect(() => {
@@ -127,16 +130,38 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
             setFaceDetected(result.detected);
             lastFaceDetectedRef.current = result.detected;
             detectionCountRef.current = 0;
+            // Reset confidence history when face detection changes
+            if (!result.detected) {
+              confidenceHistoryRef.current = [];
+              smoothedConfidenceRef.current = 0;
+              setFaceConfidence(0);
+            }
           }
         } else {
           detectionCountRef.current = 0;
         }
         
-        setFaceConfidence(result.confidence);
+        // Smooth confidence using rolling average (last 10 values)
+        if (result.detected) {
+          confidenceHistoryRef.current.push(result.confidence);
+          // Keep only last 10 values
+          if (confidenceHistoryRef.current.length > 10) {
+            confidenceHistoryRef.current.shift();
+          }
+          // Calculate average
+          const avg = confidenceHistoryRef.current.reduce((a, b) => a + b, 0) / confidenceHistoryRef.current.length;
+          // Smooth transition - move 20% toward new average each frame
+          smoothedConfidenceRef.current = smoothedConfidenceRef.current + (avg - smoothedConfidenceRef.current) * 0.2;
+          setFaceConfidence(Math.round(smoothedConfidenceRef.current));
+        }
+        
         setFaceBox(result.box || null);
         
-        // Auto-capture when confidence >= 90% for 5 consecutive frames
-        if (result.detected && result.confidence >= 90 && !autoCaptureTriggeredRef.current) {
+        // Get smoothed confidence for auto-capture check
+        const currentConfidence = smoothedConfidenceRef.current;
+        
+        // Auto-capture when smoothed confidence >= 90% for 5 consecutive frames
+        if (result.detected && currentConfidence >= 90 && !autoCaptureTriggeredRef.current) {
           highConfidenceCountRef.current++;
           if (highConfidenceCountRef.current >= 5) {
             autoCaptureTriggeredRef.current = true;
@@ -237,12 +262,15 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
       setStream(null);
     }
     setFaceDetected(false);
+    setFaceConfidence(0);
     setFaceBox(null);
     setCameraReady(false);
     lastFaceDetectedRef.current = false;
     detectionCountRef.current = 0;
     autoCaptureTriggeredRef.current = false;
     highConfidenceCountRef.current = 0;
+    confidenceHistoryRef.current = [];
+    smoothedConfidenceRef.current = 0;
   };
 
   const capturePhoto = () => {
