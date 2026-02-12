@@ -47,6 +47,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const targetUrl = `${BACKEND_URL}/backend/api/${pathStr}${queryString ? `?${queryString}` : ''}`;
 
   try {
+    // Get authorization headers from incoming request
+    const authorization = req.headers['authorization'] || req.headers['Authorization'];
+    const adminEmail = req.headers['x-admin-email'] || req.headers['X-Admin-Email'];
+    
     // Prepare fetch options
     const fetchOptions: RequestInit = {
       method: req.method,
@@ -55,6 +59,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
+        ...(authorization ? { 'Authorization': Array.isArray(authorization) ? authorization[0] : authorization } : {}),
+        ...(adminEmail ? { 'X-Admin-Email': Array.isArray(adminEmail) ? adminEmail[0] : adminEmail } : {}),
       },
     };
 
