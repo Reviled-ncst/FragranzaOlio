@@ -45,6 +45,8 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   const [faceBox, setFaceBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const lastFaceDetectedRef = useRef(false);
   const detectionCountRef = useRef(0);
+  const autoCaptureTriggeredRef = useRef(false);
+  const highConfidenceCountRef = useRef(0);
 
   // Load face detection models
   useEffect(() => {
@@ -133,6 +135,36 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
         setFaceConfidence(result.confidence);
         setFaceBox(result.box || null);
         
+        // Auto-capture when confidence >= 90% for 5 consecutive frames
+        if (result.detected && result.confidence >= 90 && !autoCaptureTriggeredRef.current) {
+          highConfidenceCountRef.current++;
+          if (highConfidenceCountRef.current >= 5) {
+            autoCaptureTriggeredRef.current = true;
+            // Trigger auto-capture
+            if (videoRef.current && canvasRef.current) {
+              const canvas = canvasRef.current;
+              const video = videoRef.current;
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(video, 0, 0);
+                const photoData = canvas.toDataURL('image/jpeg', 0.8);
+                // Stop detection and capture
+                if (animationFrameRef.current) {
+                  cancelAnimationFrame(animationFrameRef.current);
+                  animationFrameRef.current = null;
+                }
+                onCapture(photoData);
+                stopCamera();
+                return;
+              }
+            }
+          }
+        } else {
+          highConfidenceCountRef.current = 0;
+        }
+        
         // Draw overlay on canvas
         if (overlayCanvasRef.current && videoRef.current) {
           const canvas = overlayCanvasRef.current;
@@ -209,6 +241,8 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
     setCameraReady(false);
     lastFaceDetectedRef.current = false;
     detectionCountRef.current = 0;
+    autoCaptureTriggeredRef.current = false;
+    highConfidenceCountRef.current = 0;
   };
 
   const capturePhoto = () => {
@@ -267,7 +301,12 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
               />
               {/* Face detection status badge */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
-                {faceDetected ? (
+                {faceDetected && faceConfidence >= 90 ? (
+                  <div className="bg-green-500 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg animate-pulse">
+                    <Loader2 className="animate-spin" size={16} />
+                    Auto-capturing... ({faceConfidence}%)
+                  </div>
+                ) : faceDetected ? (
                   <div className="bg-green-500/90 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
                     <CheckCircle size={16} />
                     Face Detected ({faceConfidence}%)
@@ -289,10 +328,15 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
                   <AlertTriangle className="text-yellow-400 flex-shrink-0" size={16} />
                   <span className="text-yellow-400 text-sm">No face detected - you can still capture</span>
                 </div>
+              ) : modelsLoaded && cameraReady && faceDetected && faceConfidence >= 90 ? (
+                <div className="w-full p-3 bg-green-500/30 border border-green-500/50 rounded-lg flex items-center gap-2 animate-pulse">
+                  <Loader2 className="text-green-400 flex-shrink-0 animate-spin" size={16} />
+                  <span className="text-green-400 text-sm font-semibold">Auto-capturing photo...</span>
+                </div>
               ) : modelsLoaded && cameraReady && faceDetected ? (
                 <div className="w-full p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
                   <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
-                  <span className="text-green-400 text-sm">Face verified - ready to capture!</span>
+                  <span className="text-green-400 text-sm">Face verified ({faceConfidence}%) - auto-capture at 90%</span>
                 </div>
               ) : null}
             </div>
