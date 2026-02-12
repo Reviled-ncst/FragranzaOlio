@@ -1,7 +1,21 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+// Types for Vercel serverless functions
+interface VercelRequest {
+  method?: string;
+  query: { [key: string]: string | string[] };
+  body?: any;
+  headers: { [key: string]: string | string[] | undefined };
+}
+
+interface VercelResponse {
+  status: (code: number) => VercelResponse;
+  json: (data: any) => void;
+  send: (data: any) => void;
+  end: () => void;
+  setHeader: (name: string, value: string) => void;
+}
 
 // Backend URL - Use environment variable or default to Cloudflare tunnel
-const BACKEND_URL = process.env.BACKEND_URL || 'https://atom-climbing-shark-threshold.trycloudflare.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://path-etc-wanted-operated.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses

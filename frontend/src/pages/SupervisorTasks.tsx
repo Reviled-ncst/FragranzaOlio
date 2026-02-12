@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { IMAGE_BASE_URL } from '../services/api';
+import { getImageUrl } from '../services/api';
 import { 
   CheckSquare, 
   Search,
@@ -789,7 +789,7 @@ const SupervisorTasks = () => {
                             {selectedTask.submissions.filter(sub => sub.file_path).map((submission, idx) => {
                               const isImage = submission.file_type?.startsWith('image/');
                               const isVideo = submission.file_type?.startsWith('video/');
-                              const fileUrl = `${IMAGE_BASE_URL}/${submission.file_path}`;
+                              const fileUrl = getImageUrl(`/${submission.file_path}`);
                               
                               return (
                                 <div key={idx} className="bg-black-800 border border-gold-500/20 rounded-xl overflow-hidden">
@@ -1029,7 +1029,7 @@ const SupervisorTasks = () => {
                           {selectedTask.submissions.filter(sub => sub.file_path).map((submission, idx) => {
                             const isImage = submission.file_type?.startsWith('image/');
                             const isVideo = submission.file_type?.startsWith('video/');
-                            const fileUrl = `${IMAGE_BASE_URL}/${submission.file_path}`;
+                            const fileUrl = getImageUrl(`/${submission.file_path}`);
                             
                             return (
                               <div key={idx} className="bg-black-800 border border-gold-500/20 rounded-xl overflow-hidden">

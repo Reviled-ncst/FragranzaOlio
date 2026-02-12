@@ -31,3 +31,4 @@ npm-debug.log*
 # Uploads (optional - may want to keep)
 # backend/uploads/products/*
 # !backend/uploads/products/.gitkeep
+.vercel

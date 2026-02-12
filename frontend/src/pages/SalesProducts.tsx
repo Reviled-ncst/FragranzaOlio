@@ -415,13 +415,11 @@ const SalesProducts = () => {
   const handleEditProduct = (product: Product) => {
     setIsNewProduct(false);
     setActiveTab('basic');
-    setImagePreview(product.image_main ? `${IMAGE_BASE_URL}${product.image_main}` : null);
+    setImagePreview(product.image_main ? getImageUrl(product.image_main) : null);
     setImageFile(null);
     // Load existing gallery images
     if (product.image_gallery && product.image_gallery.length > 0) {
-      setGalleryPreviews(product.image_gallery.map(img => 
-        img.startsWith('http') ? img : `${IMAGE_BASE_URL}${img}`
-      ));
+      setGalleryPreviews(product.image_gallery.map(img => getImageUrl(img)));
     } else {
       setGalleryPreviews([]);
     }
@@ -791,7 +789,7 @@ const SalesProducts = () => {
                           <div className="w-12 h-12 bg-black-700 rounded-lg overflow-hidden flex-shrink-0">
                             {product.image_main ? (
                               <img
-                                src={product.image_main.startsWith('http') ? product.image_main : `${IMAGE_BASE_URL}${product.image_main}`}
+                                src={getImageUrl(product.image_main)}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                               />
@@ -1153,9 +1151,7 @@ const SalesProducts = () => {
                                   <div className="w-14 h-14 rounded-lg overflow-hidden bg-black-800 flex items-center justify-center">
                                     {variation.image ? (
                                       <img 
-                                        src={variation.image.startsWith('http') || variation.image.startsWith('data:') || variation.image.startsWith('blob:') 
-                                          ? variation.image 
-                                          : `${IMAGE_BASE_URL}${variation.image}`}
+                                        src={getImageUrl(variation.image)}
                                         alt={variation.volume}
                                         className="w-full h-full object-cover"
                                       />
@@ -1465,9 +1461,7 @@ const SalesProducts = () => {
                                       {variation.image ? (
                                         <>
                                           <img 
-                                            src={variation.image.startsWith('http') || variation.image.startsWith('data:') || variation.image.startsWith('blob:') 
-                                              ? variation.image 
-                                              : `${IMAGE_BASE_URL}${variation.image}`} 
+                                            src={getImageUrl(variation.image)} 
                                             alt={variation.volume} 
                                             className="w-full h-full object-cover" 
                                           />
@@ -2218,7 +2212,7 @@ const SalesProducts = () => {
                         
                         return currentImage ? (
                           <img
-                            src={currentImage.startsWith('http') || currentImage.startsWith('data:') ? currentImage : `${IMAGE_BASE_URL}${currentImage}`}
+                            src={getImageUrl(currentImage)}
                             alt={viewingProduct.name}
                             className="w-full h-full object-cover"
                           />
@@ -2255,7 +2249,7 @@ const SalesProducts = () => {
                               }`}
                             >
                               <img
-                                src={img.startsWith('http') || img.startsWith('data:') ? img : `${IMAGE_BASE_URL}${img}`}
+                                src={getImageUrl(img)}
                                 alt={`Gallery ${index + 1}`}
                                 className="w-full h-full object-cover"
                               />

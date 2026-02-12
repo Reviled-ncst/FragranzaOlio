@@ -2,6 +2,7 @@
 /**
  * Upload API
  * Handles file uploads for product images
+ * Supports both multipart/form-data and base64 JSON uploads
  */
 
 // Send CORS headers immediately
@@ -30,6 +31,76 @@ if (!is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
+// Check for base64 JSON upload first
+$contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+if (strpos($contentType, 'application/json') !== false) {
+    $jsonData = json_decode(file_get_contents('php://input'), true);
+    
+    if (isset($jsonData['image_base64']) && isset($jsonData['filename'])) {
+        // Base64 upload
+        $base64Data = $jsonData['image_base64'];
+        $originalFilename = $jsonData['filename'];
+        
+        // Remove data URL prefix if present
+        if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
+            $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $mimeType = 'image/' . $matches[1];
+        } else {
+            // Detect from extension
+            $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+            $mimeTypes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'];
+            $mimeType = $mimeTypes[$ext] ?? 'image/jpeg';
+        }
+        
+        $imageData = base64_decode($base64Data);
+        if ($imageData === false) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid base64 data']);
+            exit;
+        }
+        
+        // Check size
+        if (strlen($imageData) > $maxFileSize) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'File size exceeds 5MB limit']);
+            exit;
+        }
+        
+        // Validate mime type
+        if (!in_array($mimeType, $allowedTypes)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid file type']);
+            exit;
+        }
+        
+        // Generate filename
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'jpg';
+        $filename = uniqid('product_', true) . '.' . strtolower($extension);
+        $destination = $uploadDir . $filename;
+        
+        // Save file
+        if (file_put_contents($destination, $imageData) === false) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Failed to save file']);
+            exit;
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'File uploaded successfully',
+            'data' => [
+                'filename' => $filename,
+                'path' => 'products/' . $filename,
+                'url' => '/uploads/products/' . $filename,
+                'size' => strlen($imageData),
+                'type' => $mimeType
+            ]
+        ]);
+        exit;
+    }
+}
+
+// Traditional multipart/form-data upload
 // Check if file was uploaded
 if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
     $errorMessage = 'No file uploaded';

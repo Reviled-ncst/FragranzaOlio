@@ -73,7 +73,7 @@ export const apiFetch = async (url: string, options?: RequestInit): Promise<Resp
 // Helper function to get full image URL
 export const getImageUrl = (imagePath: string | null | undefined): string => {
   if (!imagePath) return '/placeholder-product.png';
-  if (imagePath.startsWith('http') || imagePath.startsWith('data:')) return imagePath;
+  if (imagePath.startsWith('http') || imagePath.startsWith('data:') || imagePath.startsWith('blob:')) return imagePath;
   
   if (isProduction) {
     // In production, use the image proxy
