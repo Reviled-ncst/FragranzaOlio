@@ -259,7 +259,139 @@ Copy-Item -Path "C:\Users\User\Documents\Projects\FragranzaWeb\frontend\src\*" -
 
 ---
 
-# Session Notes - February 10, 2026
+# Session Notes - February 12, 2026
+
+## Current Status
+- **Frontend**: Deployed on Vercel at `https://fragranza-olio.vercel.app`
+- **Backend**: PHP/MySQL - needs hosting (currently local XAMPP)
+- **Database**: MySQL - `fragranza_db`
+
+---
+
+## NEXT STEPS: Ubuntu Server Setup
+
+### 1. After Ubuntu is installed, run these commands:
+
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install LAMP stack
+sudo apt install apache2 mysql-server php php-mysql php-curl php-json php-mbstring libapache2-mod-php -y
+
+# Enable Apache modules
+sudo a2enmod rewrite headers
+sudo systemctl restart apache2
+
+# Secure MySQL
+sudo mysql_secure_installation
+```
+
+### 2. Create database and user:
+```bash
+sudo mysql
+```
+```sql
+CREATE DATABASE fragranza_db;
+CREATE USER 'fragranza'@'localhost' IDENTIFIED BY 'your_secure_password';
+GRANT ALL PRIVILEGES ON fragranza_db.* TO 'fragranza'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### 3. Clone the project:
+```bash
+cd /var/www
+sudo git clone https://github.com/Reviled-ncst/FragranzaOlio.git fragranza
+sudo chown -R www-data:www-data /var/www/fragranza
+```
+
+### 4. Import database:
+```bash
+cd /var/www/fragranza/database
+sudo mysql fragranza_db < COMPLETE_SETUP.sql
+```
+
+### 5. Configure Apache Virtual Host:
+```bash
+sudo nano /etc/apache2/sites-available/fragranza.conf
+```
+```apache
+<VirtualHost *:80>
+    ServerName your-server-ip-or-domain
+    DocumentRoot /var/www/fragranza/backend
+    
+    <Directory /var/www/fragranza/backend>
+        AllowOverride All
+        Require all granted
+    </Directory>
+    
+    # CORS headers
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+</VirtualHost>
+```
+```bash
+sudo a2ensite fragranza.conf
+sudo a2dissite 000-default.conf
+sudo systemctl restart apache2
+```
+
+### 6. Update backend config:
+Edit `/var/www/fragranza/backend/config/database.php`:
+- Set `$host = 'localhost'`
+- Set `$db = 'fragranza_db'`
+- Set `$user = 'fragranza'`
+- Set `$pass = 'your_secure_password'`
+
+### 7. SSL with Let's Encrypt (after domain setup):
+```bash
+sudo apt install certbot python3-certbot-apache -y
+sudo certbot --apache -d your-domain.com
+```
+
+---
+
+## Files to Update After Backend is Live
+
+### Update Vercel proxy.ts:
+File: `api/proxy.ts`
+Change `BACKEND_URL` to your server's URL:
+```typescript
+const BACKEND_URL = 'https://your-domain.com';
+```
+
+### Update image proxy (api/image.ts):
+Same change for `BACKEND_URL`
+
+### Commit and push to redeploy Vercel frontend
+
+---
+
+## Important URLs & Credentials
+
+- **GitHub Repo**: https://github.com/Reviled-ncst/FragranzaOlio
+- **Vercel Frontend**: https://fragranza-olio.vercel.app
+- **Cloudflare Tunnel ID**: 486637d4-67da-490a-ba20-0bf7e8fcea19 (created but not configured)
+
+---
+
+## Vercel Environment Variables
+**DELETE these if still present:**
+- `VITE_API_URL` 
+- `VITE_IMAGE_URL`
+
+These were pointing to old InfinityFree hosting which is broken.
+
+---
+
+## Database Schema
+Use `/database/COMPLETE_SETUP.sql` for full schema import.
+
+---
+
+## Previous Session Notes - February 10, 2026
 
 ## Overview
 This session focused on enhancing the checkout experience for Fragranza customers, improving notification visibility, and ensuring mobile responsiveness across all pages.
