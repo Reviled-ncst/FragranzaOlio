@@ -4,7 +4,7 @@
  */
 
 import { getToken } from './authServicePHP';
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 
 export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'admin';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';
@@ -120,7 +120,7 @@ export const adminUsersService = {
         }
       });
 
-      const response = await fetch(`${API_BASE_URL}/admin_users.php?${queryParams}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php?${queryParams}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -137,7 +137,7 @@ export const adminUsersService = {
    */
   async getUser(id: number): Promise<ApiResponse<{ user: AdminUser }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/${id}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -154,7 +154,7 @@ export const adminUsersService = {
    */
   async createUser(data: CreateUserData): Promise<ApiResponse<{ userId: number; email: string; employeeId?: string }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php`, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -172,7 +172,7 @@ export const adminUsersService = {
    */
   async updateUser(id: number, data: UpdateUserData): Promise<ApiResponse<{ userId: number }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/${id}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify(data),
@@ -190,7 +190,7 @@ export const adminUsersService = {
    */
   async deleteUser(id: number): Promise<ApiResponse<null>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php/${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/${id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
@@ -207,7 +207,7 @@ export const adminUsersService = {
    */
   async getUsersByRole(role: UserRole): Promise<ApiResponse<{ users: Array<{ id: number; firstName: string; lastName: string; email: string; employeeId?: string; fullName: string }> }>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php/role/${role}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/role/${role}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -224,7 +224,7 @@ export const adminUsersService = {
    */
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_users.php/stats`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/stats`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });

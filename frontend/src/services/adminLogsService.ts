@@ -3,7 +3,7 @@
  * Handles audit trail and activity log operations
  */
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 
 // Get token from localStorage - check multiple possible keys
 const getToken = (): string | null => {
@@ -131,7 +131,7 @@ export const adminLogsService = {
         queryParams.append('admin_email', email);
       }
 
-      const response = await fetch(`${API_BASE_URL}/admin_logs.php?${queryParams}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_logs.php?${queryParams}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
@@ -148,7 +148,7 @@ export const adminLogsService = {
    */
   async getStats(days: number = 30): Promise<ApiResponse<LogStats>> {
     try {
-      const response = await fetch(`${API_BASE_URL}/admin_logs.php/stats?days=${days}`, {
+      const response = await apiFetch(`${API_BASE_URL}/admin_logs.php/stats?days=${days}`, {
         method: 'GET',
         headers: getAuthHeaders(),
       });
