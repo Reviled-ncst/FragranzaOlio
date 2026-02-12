@@ -393,6 +393,7 @@ function clockOut($conn) {
     $workMinutes = $totalMinutes - $breakMinutes;
     $workHours = round($workMinutes / 60, 2);
     $breakHours = round($breakMinutes / 60, 2);
+    $totalHours = round($totalMinutes / 60, 2);
     
     // Calculate overtime (after 8 hours of work)
     $overtimeHours = max(0, $workHours - 8);
@@ -405,6 +406,7 @@ function clockOut($conn) {
             longitude_out = ?,
             location_out = ?,
             face_verified_out = ?,
+            total_hours = ?,
             work_hours = ?,
             break_hours = ?,
             overtime_hours = ?
@@ -412,7 +414,7 @@ function clockOut($conn) {
     ");
     $stmt->execute([
         $photoPath, $latitude, $longitude, $location,
-        $faceVerified ? 1 : 0, $workHours, $breakHours, $overtimeHours, $record['id']
+        $faceVerified ? 1 : 0, $totalHours, $workHours, $breakHours, $overtimeHours, $record['id']
     ]);
     
     // Create notification

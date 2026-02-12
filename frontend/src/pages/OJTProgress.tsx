@@ -40,23 +40,24 @@ const OJTProgress = () => {
       setIsLoading(true);
       try {
         // Fetch real data from API - use allSettled to handle individual failures
-        const [tasksRes, timesheetsRes, assignmentRes, modulesRes] = await Promise.allSettled([
+        const [tasksRes, attendanceRes, assignmentRes, modulesRes] = await Promise.allSettled([
           api.get(`/ojt_tasks.php?assigned_to=${user.id}`),
-          api.get(`/ojt_timesheets.php?trainee_id=${user.id}`),
+          api.get(`/ojt_attendance.php?trainee_id=${user.id}`),
           api.get(`/ojt_timesheets.php/get-assignment?trainee_id=${user.id}`),
           api.get(`/ojt_modules.php?trainee_id=${user.id}`)
         ]);
 
         const tasks = tasksRes.status === 'fulfilled' ? ((tasksRes.value as any).data || []) : [];
-        const timesheets = timesheetsRes.status === 'fulfilled' ? ((timesheetsRes.value as any).data || []) : [];
+        const attendance = attendanceRes.status === 'fulfilled' ? ((attendanceRes.value as any).data || []) : [];
         const assignmentData = assignmentRes.status === 'fulfilled' ? (assignmentRes.value as any) : {};
         const assignment = assignmentData.success ? (assignmentData.data || {}) : {};
         const moduleData = modulesRes.status === 'fulfilled' ? ((modulesRes.value as any) || {}) : {};
 
         // Calculate progress from real data
-        const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
-        const approvedTimesheets = timesheets.filter((ts: any) => ts.status === 'approved');
-        const totalHours = approvedTimesheets.reduce((sum: number, ts: any) => sum + (parseFloat(ts.total_hours) || 0), 0);
+        // Count 'approved' or 'completed' tasks as completed
+        const completedTasks = tasks.filter((t: any) => t.status === 'completed' || t.status === 'approved').length;
+        // Calculate total hours from attendance records
+        const totalHours = attendance.reduce((sum: number, a: any) => sum + (parseFloat(a.total_hours) || 0), 0);
         
         // Calculate average rating from completed tasks
         const ratedTasks = tasks.filter((t: any) => t.rating);
