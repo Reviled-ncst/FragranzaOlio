@@ -392,12 +392,28 @@ const OJTTasks = () => {
                         Submit
                       </button>
                     )}
-                    {task.status === 'completed' && task.feedback && (
+                    {task.status === 'revision' && (
+                      <button
+                        onClick={() => setSelectedTask(task)}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700 transition-colors"
+                      >
+                        View Revision Notes
+                      </button>
+                    )}
+                    {(task.status === 'completed' || task.status === 'approved') && task.feedback && (
                       <button
                         onClick={() => setSelectedTask(task)}
                         className="px-4 py-2 bg-black-800 text-gray-300 rounded-lg text-sm hover:bg-black-700 transition-colors"
                       >
                         View Feedback
+                      </button>
+                    )}
+                    {(task.status === 'cancelled' || task.status === 'rejected') && task.feedback && (
+                      <button
+                        onClick={() => setSelectedTask(task)}
+                        className="px-4 py-2 bg-red-600/20 text-red-400 rounded-lg text-sm hover:bg-red-600/30 transition-colors"
+                      >
+                        View Rejection
                       </button>
                     )}
                   </div>
@@ -584,7 +600,7 @@ const OJTTasks = () => {
 
         {/* Feedback Modal */}
         <AnimatePresence>
-          {selectedTask && selectedTask.status === 'completed' && selectedTask.feedback && (
+          {selectedTask && ['completed', 'approved', 'revision', 'rejected', 'cancelled'].includes(selectedTask.status) && (selectedTask.feedback || selectedTask.status === 'revision') && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -597,10 +613,28 @@ const OJTTasks = () => {
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.95, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-black-900 border border-green-500/30 rounded-xl p-6 max-w-lg w-full"
+                className={`bg-black-900 border rounded-xl p-6 max-w-lg w-full ${
+                  selectedTask.status === 'revision' 
+                    ? 'border-orange-500/30' 
+                    : selectedTask.status === 'rejected' || selectedTask.status === 'cancelled'
+                    ? 'border-red-500/30'
+                    : 'border-green-500/30'
+                }`}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Task Feedback</h3>
+                  <h3 className={`text-lg font-semibold ${
+                    selectedTask.status === 'revision' 
+                      ? 'text-orange-400' 
+                      : selectedTask.status === 'rejected' || selectedTask.status === 'cancelled'
+                      ? 'text-red-400'
+                      : 'text-white'
+                  }`}>
+                    {selectedTask.status === 'revision' 
+                      ? '⚠️ Revision Required' 
+                      : selectedTask.status === 'rejected' || selectedTask.status === 'cancelled'
+                      ? '❌ Task Rejected'
+                      : '✅ Task Approved'}
+                  </h3>
                   <button
                     onClick={() => setSelectedTask(null)}
                     className="p-1 hover:bg-black-800 rounded-lg transition-colors"
@@ -610,6 +644,14 @@ const OJTTasks = () => {
                 </div>
                 
                 <p className="text-white font-medium mb-2">{selectedTask.title}</p>
+                
+                {selectedTask.status === 'revision' && (
+                  <p className="text-orange-300 text-sm mb-4">Your supervisor has requested changes. Please review the feedback below and resubmit.</p>
+                )}
+                
+                {(selectedTask.status === 'rejected' || selectedTask.status === 'cancelled') && (
+                  <p className="text-red-300 text-sm mb-4">This task has been rejected by your supervisor.</p>
+                )}
                 
                 {selectedTask.rating && (
                   <div className="flex items-center gap-2 mb-4">
@@ -624,9 +666,39 @@ const OJTTasks = () => {
                   </div>
                 )}
                 
-                <div className="bg-black-800 rounded-lg p-4">
-                  <p className="text-gray-300">{selectedTask.feedback}</p>
-                </div>
+                {selectedTask.feedback ? (
+                  <div className={`rounded-lg p-4 ${
+                    selectedTask.status === 'revision' 
+                      ? 'bg-orange-500/10 border border-orange-500/20' 
+                      : selectedTask.status === 'rejected' || selectedTask.status === 'cancelled'
+                      ? 'bg-red-500/10 border border-red-500/20'
+                      : 'bg-black-800'
+                  }`}>
+                    <p className="text-xs text-gray-500 uppercase mb-2">Supervisor Feedback</p>
+                    <p className="text-gray-300">{selectedTask.feedback}</p>
+                  </div>
+                ) : (
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-4">
+                    <p className="text-gray-400 italic">No specific feedback provided. Please contact your supervisor for more details.</p>
+                  </div>
+                )}
+                
+                {selectedTask.status === 'revision' && (
+                  <button
+                    onClick={() => {
+                      setSelectedTask(null);
+                      // Find the task and trigger the submit modal
+                      const task = tasks.find(t => t.id === selectedTask.id);
+                      if (task) {
+                        // Set task to in_progress to show submit modal
+                        handleStartTask(task.id);
+                      }
+                    }}
+                    className="w-full mt-4 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-500 transition-colors font-medium"
+                  >
+                    Start Revision
+                  </button>
+                )}
                 
                 <button
                   onClick={() => setSelectedTask(null)}
