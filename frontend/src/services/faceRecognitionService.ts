@@ -3,7 +3,8 @@
  * Provides face detection and recognition functionality for attendance system
  */
 
-import * as faceapi from 'face-api.js';
+// Dynamic import for face-api.js to avoid bundling issues
+let faceapi: typeof import('face-api.js') | null = null;
 
 // Models loaded flag
 let modelsLoaded = false;
@@ -13,7 +14,7 @@ let loadingPromise: Promise<void> | null = null;
 const MODEL_URL = '/models';
 
 /**
- * Load face-api.js models
+ * Load face-api.js library and models
  * Only loads once, subsequent calls return cached promise
  */
 export const loadModels = async (): Promise<void> => {
@@ -23,6 +24,12 @@ export const loadModels = async (): Promise<void> => {
   
   loadingPromise = (async () => {
     try {
+      console.log('Loading face-api.js library...');
+      
+      // Dynamic import of face-api.js
+      const faceapiModule = await import('face-api.js');
+      faceapi = faceapiModule;
+      
       console.log('Loading face detection models...');
       
       // Load the models we need
@@ -50,14 +57,6 @@ export const loadModels = async (): Promise<void> => {
 export const areModelsLoaded = (): boolean => modelsLoaded;
 
 /**
- * Detection options for TinyFaceDetector
- */
-const detectionOptions = new faceapi.TinyFaceDetectorOptions({
-  inputSize: 320,
-  scoreThreshold: 0.5
-});
-
-/**
  * Detect faces in a video element
  * Returns detection result with face count and confidence
  */
@@ -72,11 +71,17 @@ export interface FaceDetectionResult {
 export const detectFace = async (
   videoElement: HTMLVideoElement
 ): Promise<FaceDetectionResult> => {
-  if (!modelsLoaded) {
+  if (!modelsLoaded || !faceapi) {
     return { detected: false, faceCount: 0, confidence: 0, landmarks: false };
   }
   
   try {
+    // Create detection options
+    const detectionOptions = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 320,
+      scoreThreshold: 0.5
+    });
+    
     // Detect with landmarks for better accuracy
     const detections = await faceapi
       .detectAllFaces(videoElement, detectionOptions)
@@ -115,9 +120,14 @@ export const detectFace = async (
 export const getFaceDescriptor = async (
   videoElement: HTMLVideoElement
 ): Promise<Float32Array | null> => {
-  if (!modelsLoaded) return null;
+  if (!modelsLoaded || !faceapi) return null;
   
   try {
+    const detectionOptions = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 320,
+      scoreThreshold: 0.5
+    });
+    
     const detection = await faceapi
       .detectSingleFace(videoElement, detectionOptions)
       .withFaceLandmarks()
@@ -138,6 +148,8 @@ export const compareFaces = (
   descriptor1: Float32Array,
   descriptor2: Float32Array
 ): number => {
+  if (!faceapi) return 0;
+  
   const distance = faceapi.euclideanDistance(descriptor1, descriptor2);
   // Convert distance to similarity percentage
   // Distance of 0.6 or less is typically considered a match
