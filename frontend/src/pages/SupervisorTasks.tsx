@@ -658,13 +658,13 @@ const SupervisorTasks = () => {
                   </div>
 
                   {/* Submission preview for under_review tasks */}
-                  {task.status === 'under_review' && task.submission_text && (
+                  {task.status === 'under_review' && (task.submission_text || task.submission_notes) && (
                     <div className="mt-4 p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
                       <p className="text-xs text-amber-400 mb-2 flex items-center gap-2 font-medium">
                         <MessageSquare size={14} />
                         Trainee Submission
                       </p>
-                      <p className="text-gray-300 text-sm">{task.submission_text}</p>
+                      <p className="text-gray-300 text-sm">{task.submission_text || task.submission_notes}</p>
                       
                       {/* Show file count indicator */}
                       {task.submissions && task.submissions.filter(s => s.file_path).length > 0 && (
@@ -774,10 +774,10 @@ const SupervisorTasks = () => {
                           <p className="text-white mt-1">{formatDate(selectedTask.due_date)}</p>
                         </div>
                       </div>
-                      {selectedTask.submission_text && (
+                      {(selectedTask.submission_text || selectedTask.submission_notes) && (
                         <div>
                           <label className="text-xs text-gray-500 uppercase tracking-wider">Trainee Submission</label>
-                          <p className="text-gray-300 mt-2 p-4 bg-black-800 rounded-xl border border-gold-500/10">{selectedTask.submission_text}</p>
+                          <p className="text-gray-300 mt-2 p-4 bg-black-800 rounded-xl border border-gold-500/10">{selectedTask.submission_text || selectedTask.submission_notes}</p>
                         </div>
                       )}
                       
@@ -1010,11 +1010,11 @@ const SupervisorTasks = () => {
                     )}
 
                     {/* Trainee's Submission Text */}
-                    {selectedTask.submission_text && (
+                    {(selectedTask.submission_text || selectedTask.submission_notes) && (
                       <div>
                         <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Trainee's Response</label>
                         <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-                          <p className="text-gray-300 whitespace-pre-wrap">{selectedTask.submission_text}</p>
+                          <p className="text-gray-300 whitespace-pre-wrap">{selectedTask.submission_text || selectedTask.submission_notes}</p>
                         </div>
                       </div>
                     )}

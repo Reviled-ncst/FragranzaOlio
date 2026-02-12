@@ -20,6 +20,7 @@ export interface Task {
   due_date?: string;
   completed_at?: string;
   submission_text?: string;
+  submission_notes?: string;
   submission_file?: string;
   feedback?: string;
   rating?: number;
