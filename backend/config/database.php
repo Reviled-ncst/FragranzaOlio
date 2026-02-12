@@ -7,11 +7,12 @@
  * Control Panel → MySQL Databases
  */
 
-// Check if we're in production (InfinityFree) or local (XAMPP/ngrok)
+// Check if we're in production (InfinityFree) or local (XAMPP/ngrok/Cloudflare tunnel)
 $serverName = $_SERVER['SERVER_NAME'] ?? '';
 $isLocal = in_array($serverName, ['localhost', '127.0.0.1']) || 
            strpos($serverName, 'ngrok') !== false ||
-           strpos($serverName, 'ngrok-free.app') !== false;
+           strpos($serverName, 'ngrok-free.app') !== false ||
+           strpos($serverName, 'trycloudflare.com') !== false;
 $isProduction = !$isLocal;
 
 if ($isProduction) {

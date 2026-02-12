@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Backend URL - Use environment variable or default to ngrok URL
-const BACKEND_URL = process.env.BACKEND_URL || 'https://8e9b-136-158-49-118.ngrok-free.app';
+// Backend URL - Use environment variable or default to Cloudflare tunnel
+const BACKEND_URL = process.env.BACKEND_URL || 'https://mag-stuff-amsterdam-smilies.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses

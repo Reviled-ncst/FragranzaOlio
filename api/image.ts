@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Backend URL for images - ngrok tunnel to local XAMPP
-const BACKEND_URL = process.env.BACKEND_URL || 'https://8e9b-136-158-49-118.ngrok-free.app';
+// Backend URL for images - Cloudflare tunnel to local XAMPP
+const BACKEND_URL = process.env.BACKEND_URL || 'https://mag-stuff-amsterdam-smilies.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
