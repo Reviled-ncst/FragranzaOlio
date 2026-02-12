@@ -692,7 +692,7 @@ function getInventoryOverview($db) {
         (SELECT COUNT(DISTINCT branch_id) FROM branch_inventory WHERE product_id = p.id AND quantity > 0) as branches_with_stock
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.status = 'active'
+        WHERE p.is_active = 1
         ORDER BY p.name");
     
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
