@@ -51,10 +51,15 @@ export const apiFetch = async (url: string, options?: RequestInit): Promise<Resp
     const urlObj = new URL(url, window.location.origin);
     const pathname = urlObj.pathname;
     
-    // Extract the PHP file and action from the path
-    // Handle both /api/auth.php and /FragranzaWeb/backend/api/auth.php
-    const phpFileMatch = pathname.match(/\/([^/]+\.php)$/);
-    const endpoint = phpFileMatch ? phpFileMatch[1] : pathname.split('/').pop() || '';
+    // Extract the PHP file and any path after it
+    // Handle patterns like: /admin_users.php, /admin_users.php/stats, /admin_users.php/role/ojt
+    const phpMatch = pathname.match(/\/([^/]+\.php)(\/.*)?$/);
+    let endpoint = '';
+    if (phpMatch) {
+      endpoint = phpMatch[1] + (phpMatch[2] || ''); // e.g., "admin_users.php/stats"
+    } else {
+      endpoint = pathname.split('/').pop() || '';
+    }
     
     // Build proxy URL
     const proxyUrl = new URL('/api/proxy', window.location.origin);
@@ -92,9 +97,32 @@ const api = axios.create({
   },
 });
 
+// Helper to get auth headers
+const getAuthInfo = () => {
+  try {
+    const token = localStorage.getItem('fragranza_session');
+    const userStr = localStorage.getItem('fragranza_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    return { token, email: user?.email };
+  } catch {
+    return { token: null, email: null };
+  }
+};
+
 // Request interceptor - transform URLs for production proxy
 api.interceptors.request.use(
   (config) => {
+    // Add auth headers
+    const { token, email } = getAuthInfo();
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (email) {
+      config.headers = config.headers || {};
+      config.headers['X-Admin-Email'] = email;
+    }
+    
     if (isProduction && config.url) {
       // Extract the PHP file from URL like "/supervisor.php/dashboard" or "supervisor.php?action=x"
       const urlStr = config.url;

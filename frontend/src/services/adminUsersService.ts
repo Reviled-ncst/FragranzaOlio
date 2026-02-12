@@ -3,7 +3,7 @@
  * Fragranza Olio - User Management API
  */
 
-import { getToken } from './authServicePHP';
+import { getToken, getStoredUser } from './authServicePHP';
 import { API_BASE_URL, apiFetch } from './api';
 
 export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'admin';
@@ -101,9 +101,11 @@ interface ApiResponse<T> {
 
 const getAuthHeaders = (): HeadersInit => {
   const token = getToken();
+  const user = getStoredUser();
   return {
     'Content-Type': 'application/json',
     'Authorization': token ? `Bearer ${token}` : '',
+    ...(user?.email ? { 'X-Admin-Email': user.email } : {}),
   };
 };
 
