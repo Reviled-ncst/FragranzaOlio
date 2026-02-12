@@ -90,6 +90,40 @@ try {
 }
 
 /**
+ * Expand file_path JSON arrays into individual submission entries
+ * When multiple files are uploaded, they're stored as JSON in file_path
+ */
+function expandFilePathSubmissions($submissions) {
+    $expanded = [];
+    
+    foreach ($submissions as $submission) {
+        $filePath = $submission['file_path'];
+        
+        // Check if file_path is a JSON array (starts with '[')
+        if ($filePath && substr(trim($filePath), 0, 1) === '[') {
+            $files = json_decode($filePath, true);
+            if (is_array($files)) {
+                // Create a submission entry for each file
+                foreach ($files as $file) {
+                    $newSubmission = $submission;
+                    $newSubmission['file_path'] = $file['path'] ?? null;
+                    $newSubmission['file_name'] = $file['name'] ?? null;
+                    $newSubmission['file_size'] = $file['size'] ?? null;
+                    $newSubmission['file_type'] = $file['type'] ?? null;
+                    $expanded[] = $newSubmission;
+                }
+                continue;
+            }
+        }
+        
+        // Single file or no file - add as-is
+        $expanded[] = $submission;
+    }
+    
+    return $expanded;
+}
+
+/**
  * Get all tasks (with filters)
  */
 function getTasks($conn) {
@@ -168,7 +202,8 @@ function getTasks($conn) {
             ORDER BY submitted_at DESC
         ");
         $stmt->execute([$task['id']]);
-        $task['submissions'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rawSubmissions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $task['submissions'] = expandFilePathSubmissions($rawSubmissions);
     }
     
     echo json_encode([
@@ -209,7 +244,8 @@ function getTask($conn, $id) {
         ORDER BY submitted_at DESC
     ");
     $stmt->execute([$id]);
-    $task['submissions'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rawSubmissions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $task['submissions'] = expandFilePathSubmissions($rawSubmissions);
     
     echo json_encode([
         'success' => true,
