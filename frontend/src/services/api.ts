@@ -199,6 +199,8 @@ export const uploadFile = async (
     ? `${DIRECT_BACKEND_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
     : `${devApiUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
   
+  console.log('uploadFile: Starting upload to', url, 'isProduction:', isProduction);
+  
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     
@@ -225,8 +227,14 @@ export const uploadFile = async (
       }
     });
     
-    xhr.addEventListener('error', () => {
+    xhr.addEventListener('error', (e) => {
+      console.error('XHR upload error:', e, 'URL:', url, 'readyState:', xhr.readyState);
       reject({ message: 'Network error during upload' });
+    });
+    
+    xhr.addEventListener('abort', () => {
+      console.error('XHR upload aborted');
+      reject({ message: 'Upload was aborted' });
     });
     
     xhr.open('POST', url);
