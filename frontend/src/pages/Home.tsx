@@ -222,7 +222,7 @@ const Home = () => {
   return (
     <div className="overflow-hidden">
       {/* Hero Section - Black & Gold Theme */}
-      <section className="relative min-h-screen flex items-center justify-center bg-black-950 px-4 sm:px-0">
+      <section className="relative min-h-screen flex items-center justify-center bg-black-950">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
@@ -232,7 +232,7 @@ const Home = () => {
         {/* Gold gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-black-950 via-black-900/95 to-gold-900/20" />
 
-        <div className="container-custom relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-4 sm:px-6">
+        <div className="container-custom relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-6 md:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Hero Content */}
             <motion.div
