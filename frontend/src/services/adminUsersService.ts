@@ -300,6 +300,41 @@ export const adminUsersService = {
       return { success: false, message: 'Failed to fetch activity logs' };
     }
   },
+
+  /**
+   * Update user status (activate, suspend, terminate, complete_training, reactivate)
+   */
+  async updateUserStatus(userId: number, action: 'activate' | 'suspend' | 'terminate' | 'complete_training' | 'reactivate', reason?: string): Promise<ApiResponse<{ userId: number; previousStatus: string; newStatus: string }>> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/${userId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ action, reason }),
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Update user status error:', error);
+      return { success: false, message: 'Failed to update user status' };
+    }
+  },
+
+  /**
+   * Permanently delete a user (cannot be undone)
+   */
+  async permanentDeleteUser(userId: number): Promise<ApiResponse<void>> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/admin_users.php/permanent/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Permanent delete user error:', error);
+      return { success: false, message: 'Failed to permanently delete user' };
+    }
+  },
 };
 
 export default adminUsersService;

@@ -230,6 +230,14 @@ const AdminUsers = () => {
   const [userToDelete, setUserToDelete] = useState<AdminUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // User action modal
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [actionUser, setActionUser] = useState<AdminUser | null>(null);
+  const [actionType, setActionType] = useState<'activate' | 'suspend' | 'terminate' | 'complete_training' | 'reactivate' | 'permanent_delete' | null>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [isPerformingAction, setIsPerformingAction] = useState(false);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
   // Check URL params for action
   useEffect(() => {
     const action = searchParams.get('action');
@@ -457,6 +465,66 @@ const AdminUsers = () => {
     }
   };
 
+  const openActionModal = (user: AdminUser, action: typeof actionType) => {
+    setActionUser(user);
+    setActionType(action);
+    setActionReason('');
+    setActionSuccess(null);
+    setShowActionModal(true);
+  };
+
+  const handleUserAction = async () => {
+    if (!actionUser || !actionType) return;
+    
+    setIsPerformingAction(true);
+    try {
+      let response;
+      
+      if (actionType === 'permanent_delete') {
+        response = await adminUsersService.permanentDeleteUser(actionUser.id);
+      } else {
+        response = await adminUsersService.updateUserStatus(actionUser.id, actionType, actionReason || undefined);
+      }
+      
+      if (response.success) {
+        setActionSuccess(`Successfully ${actionType.replace('_', ' ')} ${actionUser.firstName} ${actionUser.lastName}`);
+        fetchUsers();
+        // Auto-close after 1.5 seconds
+        setTimeout(() => {
+          setShowActionModal(false);
+          setActionUser(null);
+          setActionType(null);
+          setActionSuccess(null);
+        }, 1500);
+      } else {
+        setError(response.message);
+      }
+    } catch (err) {
+      setError('Failed to perform action');
+    } finally {
+      setIsPerformingAction(false);
+    }
+  };
+
+  const getActionConfig = (action: typeof actionType) => {
+    switch (action) {
+      case 'activate':
+        return { title: 'Activate Account', icon: UserCheck, color: 'green', description: 'This will activate the user account, allowing them to log in and access the system.' };
+      case 'suspend':
+        return { title: 'Suspend Account', icon: UserX, color: 'yellow', description: 'Suspended accounts cannot log in. The user can be reactivated later.' };
+      case 'terminate':
+        return { title: 'Terminate Account', icon: UserX, color: 'red', description: 'This will deactivate the account and terminate any active OJT assignments. The account can be reactivated later.' };
+      case 'complete_training':
+        return { title: 'Complete Training', icon: GraduationCap, color: 'blue', description: 'This will mark the OJT training as completed. The account will remain active.' };
+      case 'reactivate':
+        return { title: 'Reactivate Account', icon: RefreshCw, color: 'green', description: 'This will reactivate the account and any terminated OJT assignments.' };
+      case 'permanent_delete':
+        return { title: 'Permanently Delete', icon: Trash2, color: 'red', description: 'WARNING: This will permanently delete the user and ALL related data. This action CANNOT be undone!' };
+      default:
+        return { title: 'Action', icon: AlertCircle, color: 'gray', description: '' };
+    }
+  };
+
   // Auth checks
   if (authLoading) {
     return (
@@ -653,16 +721,81 @@ const AdminUsers = () => {
                               >
                                 <Edit size={16} />
                               </button>
-                              <button
-                                onClick={() => {
-                                  setUserToDelete(u);
-                                  setShowDeleteConfirm(true);
-                                }}
-                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-black-700 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              <div className="relative group">
+                                <button
+                                  className="p-2 text-gray-400 hover:text-white hover:bg-black-700 rounded-lg transition-colors"
+                                  title="More Actions"
+                                >
+                                  <MoreVertical size={16} />
+                                </button>
+                                <div className="absolute right-0 top-full mt-1 w-48 bg-black-800 border border-gold-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
+                                  <div className="py-1">
+                                    {u.status !== 'active' && (
+                                      <button
+                                        onClick={() => openActionModal(u, 'activate')}
+                                        className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-green-500/10 flex items-center gap-2"
+                                      >
+                                        <UserCheck size={14} />
+                                        Activate
+                                      </button>
+                                    )}
+                                    {u.status === 'active' && (
+                                      <button
+                                        onClick={() => openActionModal(u, 'suspend')}
+                                        className="w-full px-4 py-2 text-left text-sm text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-2"
+                                      >
+                                        <UserX size={14} />
+                                        Suspend
+                                      </button>
+                                    )}
+                                    {u.role === 'ojt' && u.status === 'active' && (
+                                      <button
+                                        onClick={() => openActionModal(u, 'complete_training')}
+                                        className="w-full px-4 py-2 text-left text-sm text-blue-400 hover:bg-blue-500/10 flex items-center gap-2"
+                                      >
+                                        <GraduationCap size={14} />
+                                        Complete Training
+                                      </button>
+                                    )}
+                                    {(u.status === 'inactive' || u.status === 'suspended') && (
+                                      <button
+                                        onClick={() => openActionModal(u, 'reactivate')}
+                                        className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-green-500/10 flex items-center gap-2"
+                                      >
+                                        <RefreshCw size={14} />
+                                        Reactivate
+                                      </button>
+                                    )}
+                                    {u.status === 'active' && (
+                                      <button
+                                        onClick={() => openActionModal(u, 'terminate')}
+                                        className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"
+                                      >
+                                        <UserX size={14} />
+                                        Terminate
+                                      </button>
+                                    )}
+                                    <div className="border-t border-gold-500/10 my-1"></div>
+                                    <button
+                                      onClick={() => {
+                                        setUserToDelete(u);
+                                        setShowDeleteConfirm(true);
+                                      }}
+                                      className="w-full px-4 py-2 text-left text-sm text-gray-400 hover:bg-black-700 flex items-center gap-2"
+                                    >
+                                      <Trash2 size={14} />
+                                      Deactivate
+                                    </button>
+                                    <button
+                                      onClick={() => openActionModal(u, 'permanent_delete')}
+                                      className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2"
+                                    >
+                                      <Trash2 size={14} />
+                                      Delete Permanently
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -719,15 +852,33 @@ const AdminUsers = () => {
                         >
                           Edit
                         </button>
-                        <button
-                          onClick={() => {
-                            setUserToDelete(u);
-                            setShowDeleteConfirm(true);
-                          }}
-                          className="py-2 px-3 text-sm text-red-400 bg-black-800 rounded-lg hover:bg-red-500/10 transition-colors"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="relative group">
+                          <button className="py-2 px-3 text-sm text-gray-400 bg-black-800 rounded-lg hover:bg-black-700 transition-colors">
+                            <MoreVertical size={16} />
+                          </button>
+                          <div className="absolute right-0 bottom-full mb-1 w-48 bg-black-800 border border-gold-500/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-30">
+                            <div className="py-1">
+                              {u.status !== 'active' && (
+                                <button onClick={() => openActionModal(u, 'activate')} className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-green-500/10 flex items-center gap-2"><UserCheck size={14} />Activate</button>
+                              )}
+                              {u.status === 'active' && (
+                                <button onClick={() => openActionModal(u, 'suspend')} className="w-full px-4 py-2 text-left text-sm text-yellow-400 hover:bg-yellow-500/10 flex items-center gap-2"><UserX size={14} />Suspend</button>
+                              )}
+                              {u.role === 'ojt' && u.status === 'active' && (
+                                <button onClick={() => openActionModal(u, 'complete_training')} className="w-full px-4 py-2 text-left text-sm text-blue-400 hover:bg-blue-500/10 flex items-center gap-2"><GraduationCap size={14} />Complete Training</button>
+                              )}
+                              {(u.status === 'inactive' || u.status === 'suspended') && (
+                                <button onClick={() => openActionModal(u, 'reactivate')} className="w-full px-4 py-2 text-left text-sm text-green-400 hover:bg-green-500/10 flex items-center gap-2"><RefreshCw size={14} />Reactivate</button>
+                              )}
+                              {u.status === 'active' && (
+                                <button onClick={() => openActionModal(u, 'terminate')} className="w-full px-4 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 flex items-center gap-2"><UserX size={14} />Terminate</button>
+                              )}
+                              <div className="border-t border-gold-500/10 my-1"></div>
+                              <button onClick={() => { setUserToDelete(u); setShowDeleteConfirm(true); }} className="w-full px-4 py-2 text-left text-sm text-gray-400 hover:bg-black-700 flex items-center gap-2"><Trash2 size={14} />Deactivate</button>
+                              <button onClick={() => openActionModal(u, 'permanent_delete')} className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2"><Trash2 size={14} />Delete Permanently</button>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1367,6 +1518,123 @@ const AdminUsers = () => {
                   )}
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* User Action Modal */}
+      <AnimatePresence>
+        {showActionModal && actionUser && actionType && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => !isPerformingAction && setShowActionModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className={`bg-black-900 border ${actionType === 'permanent_delete' || actionType === 'terminate' ? 'border-red-500/30' : actionType === 'complete_training' ? 'border-blue-500/30' : actionType === 'activate' || actionType === 'reactivate' ? 'border-green-500/30' : 'border-gold-500/30'} rounded-xl p-6 max-w-md w-full`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {actionSuccess ? (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Check className="text-green-500" size={32} />
+                  </div>
+                  <p className="text-white font-medium">{actionSuccess}</p>
+                </div>
+              ) : (
+                <>
+                  {(() => {
+                    const config = getActionConfig(actionType);
+                    const IconComponent = config.icon;
+                    return (
+                      <>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className={`w-12 h-12 bg-${config.color}-500/20 rounded-full flex items-center justify-center`}>
+                            <IconComponent className={`text-${config.color}-500`} size={24} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-semibold text-white">{config.title}</h3>
+                            <p className="text-sm text-gray-400">{actionUser.firstName} {actionUser.lastName}</p>
+                          </div>
+                        </div>
+                        
+                        <p className="text-gray-300 mb-4 text-sm">{config.description}</p>
+                        
+                        {(actionType === 'suspend' || actionType === 'terminate') && (
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Reason (optional)
+                            </label>
+                            <textarea
+                              value={actionReason}
+                              onChange={(e) => setActionReason(e.target.value)}
+                              placeholder="Enter reason for this action..."
+                              className="w-full px-3 py-2 bg-black-800 border border-gold-500/20 rounded-lg text-white placeholder-gray-500 focus:border-gold-500 focus:outline-none resize-none"
+                              rows={3}
+                            />
+                          </div>
+                        )}
+                        
+                        {actionType === 'permanent_delete' && (
+                          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                            <p className="text-red-400 text-sm font-medium flex items-center gap-2">
+                              <AlertCircle size={16} />
+                              This will permanently delete:
+                            </p>
+                            <ul className="text-red-300 text-xs mt-2 space-y-1 ml-6">
+                              <li>• User account and profile</li>
+                              <li>• OJT assignments and attendance records</li>
+                              <li>• Timesheets and task history</li>
+                              <li>• All session and activity logs</li>
+                            </ul>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setShowActionModal(false)}
+                            disabled={isPerformingAction}
+                            className="flex-1 py-2.5 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleUserAction}
+                            disabled={isPerformingAction}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 ${
+                              actionType === 'permanent_delete' || actionType === 'terminate' 
+                                ? 'bg-red-500 hover:bg-red-600' 
+                                : actionType === 'complete_training' 
+                                ? 'bg-blue-500 hover:bg-blue-600' 
+                                : actionType === 'activate' || actionType === 'reactivate' 
+                                ? 'bg-green-500 hover:bg-green-600' 
+                                : 'bg-gold-500 hover:bg-gold-600'
+                            } text-white rounded-lg font-medium transition-all disabled:opacity-50`}
+                          >
+                            {isPerformingAction ? (
+                              <>
+                                <Loader2 size={16} className="animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <IconComponent size={16} />
+                                {config.title}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

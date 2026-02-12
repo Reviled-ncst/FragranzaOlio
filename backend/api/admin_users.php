@@ -670,6 +670,178 @@ class AdminUsersController {
     }
     
     /**
+     * Permanently delete a user (hard delete)
+     */
+    public function permanentDeleteUser($id) {
+        $admin = $this->verifyAdmin();
+        if (!$admin) {
+            return $this->response(false, 'Unauthorized. Admin access required.', null, 401);
+        }
+        
+        // Prevent admin from deleting themselves
+        if ($admin['id'] == $id) {
+            return $this->response(false, 'Cannot delete your own account', null, 400);
+        }
+        
+        try {
+            // Check if user exists
+            $stmt = $this->db->prepare("SELECT id, email, role, first_name, last_name, department, position FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                return $this->response(false, 'User not found', null, 404);
+            }
+            
+            // Delete related records first
+            $this->db->prepare("DELETE FROM ojt_assignments WHERE trainee_id = ? OR supervisor_id = ?")->execute([$id, $id]);
+            $this->db->prepare("DELETE FROM ojt_attendance WHERE trainee_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM ojt_timesheets WHERE trainee_id = ? OR supervisor_id = ?")->execute([$id, $id]);
+            $this->db->prepare("DELETE FROM ojt_tasks WHERE assigned_to = ? OR assigned_by = ?")->execute([$id, $id]);
+            $this->db->prepare("DELETE FROM user_sessions WHERE user_id = ?")->execute([$id]);
+            $this->db->prepare("DELETE FROM user_activity_log WHERE user_id = ?")->execute([$id]);
+            
+            // Hard delete the user
+            $stmt = $this->db->prepare("DELETE FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            
+            // Log the action
+            $targetName = $user['first_name'] . ' ' . $user['last_name'];
+            $this->logAction(
+                $admin,
+                'permanent_delete',
+                $id,
+                $targetName,
+                "Permanently deleted user {$user['email']} (Role: {$user['role']})",
+                [
+                    'email' => $user['email'],
+                    'role' => $user['role'],
+                    'department' => $user['department'],
+                    'position' => $user['position']
+                ],
+                null
+            );
+            
+            return $this->response(true, 'User permanently deleted');
+            
+        } catch (PDOException $e) {
+            error_log("Permanent delete user error: " . $e->getMessage());
+            return $this->response(false, 'Failed to permanently delete user', null, 500);
+        }
+    }
+    
+    /**
+     * Update user status (activate, suspend, terminate, complete training)
+     */
+    public function updateUserStatus($id, $data) {
+        $admin = $this->verifyAdmin();
+        if (!$admin) {
+            return $this->response(false, 'Unauthorized. Admin access required.', null, 401);
+        }
+        
+        $action = $data['action'] ?? null;
+        $reason = $data['reason'] ?? null;
+        
+        if (!$action) {
+            return $this->response(false, 'Action is required', null, 400);
+        }
+        
+        // Prevent admin from modifying themselves
+        if ($admin['id'] == $id) {
+            return $this->response(false, 'Cannot modify your own account status', null, 400);
+        }
+        
+        try {
+            // Check if user exists
+            $stmt = $this->db->prepare("SELECT id, email, role, first_name, last_name, status FROM users WHERE id = ?");
+            $stmt->execute([$id]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                return $this->response(false, 'User not found', null, 404);
+            }
+            
+            $targetName = $user['first_name'] . ' ' . $user['last_name'];
+            $oldStatus = $user['status'];
+            $newStatus = null;
+            $message = '';
+            
+            switch ($action) {
+                case 'activate':
+                    $newStatus = 'active';
+                    $message = "Activated user account";
+                    break;
+                    
+                case 'suspend':
+                    $newStatus = 'suspended';
+                    $message = "Suspended user account" . ($reason ? ": $reason" : "");
+                    break;
+                    
+                case 'terminate':
+                    $newStatus = 'inactive';
+                    $message = "Terminated user account" . ($reason ? ": $reason" : "");
+                    // Also terminate OJT assignment if applicable
+                    if ($user['role'] === 'ojt') {
+                        $stmt = $this->db->prepare("UPDATE ojt_assignments SET status = 'terminated', notes = CONCAT(IFNULL(notes, ''), '\nTerminated: ', ?) WHERE trainee_id = ? AND status = 'active'");
+                        $stmt->execute([$reason ?? 'Account terminated', $id]);
+                    }
+                    break;
+                    
+                case 'complete_training':
+                    if ($user['role'] !== 'ojt') {
+                        return $this->response(false, 'This action is only available for OJT trainees', null, 400);
+                    }
+                    $newStatus = 'active'; // Keep active but complete assignment
+                    $message = "Marked OJT training as completed";
+                    // Mark OJT assignment as completed
+                    $stmt = $this->db->prepare("UPDATE ojt_assignments SET status = 'completed', notes = CONCAT(IFNULL(notes, ''), '\nTraining completed on ', NOW()) WHERE trainee_id = ? AND status = 'active'");
+                    $stmt->execute([$id]);
+                    break;
+                    
+                case 'reactivate':
+                    $newStatus = 'active';
+                    $message = "Reactivated user account";
+                    // Reactivate OJT assignment if applicable
+                    if ($user['role'] === 'ojt') {
+                        $stmt = $this->db->prepare("UPDATE ojt_assignments SET status = 'active' WHERE trainee_id = ? AND status IN ('terminated', 'completed') ORDER BY created_at DESC LIMIT 1");
+                        $stmt->execute([$id]);
+                    }
+                    break;
+                    
+                default:
+                    return $this->response(false, 'Invalid action', null, 400);
+            }
+            
+            // Update user status
+            if ($newStatus) {
+                $stmt = $this->db->prepare("UPDATE users SET status = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$newStatus, $id]);
+            }
+            
+            // Log the action
+            $this->logAction(
+                $admin,
+                $action,
+                $id,
+                $targetName,
+                $message,
+                ['status' => $oldStatus],
+                ['status' => $newStatus, 'reason' => $reason]
+            );
+            
+            return $this->response(true, ucfirst(str_replace('_', ' ', $action)) . " successful", [
+                'userId' => (int)$id,
+                'previousStatus' => $oldStatus,
+                'newStatus' => $newStatus
+            ]);
+            
+        } catch (PDOException $e) {
+            error_log("Update user status error: " . $e->getMessage());
+            return $this->response(false, 'Failed to update user status', null, 500);
+        }
+    }
+    
+    /**
      * Get users by role (for supervisor dropdown, etc.)
      */
     public function getUsersByRole($role) {
@@ -997,8 +1169,19 @@ switch ($method) {
         break;
         
     case 'DELETE':
-        if ($id) {
+        if ($action === 'permanent' && $id) {
+            $controller->permanentDeleteUser($id);
+        } elseif ($id) {
             $controller->deleteUser($id);
+        } else {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'User ID required']);
+        }
+        break;
+    
+    case 'PATCH':
+        if ($id) {
+            $controller->updateUserStatus($id, $data);
         } else {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'User ID required']);
