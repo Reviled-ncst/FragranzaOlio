@@ -8,9 +8,11 @@
       "runtime": "@vercel/node@3.0.0"
     }
   },
-  "rewrites": [
-    { "source": "/api/proxy/:path*", "destination": "/api/proxy.ts" },
-    { "source": "/api/image", "destination": "/api/image.ts" },
-    { "source": "/((?!api|assets|favicon).*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/proxy(.*)", "dest": "/api/proxy.ts" },
+    { "src": "/api/image(.*)", "dest": "/api/image.ts" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
