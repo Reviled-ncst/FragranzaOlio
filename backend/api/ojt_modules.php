@@ -37,7 +37,7 @@ try {
                         mp.score
                     FROM ojt_modules m
                     LEFT JOIN ojt_module_progress mp ON m.id = mp.module_id AND mp.trainee_id = ?
-                    ORDER BY m.sequence_order ASC
+                    ORDER BY m.order_index ASC
                 ");
                 $stmt->execute([$traineeId]);
                 $modules = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -88,7 +88,7 @@ try {
                 }
             } else {
                 // Get all modules
-                $stmt = $pdo->query("SELECT * FROM ojt_modules ORDER BY sequence_order ASC");
+                $stmt = $pdo->query("SELECT * FROM ojt_modules ORDER BY order_index ASC");
                 $modules = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 echo json_encode(['success' => true, 'modules' => $modules]);
             }
@@ -146,18 +146,16 @@ try {
             } else {
                 // Create new module (admin only)
                 $stmt = $pdo->prepare("
-                    INSERT INTO ojt_modules (title, description, category, duration_hours, content_type, content_url, sequence_order, is_required)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO ojt_modules (title, description, content, duration_hours, order_index, is_active)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $data['title'],
                     $data['description'] ?? null,
-                    $data['category'] ?? 'orientation',
-                    $data['duration_hours'] ?? 1.00,
-                    $data['content_type'] ?? 'reading',
-                    $data['content_url'] ?? null,
-                    $data['sequence_order'] ?? 0,
-                    $data['is_required'] ?? true
+                    $data['content'] ?? null,
+                    $data['duration_hours'] ?? 1,
+                    $data['order_index'] ?? 0,
+                    $data['is_active'] ?? 1
                 ]);
                 
                 $moduleId = $pdo->lastInsertId();
@@ -179,23 +177,19 @@ try {
                 UPDATE ojt_modules SET 
                     title = COALESCE(?, title),
                     description = COALESCE(?, description),
-                    category = COALESCE(?, category),
+                    content = COALESCE(?, content),
                     duration_hours = COALESCE(?, duration_hours),
-                    content_type = COALESCE(?, content_type),
-                    content_url = COALESCE(?, content_url),
-                    sequence_order = COALESCE(?, sequence_order),
-                    is_required = COALESCE(?, is_required)
+                    order_index = COALESCE(?, order_index),
+                    is_active = COALESCE(?, is_active)
                 WHERE id = ?
             ");
             $stmt->execute([
                 $data['title'] ?? null,
                 $data['description'] ?? null,
-                $data['category'] ?? null,
+                $data['content'] ?? null,
                 $data['duration_hours'] ?? null,
-                $data['content_type'] ?? null,
-                $data['content_url'] ?? null,
-                $data['sequence_order'] ?? null,
-                $data['is_required'] ?? null,
+                $data['order_index'] ?? null,
+                $data['is_active'] ?? null,
                 $moduleId
             ]);
             
