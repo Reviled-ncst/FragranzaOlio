@@ -588,25 +588,25 @@ function handleTaskReview($conn, $method, $taskId) {
     
     switch ($action) {
         case 'approve':
-            $newStatus = 'completed';
+            $newStatus = 'approved';
             $notificationTitle = 'Task Approved! 🎉';
             $notificationMessage = "Your task \"{$task['title']}\" has been approved" . ($score ? " with a score of $score/5" : "") . ".";
             $actionType = 'task_approved';
             break;
         case 'reject':
-            $newStatus = 'cancelled';
+            $newStatus = 'rejected';
             $notificationTitle = 'Task Rejected';
             $notificationMessage = "Your task \"{$task['title']}\" has been rejected. " . ($feedback ? "Feedback: $feedback" : "Please contact your supervisor for more details.");
             $actionType = 'task_rejected';
             break;
         case 'revise':
-            $newStatus = 'pending';
+            $newStatus = 'revision';
             $notificationTitle = 'Task Needs Revision';
             $notificationMessage = "Your task \"{$task['title']}\" requires revision. " . ($feedback ? "Feedback: $feedback" : "Please review and resubmit.");
             $actionType = 'task_revised';
             break;
         default:
-            $newStatus = $action === 'approve' ? 'completed' : 'pending';
+            $newStatus = $action === 'approve' ? 'approved' : 'pending';
     }
     
     $query = "UPDATE ojt_tasks SET status = ?, feedback = ?, score = ?";

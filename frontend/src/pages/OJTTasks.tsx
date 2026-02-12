@@ -28,7 +28,7 @@ interface Task {
   title: string;
   description: string;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'under_review' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'under_review' | 'completed' | 'cancelled' | 'approved' | 'rejected' | 'revision' | 'submitted';
   due_date: string;
   assigned_by_name?: string;
   feedback?: string;
@@ -206,32 +206,43 @@ const OJTTasks = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'completed':
+      case 'approved': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'in_progress': return 'bg-gold-500/20 text-gold-400 border-gold-500/30';
-      case 'under_review': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      case 'under_review':
+      case 'submitted': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
       case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-      case 'cancelled': return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+      case 'revision': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'cancelled':
+      case 'rejected': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed': return <CheckCircle size={16} />;
+      case 'completed':
+      case 'approved': return <CheckCircle size={16} />;
       case 'in_progress': return <Clock size={16} />;
-      case 'under_review': return <FileText size={16} />;
+      case 'under_review':
+      case 'submitted': return <FileText size={16} />;
       case 'pending': return <AlertCircle size={16} />;
+      case 'revision': return <AlertCircle size={16} />;
+      case 'cancelled':
+      case 'rejected': return <XCircle size={16} />;
       default: return <XCircle size={16} />;
     }
   };
 
   const filteredTasks = tasks.filter(task => {
     if (filter === 'all') return true;
+    // Handle 'completed' filter to also include 'approved' status
+    if (filter === 'completed') return task.status === 'completed' || task.status === 'approved';
     return task.status === filter;
   });
 
   const isOverdue = (dueDate: string) => {
-    return new Date(dueDate) < new Date() && !['completed', 'cancelled'].includes(filteredTasks.find(t => t.due_date === dueDate)?.status || '');
+    return new Date(dueDate) < new Date() && !['completed', 'cancelled', 'approved', 'rejected'].includes(filteredTasks.find(t => t.due_date === dueDate)?.status || '');
   };
 
   if (authLoading) {
@@ -285,7 +296,7 @@ const OJTTasks = () => {
             <div className="bg-black-800 border border-gold-500/20 rounded-lg px-4 py-2">
               <p className="text-xs text-gray-400">Completed</p>
               <p className="text-xl font-bold text-green-400">
-                {tasks.filter(t => t.status === 'completed').length}
+                {tasks.filter(t => t.status === 'completed' || t.status === 'approved').length}
               </p>
             </div>
           </div>

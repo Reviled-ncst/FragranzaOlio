@@ -16,7 +16,7 @@ export interface Task {
   assigned_to: number;
   assigned_by: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'pending' | 'in_progress' | 'under_review' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'under_review' | 'completed' | 'cancelled' | 'approved' | 'rejected' | 'revision' | 'submitted';
   due_date?: string;
   completed_at?: string;
   submission_text?: string;
