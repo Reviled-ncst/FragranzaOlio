@@ -7,6 +7,9 @@ const isProduction = typeof window !== 'undefined' &&
 // For development only - never use in production
 const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
+// Direct backend URL for file uploads (bypasses Vercel proxy size limits)
+const DIRECT_BACKEND_URL = 'https://path-etc-wanted-operated.trycloudflare.com/backend/api';
+
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;
 
@@ -182,5 +185,63 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+/**
+ * Upload files directly to backend (bypasses Vercel proxy size limits)
+ * Use this for file uploads > 4MB
+ */
+export const uploadFile = async (
+  endpoint: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void
+): Promise<any> => {
+  const url = isProduction 
+    ? `${DIRECT_BACKEND_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
+    : `${devApiUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable && onProgress) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
+    });
+    
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          resolve(xhr.responseText);
+        }
+      } else {
+        try {
+          reject(JSON.parse(xhr.responseText));
+        } catch {
+          reject({ message: xhr.statusText || 'Upload failed' });
+        }
+      }
+    });
+    
+    xhr.addEventListener('error', () => {
+      reject({ message: 'Network error during upload' });
+    });
+    
+    xhr.open('POST', url);
+    
+    // Add auth headers
+    const authInfo = getAuthInfo();
+    if (authInfo.token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${authInfo.token}`);
+    }
+    if (authInfo.email) {
+      xhr.setRequestHeader('X-Admin-Email', authInfo.email);
+    }
+    
+    xhr.send(formData);
+  });
+};
 
 export default api;

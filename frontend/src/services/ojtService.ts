@@ -3,7 +3,7 @@
  * Handles all OJT-related API calls (tasks, timesheets, attendance)
  */
 
-import api from './api';
+import api, { uploadFile } from './api';
 
 // ============ TASKS ============
 
@@ -122,6 +122,7 @@ class OjtTaskService {
 
   /**
    * Submit task (trainee submitting work)
+   * Uses direct upload to bypass Vercel proxy size limits for file uploads
    */
   async submitTask(
     taskId: number,
@@ -148,8 +149,12 @@ class OjtTaskService {
     if (data.file) {
       formData.append('file', data.file);
       formData.append('submission_type', 'file');
+      // Use direct upload for files to bypass Vercel 4.5MB limit
+      await uploadFile(`${TASKS_API}/${taskId}/submit`, formData);
+      return;
     }
     
+    // For text/link submissions, use regular API
     await api.post(`${TASKS_API}/${taskId}/submit`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
