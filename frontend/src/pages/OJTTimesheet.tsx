@@ -142,7 +142,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
           detectionCountRef.current = 0;
         }
         
-        // Calculate quality score based on face size and position (not raw detection score)
+        // Calculate quality score based on face size and position
         if (result.detected && result.box && video) {
           const frameWidth = video.videoWidth;
           const frameHeight = video.videoHeight;
@@ -153,26 +153,29 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
           const frameCenterX = frameWidth / 2;
           const frameCenterY = frameHeight / 2;
           
-          // Size score: face should be 15-50% of frame width (ideal ~25%)
+          // Size score: face should be at least 10% of frame width
+          // More forgiving - any reasonably sized face is good
           const sizeRatio = faceWidth / frameWidth;
-          let sizeScore = 0;
-          if (sizeRatio >= 0.15 && sizeRatio <= 0.50) {
-            // Peak at 25%, falls off toward edges
-            sizeScore = 1 - Math.abs(sizeRatio - 0.25) / 0.25;
-            sizeScore = Math.max(0, Math.min(1, sizeScore));
-          } else if (sizeRatio > 0.50) {
-            sizeScore = 0.7; // Too close but still okay
+          let sizeScore = 1;
+          if (sizeRatio < 0.10) {
+            // Too small - face too far
+            sizeScore = sizeRatio / 0.10;
+          } else if (sizeRatio >= 0.10) {
+            // Good size or close - full score
+            sizeScore = 1;
           }
           
-          // Position score: face should be centered
+          // Position score: face should be reasonably centered (more forgiving)
           const maxDistX = frameWidth / 2;
           const maxDistY = frameHeight / 2;
           const distX = Math.abs(faceCenterX - frameCenterX) / maxDistX;
           const distY = Math.abs(faceCenterY - frameCenterY) / maxDistY;
-          const positionScore = 1 - Math.sqrt(distX * distX + distY * distY) / Math.sqrt(2);
+          // More forgiving - only penalize if very off-center
+          const positionScore = Math.max(0, 1 - (distX * 0.5 + distY * 0.5));
           
-          // Combined score (size 60%, position 40%)
-          const qualityScore = (sizeScore * 0.6 + positionScore * 0.4) * 100;
+          // Combined score - base 50% just for detecting, rest from quality
+          // Size 30%, Position 20%
+          const qualityScore = 50 + (sizeScore * 30) + (positionScore * 20);
           
           // Very slow smooth transition - only move 5% toward target per frame
           const targetScore = Math.min(99, Math.max(30, qualityScore));
