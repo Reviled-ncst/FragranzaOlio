@@ -248,7 +248,7 @@ const Home = () => {
                 Discover the Art of
                 <span className="text-gradient-gold block">Luxury Scents</span>
               </h1>
-              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 max-w-full sm:max-w-lg mx-auto lg:mx-0">
+              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 lg:max-w-lg mx-auto lg:mx-0">
                 Experience exquisite fragrances and premium cosmetics crafted with passion, 
                 precision, and the finest ingredients from around the world.
               </p>
