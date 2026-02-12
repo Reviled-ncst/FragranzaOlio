@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -15,8 +16,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface AnalyticsData {
   revenue: {
@@ -59,7 +58,7 @@ const SalesAnalytics = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=analytics&period=${period}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=analytics&period=${period}`);
       const data = await response.json();
       
       if (data.success) {
@@ -372,3 +371,4 @@ const SalesAnalytics = () => {
 };
 
 export default SalesAnalytics;
+

@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -17,8 +18,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface UserSettings {
   user_id: string;
@@ -83,7 +82,7 @@ const SalesSettings = () => {
   const fetchSettings = async () => {
     try {
       setIsLoadingSettings(true);
-      const response = await fetch(`${API_URL}/sales.php?action=settings&user_id=${user?.id}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=settings&user_id=${user?.id}`);
       const data = await response.json();
       
       if (data.success && data.data) {
@@ -127,7 +126,7 @@ const SalesSettings = () => {
     setSaveMessage(null);
     
     try {
-      const response = await fetch(`${API_URL}/sales.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +160,7 @@ const SalesSettings = () => {
     setSaveMessage(null);
     
     try {
-      const response = await fetch(`${API_URL}/sales.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +195,7 @@ const SalesSettings = () => {
     setSaveMessage(null);
     
     try {
-      const response = await fetch(`${API_URL}/sales.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -239,7 +238,7 @@ const SalesSettings = () => {
     setSaveMessage(null);
     
     try {
-      const response = await fetch(`${API_URL}/sales.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -635,3 +634,4 @@ const SalesSettings = () => {
 };
 
 export default SalesSettings;
+

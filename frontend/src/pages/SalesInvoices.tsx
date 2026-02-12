@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -18,8 +19,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface Invoice {
   id: number;
@@ -79,7 +78,7 @@ const SalesInvoices = () => {
         params.append('status', statusFilter);
       }
       
-      const response = await fetch(`${API_URL}/sales.php?${params}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -98,7 +97,7 @@ const SalesInvoices = () => {
 
   const updateInvoiceStatus = async (invoiceId: number, newStatus: string) => {
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=invoice-status`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=invoice-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: invoiceId, status: newStatus })
@@ -487,3 +486,4 @@ const SalesInvoices = () => {
 };
 
 export default SalesInvoices;
+

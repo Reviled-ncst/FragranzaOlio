@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -29,8 +30,6 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface OrderItem {
   id: number;
@@ -148,7 +147,7 @@ const SalesOrders = () => {
         params.append('search', searchQuery);
       }
       
-      const response = await fetch(`${API_URL}/sales.php?${params}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -193,7 +192,7 @@ const SalesOrders = () => {
       setTimeout(async () => {
         try {
           const params = new URLSearchParams({ action: 'orders', search: orderNumber });
-          const response = await fetch(`${API_URL}/sales.php?${params}`);
+          const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
           const data = await response.json();
           
           if (data.success && data.data?.length > 0) {
@@ -217,7 +216,7 @@ const SalesOrders = () => {
             }
             
             // Auto-complete the transaction
-            const completeResponse = await fetch(`${API_URL}/sales.php?action=order-status`, {
+            const completeResponse = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
@@ -330,7 +329,7 @@ const SalesOrders = () => {
   const fetchOrderDetail = async (orderId: number) => {
     setIsLoadingDetail(true);
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=order&id=${orderId}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=order&id=${orderId}`);
       const data = await response.json();
       
       if (data.success) {
@@ -528,7 +527,7 @@ const SalesOrders = () => {
     
     try {
       // Update order status to delivered
-      await fetch(`${API_URL}/sales.php?action=order-status`, {
+      await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: orderId, status: 'delivered', payment_status: 'paid' })
@@ -548,7 +547,7 @@ const SalesOrders = () => {
 
   const updateOrderStatus = async (orderId: number, newStatus: string) => {
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=order-status`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: orderId, status: newStatus })
@@ -1285,3 +1284,5 @@ const SalesOrders = () => {
 };
 
 export default SalesOrders;
+
+

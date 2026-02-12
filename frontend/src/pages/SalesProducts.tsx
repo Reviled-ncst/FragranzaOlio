@@ -2531,3 +2531,4 @@ const SalesProducts = () => {
 };
 
 export default SalesProducts;
+

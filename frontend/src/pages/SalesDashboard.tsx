@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -23,8 +24,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface DashboardStats {
   totalSales: number;
@@ -85,7 +84,7 @@ const SalesDashboard = () => {
     
     try {
       // Fetch dashboard stats
-      const dashboardRes = await fetch(`${API_URL}/sales.php?action=dashboard&period=${dateRange}`);
+      const dashboardRes = await apiFetch(`${API_BASE_URL}/sales.php?action=dashboard&period=${dateRange}`);
       const dashboardData = await dashboardRes.json();
       
       if (dashboardData.success) {
@@ -109,7 +108,7 @@ const SalesDashboard = () => {
       
       // Fallback to fetch orders and customers separately if not included
       if (!dashboardData.data?.recent_orders) {
-        const ordersRes = await fetch(`${API_URL}/sales.php?action=orders&limit=5`);
+        const ordersRes = await apiFetch(`${API_BASE_URL}/sales.php?action=orders&limit=5`);
         const ordersData = await ordersRes.json();
         if (ordersData.success) {
           setRecentOrders(ordersData.data.slice(0, 5));
@@ -117,7 +116,7 @@ const SalesDashboard = () => {
       }
       
       if (!dashboardData.data?.top_customers) {
-        const customersRes = await fetch(`${API_URL}/sales.php?action=customers&limit=4`);
+        const customersRes = await apiFetch(`${API_BASE_URL}/sales.php?action=customers&limit=4`);
         const customersData = await customersRes.json();
         if (customersData.success) {
           setTopCustomers(customersData.data.slice(0, 4));
@@ -578,3 +577,4 @@ const SalesDashboard = () => {
 };
 
 export default SalesDashboard;
+

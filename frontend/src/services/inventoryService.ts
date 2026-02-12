@@ -2,7 +2,7 @@
  * Inventory Service - Handles all inventory management API calls
  */
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 
 const API_URL = API_BASE_URL;
 
@@ -148,7 +148,7 @@ export interface AdjustmentData {
 export const inventoryService = {
   // Get all branches
   async getBranches(): Promise<Branch[]> {
-    const response = await fetch(`${API_URL}/inventory.php?action=branches`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=branches`, {
       credentials: 'include',
     });
     const data = await response.json();
@@ -162,7 +162,7 @@ export const inventoryService = {
     if (branchId) url += `&branch_id=${branchId}`;
     if (productId) url += `&product_id=${productId}`;
     
-    const response = await fetch(url, { credentials: 'include' });
+    const response = await apiFetch(url, { credentials: 'include' });
     const data = await response.json();
     if (!data.success) throw new Error(data.error);
     return data.data;
@@ -174,7 +174,7 @@ export const inventoryService = {
     if (type) url += `&type=${type}`;
     if (branchId) url += `&branch_id=${branchId}`;
     
-    const response = await fetch(url, { credentials: 'include' });
+    const response = await apiFetch(url, { credentials: 'include' });
     const data = await response.json();
     if (!data.success) throw new Error(data.error);
     return data.data;
@@ -182,7 +182,7 @@ export const inventoryService = {
 
   // Get alerts
   async getAlerts(): Promise<StockAlert[]> {
-    const response = await fetch(`${API_URL}/inventory.php?action=alerts`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=alerts`, {
       credentials: 'include',
     });
     const data = await response.json();
@@ -192,7 +192,7 @@ export const inventoryService = {
 
   // Get dashboard stats
   async getDashboardStats(): Promise<DashboardStats> {
-    const response = await fetch(`${API_URL}/inventory.php?action=dashboard`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=dashboard`, {
       credentials: 'include',
     });
     const data = await response.json();
@@ -202,7 +202,7 @@ export const inventoryService = {
 
   // Stock In
   async stockIn(stockData: StockInData): Promise<{ transaction_code: string; quantity_added: number }> {
-    const response = await fetch(`${API_URL}/inventory.php?action=stock-in`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=stock-in`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -215,7 +215,7 @@ export const inventoryService = {
 
   // Stock Out
   async stockOut(stockData: StockOutData): Promise<{ transaction_code: string; quantity_removed: number }> {
-    const response = await fetch(`${API_URL}/inventory.php?action=stock-out`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=stock-out`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -228,7 +228,7 @@ export const inventoryService = {
 
   // Transfer Stock
   async transferStock(transferData: TransferData): Promise<{ transaction_code: string; status: string; quantity_transferred: number }> {
-    const response = await fetch(`${API_URL}/inventory.php?action=transfer`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=transfer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -241,7 +241,7 @@ export const inventoryService = {
 
   // Complete Transfer
   async completeTransfer(transactionCode: string, receivedRemarks?: string): Promise<void> {
-    const response = await fetch(`${API_URL}/inventory.php?action=complete-transfer`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=complete-transfer`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -253,7 +253,7 @@ export const inventoryService = {
 
   // Adjust Stock
   async adjustStock(adjustmentData: AdjustmentData): Promise<{ transaction_code: string; previous_quantity: number; new_quantity: number; difference: number }> {
-    const response = await fetch(`${API_URL}/inventory.php?action=adjustment`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=adjustment`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -266,7 +266,7 @@ export const inventoryService = {
 
   // Create Branch
   async createBranch(branchData: Partial<Branch>): Promise<{ id: number }> {
-    const response = await fetch(`${API_URL}/inventory.php?action=branch`, {
+    const response = await apiFetch(`${API_URL}/inventory.php?action=branch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
@@ -279,3 +279,4 @@ export const inventoryService = {
 };
 
 export default inventoryService;
+

@@ -1194,3 +1194,4 @@ const SalesInventory = () => {
 };
 
 export default SalesInventory;
+

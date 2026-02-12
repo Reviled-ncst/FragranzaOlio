@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -21,8 +22,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface Customer {
   id: number;
@@ -77,7 +76,7 @@ const SalesCustomers = () => {
         params.append('status', statusFilter);
       }
       
-      const response = await fetch(`${API_URL}/sales.php?${params}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -98,7 +97,7 @@ const SalesCustomers = () => {
     if (!editForm.id) return;
     
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=customer`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=customer`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm)
@@ -122,7 +121,7 @@ const SalesCustomers = () => {
     if (!confirm('Are you sure you want to delete this customer?')) return;
     
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=customer&id=${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=customer&id=${id}`, {
         method: 'DELETE'
       });
       const data = await response.json();
@@ -565,3 +564,4 @@ const SalesCustomers = () => {
 };
 
 export default SalesCustomers;
+

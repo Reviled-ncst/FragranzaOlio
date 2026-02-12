@@ -1,3 +1,4 @@
+import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -18,8 +19,6 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SalesLayout from '../components/layout/SalesLayout';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost/FragranzaWeb/backend/api';
 
 interface Complaint {
   id: number;
@@ -89,7 +88,7 @@ const SalesComplaints = () => {
         params.append('status', statusFilter);
       }
       
-      const response = await fetch(`${API_URL}/sales.php?${params}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
       const data = await response.json();
       
       if (data.success) {
@@ -108,7 +107,7 @@ const SalesComplaints = () => {
 
   const fetchComplaintDetail = async (id: number) => {
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=complaint&id=${id}`);
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=complaint&id=${id}`);
       const data = await response.json();
       
       if (data.success) {
@@ -124,7 +123,7 @@ const SalesComplaints = () => {
     
     setIsSending(true);
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=complaint-message`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=complaint-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -153,7 +152,7 @@ const SalesComplaints = () => {
 
   const updateComplaintStatus = async (id: number, status: string, resolution?: string) => {
     try {
-      const response = await fetch(`${API_URL}/sales.php?action=complaint-status`, {
+      const response = await apiFetch(`${API_BASE_URL}/sales.php?action=complaint-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -558,3 +557,4 @@ const SalesComplaints = () => {
 };
 
 export default SalesComplaints;
+
