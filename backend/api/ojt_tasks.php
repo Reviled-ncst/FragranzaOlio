@@ -331,7 +331,7 @@ function updateTask($conn, $id) {
     $updates = [];
     $params = [];
     
-    $allowedFields = ['title', 'description', 'assigned_to', 'priority', 'status', 'due_date', 'feedback', 'rating'];
+    $allowedFields = ['title', 'description', 'assigned_to', 'priority', 'status', 'due_date', 'feedback', 'score'];
     
     foreach ($allowedFields as $field) {
         if (isset($input[$field])) {
@@ -555,7 +555,7 @@ function handleTaskReview($conn, $method, $taskId) {
     
     $action = $input['action'] ?? null; // 'approve', 'reject', or 'revise'
     $feedback = $input['feedback'] ?? null;
-    $rating = $input['rating'] ?? null;
+    $score = $input['rating'] ?? $input['score'] ?? null;
     $supervisorId = $input['supervisor_id'] ?? $input['reviewed_by'] ?? null;
     
     if (!$action) {
@@ -590,7 +590,7 @@ function handleTaskReview($conn, $method, $taskId) {
         case 'approve':
             $newStatus = 'completed';
             $notificationTitle = 'Task Approved! 🎉';
-            $notificationMessage = "Your task \"{$task['title']}\" has been approved" . ($rating ? " with a rating of $rating/5" : "") . ".";
+            $notificationMessage = "Your task \"{$task['title']}\" has been approved" . ($score ? " with a score of $score/5" : "") . ".";
             $actionType = 'task_approved';
             break;
         case 'reject':
@@ -609,8 +609,8 @@ function handleTaskReview($conn, $method, $taskId) {
             $newStatus = $action === 'approve' ? 'completed' : 'pending';
     }
     
-    $query = "UPDATE ojt_tasks SET status = ?, feedback = ?, rating = ?";
-    $params = [$newStatus, $feedback, $rating];
+    $query = "UPDATE ojt_tasks SET status = ?, feedback = ?, score = ?";
+    $params = [$newStatus, $feedback, $score];
     
     if ($action === 'approve') {
         $query .= ", completed_at = NOW()";
