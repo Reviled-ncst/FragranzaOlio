@@ -16,7 +16,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, apiFetch } from '../services/api';
 
 interface Module {
   id: number;
@@ -51,7 +51,7 @@ const OJTModules = () => {
       
       try {
         setIsLoading(true);
-        const response = await fetch(`${API_BASE_URL}/ojt_modules.php?trainee_id=${user.id}`);
+        const response = await apiFetch(`${API_BASE_URL}/ojt_modules.php?trainee_id=${user.id}`);
         const data = await response.json();
         
         if (data.success) {
@@ -102,7 +102,7 @@ const OJTModules = () => {
     if (!user?.id) return;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ojt_modules.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_modules.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -357,3 +357,6 @@ const OJTModules = () => {
 };
 
 export default OJTModules;
+
+
+

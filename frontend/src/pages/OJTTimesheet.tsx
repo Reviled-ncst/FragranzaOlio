@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, apiFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
 
@@ -208,7 +208,7 @@ export default function OJTTimesheet() {
       const today = getLocalDateString();
       
       // Get today's attendance
-      const todayRes = await fetch(`${API_BASE_URL}/ojt_attendance.php/today?trainee_id=${user.id}`);
+      const todayRes = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/today?trainee_id=${user.id}`);
       const todayData = await todayRes.json();
       if (todayData.success && todayData.data) {
         // Handle array or single object
@@ -236,7 +236,7 @@ export default function OJTTimesheet() {
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
 
-      const weekRes = await fetch(
+      const weekRes = await apiFetch(
         `${API_BASE_URL}/ojt_attendance.php/history?trainee_id=${user.id}&start_date=${getLocalDateString(weekStart)}&end_date=${getLocalDateString(weekEnd)}`
       );
       const weekData = await weekRes.json();
@@ -274,7 +274,7 @@ export default function OJTTimesheet() {
       const timeIn = now.toTimeString().slice(0, 8);
       const { lateMinutes, penaltyHours } = calculateLatePenalty(timeIn);
 
-      const res = await fetch(`${API_BASE_URL}/ojt_attendance.php/clock-in`, {
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/clock-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,7 +309,7 @@ export default function OJTTimesheet() {
     setShowCamera(false);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/ojt_attendance.php/clock-out`, {
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/clock-out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -338,7 +338,7 @@ export default function OJTTimesheet() {
     setActionLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/ojt_attendance.php/break-start`, {
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/break-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -366,7 +366,7 @@ export default function OJTTimesheet() {
     setActionLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/ojt_attendance.php/break-end`, {
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/break-end`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -675,3 +675,6 @@ export default function OJTTimesheet() {
     </OJTLayout>
   );
 }
+
+
+

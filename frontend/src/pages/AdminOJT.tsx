@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, apiFetch } from '../services/api';
 import { 
   GraduationCap, 
   Users, 
@@ -69,7 +69,7 @@ export default function AdminOJT() {
     setIsLoading(true);
     try {
       // Fetch trainees - only active ones
-      const traineesRes = await fetch(`${API_BASE_URL}/admin_users.php?role=ojt&status=active`, {
+      const traineesRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt&status=active`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
       const traineesData = await traineesRes.json();
@@ -95,7 +95,7 @@ export default function AdminOJT() {
       }
 
       // Fetch supervisors
-      const supervisorsRes = await fetch(`${API_BASE_URL}/admin_users.php?role=ojt_supervisor`, {
+      const supervisorsRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt_supervisor`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
       });
       const supervisorsData = await supervisorsRes.json();
@@ -495,3 +495,6 @@ export default function AdminOJT() {
     </AdminLayout>
   );
 }
+
+
+

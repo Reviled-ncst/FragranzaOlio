@@ -14,7 +14,7 @@ import {
   RefreshCw,
   User
 } from 'lucide-react';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, apiFetch } from '../services/api';
 
 interface AttendanceClockProps {
   userId: number;
@@ -74,7 +74,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
   const fetchStatus = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/ojt_attendance.php/status?trainee_id=${userId}`);
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/status?trainee_id=${userId}`);
       const data = await response.json();
       if (data.success) {
         setStatus(data.data);
@@ -110,7 +110,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
           // Try to get address using reverse geocoding (free service)
           let address = '';
           try {
-            const response = await fetch(
+            const response = await apiFetch(
               `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
             );
             const data = await response.json();
@@ -281,7 +281,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
       
       const endpoint = cameraAction === 'in' ? 'clock-in' : 'clock-out';
       
-      const response = await fetch(`${API_BASE_URL}/ojt_attendance.php/${endpoint}`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -320,7 +320,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ojt_attendance.php/break-start`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/break-start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trainee_id: userId })
@@ -347,7 +347,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ojt_attendance.php/break-end`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/break-end`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trainee_id: userId })
@@ -708,3 +708,6 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
 };
 
 export default AttendanceClock;
+
+
+

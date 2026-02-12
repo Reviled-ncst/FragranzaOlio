@@ -12,7 +12,7 @@ import {
   Eye,
   ChevronDown
 } from 'lucide-react';
-import { API_BASE_URL } from '../services/api';
+import { API_BASE_URL, apiFetch } from '../services/api';
 
 interface OvertimeRecord {
   id: number;
@@ -51,7 +51,7 @@ const OvertimeApproval = ({ supervisorId, onApproval }: OvertimeApprovalProps) =
       setError(null);
       
       // Get attendance records with pending overtime for trainees assigned to this supervisor
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_BASE_URL}/ojt_attendance.php/pending-overtime?supervisor_id=${supervisorId}`
       );
       const data = await response.json();
@@ -92,7 +92,7 @@ const OvertimeApproval = ({ supervisorId, onApproval }: OvertimeApprovalProps) =
     setError(null);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/ojt_attendance.php/approve-overtime`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/approve-overtime`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -351,3 +351,6 @@ const OvertimeApproval = ({ supervisorId, onApproval }: OvertimeApprovalProps) =
 };
 
 export default OvertimeApproval;
+
+
+

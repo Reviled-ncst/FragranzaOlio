@@ -3,7 +3,7 @@
  * Fragranza Olio - Products from Local MySQL
  */
 
-import { API_BASE_URL } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 
 export interface Category {
   id: number;
@@ -106,7 +106,7 @@ export const productService = {
    */
   getCategories: async (): Promise<{ success: boolean; data: Category[]; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/categories.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/categories.php`, {
         credentials: 'include',
       });
       const result = await response.json();
@@ -138,7 +138,7 @@ export const productService = {
       if (filters?.limit) params.append('limit', filters.limit.toString());
 
       const url = `${API_BASE_URL}/products.php${params.toString() ? '?' + params.toString() : ''}`;
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         credentials: 'include',
       });
 
@@ -161,7 +161,7 @@ export const productService = {
    */
   getProduct: async (id: number): Promise<ProductResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products.php?id=${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/products.php?id=${id}`, {
         credentials: 'include',
       });
       const result = await response.json();
@@ -177,7 +177,7 @@ export const productService = {
    */
   getProductBySlug: async (slug: string): Promise<ProductResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products.php?slug=${slug}`, {
+      const response = await apiFetch(`${API_BASE_URL}/products.php?slug=${slug}`, {
         credentials: 'include',
       });
       const result = await response.json();
@@ -193,7 +193,7 @@ export const productService = {
    */
   createProduct: async (data: Partial<Product>): Promise<{ success: boolean; data?: any; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/products.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -215,7 +215,7 @@ export const productService = {
    */
   updateProduct: async (id: number, data: Partial<Product>): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products.php?id=${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/products.php?id=${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +237,7 @@ export const productService = {
    */
   deleteProduct: async (id: number): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/products.php?id=${id}`, {
+      const response = await apiFetch(`${API_BASE_URL}/products.php?id=${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -258,7 +258,7 @@ export const productService = {
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch(`${API_BASE_URL}/upload.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/upload.php`, {
         method: 'POST',
         credentials: 'include',
         body: formData,

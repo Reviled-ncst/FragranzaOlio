@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
-import api, { API_BASE_URL } from '../services/api';
+import api, { API_BASE_URL, apiFetch } from '../services/api';
 
 interface Task {
   id: number;
@@ -178,7 +178,7 @@ const OJTTasks = () => {
       }
       
       // Don't set Content-Type header - let browser set it with proper boundary for FormData
-      const response = await fetch(`${API_BASE_URL}/ojt_tasks.php/${selectedTask.id}/submit`, {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_tasks.php/${selectedTask.id}/submit`, {
         method: 'POST',
         body: formData
       });
@@ -638,3 +638,6 @@ const OJTTasks = () => {
 };
 
 export default OJTTasks;
+
+
+
