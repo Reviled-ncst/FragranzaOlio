@@ -304,7 +304,7 @@ function clockIn($conn) {
     $stmt = $conn->prepare("
         INSERT INTO ojt_attendance (
             trainee_id, supervisor_id, attendance_date, time_in, status,
-            photo_in, latitude_in, longitude_in, location_in, face_verified_in,
+            photo_in, latitude_in, longitude_in, location_in, face_verified,
             late_minutes, penalty_hours
         ) VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?)
     ");

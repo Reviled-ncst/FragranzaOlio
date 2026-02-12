@@ -36,12 +36,15 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
   const [error, setError] = useState<string>('');
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [faceConfidence, setFaceConfidence] = useState(0);
   const [faceBox, setFaceBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const lastFaceDetectedRef = useRef(false);
+  const detectionCountRef = useRef(0);
 
   // Load face detection models
   useEffect(() => {
@@ -73,6 +76,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   }, [isOpen]);
 
   const startCamera = async () => {
+    setCameraReady(false);
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user', width: 640, height: 480 } 
@@ -82,6 +86,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.onloadedmetadata = () => {
           videoRef.current?.play();
+          setCameraReady(true);
           if (modelsLoaded) {
             startFaceDetection();
           }
@@ -112,7 +117,19 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
       try {
         const result: FaceDetectionResult = await detectFace(videoRef.current);
         
-        setFaceDetected(result.detected);
+        // Debounce face detection state changes to reduce flickering
+        if (result.detected !== lastFaceDetectedRef.current) {
+          detectionCountRef.current++;
+          // Only change state after 3 consecutive same results
+          if (detectionCountRef.current >= 3) {
+            setFaceDetected(result.detected);
+            lastFaceDetectedRef.current = result.detected;
+            detectionCountRef.current = 0;
+          }
+        } else {
+          detectionCountRef.current = 0;
+        }
+        
         setFaceConfidence(result.confidence);
         setFaceBox(result.box || null);
         
@@ -189,6 +206,9 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
     }
     setFaceDetected(false);
     setFaceBox(null);
+    setCameraReady(false);
+    lastFaceDetectedRef.current = false;
+    detectionCountRef.current = 0;
   };
 
   const capturePhoto = () => {
@@ -252,7 +272,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
                     <CheckCircle size={16} />
                     Face Detected ({faceConfidence}%)
                   </div>
-                ) : modelsLoaded ? (
+                ) : modelsLoaded && cameraReady ? (
                   <div className="bg-gray-700/90 text-gray-200 px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
                     <User size={16} />
                     Position your face in frame
@@ -262,22 +282,30 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
             </div>
             <canvas ref={canvasRef} className="hidden" />
             
-            {/* Face detection warning if not detected */}
-            {modelsLoaded && !faceDetected && (
-              <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
-                <AlertTriangle className="text-yellow-400" size={16} />
-                <span className="text-yellow-400 text-sm">No face detected - you can still capture</span>
-              </div>
-            )}
+            {/* Face detection status - fixed height to prevent layout shifts */}
+            <div className="mb-4 h-12 flex items-center">
+              {modelsLoaded && cameraReady && !faceDetected ? (
+                <div className="w-full p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="text-yellow-400 flex-shrink-0" size={16} />
+                  <span className="text-yellow-400 text-sm">No face detected - you can still capture</span>
+                </div>
+              ) : modelsLoaded && cameraReady && faceDetected ? (
+                <div className="w-full p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
+                  <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
+                  <span className="text-green-400 text-sm">Face verified - ready to capture!</span>
+                </div>
+              ) : null}
+            </div>
             
             <div className="flex gap-3">
               <button
                 onClick={capturePhoto}
+                disabled={!cameraReady}
                 className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
                   faceDetected 
                     ? 'bg-green-500 text-white hover:bg-green-400' 
                     : 'bg-gold-500 text-black hover:bg-gold-400'
-                }`}
+                } disabled:opacity-50`}
               >
                 {faceDetected && <CheckCircle size={18} />}
                 📸 Capture Photo
