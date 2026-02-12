@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_BASE_URL, apiFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
+import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult } from '../services/faceRecognitionService';
+import { Shield, Loader2, CheckCircle, User, AlertTriangle } from 'lucide-react';
 
 interface AttendanceRecord {
   id: number;
@@ -27,12 +29,39 @@ interface CameraModalProps {
   title: string;
 }
 
-// Camera Modal Component
+// Camera Modal Component with Face Recognition
 function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string>('');
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [faceConfidence, setFaceConfidence] = useState(0);
+  const [faceBox, setFaceBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+
+  // Load face detection models
+  useEffect(() => {
+    const initModels = async () => {
+      if (!areModelsLoaded() && !modelsLoading) {
+        setModelsLoading(true);
+        try {
+          await loadModels();
+          setModelsLoaded(true);
+        } catch (err) {
+          console.error('Failed to load face detection models:', err);
+        } finally {
+          setModelsLoading(false);
+        }
+      } else if (areModelsLoaded()) {
+        setModelsLoaded(true);
+      }
+    };
+    initModels();
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +80,12 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          if (modelsLoaded) {
+            startFaceDetection();
+          }
+        };
       }
       setError('');
     } catch {
@@ -58,11 +93,102 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
     }
   };
 
+  // Start face detection when models are loaded
+  useEffect(() => {
+    if (modelsLoaded && stream && videoRef.current) {
+      startFaceDetection();
+    }
+  }, [modelsLoaded, stream]);
+
+  const startFaceDetection = () => {
+    if (!modelsLoaded) return;
+    
+    const runDetection = async () => {
+      if (!videoRef.current || videoRef.current.readyState !== 4) {
+        animationFrameRef.current = requestAnimationFrame(runDetection);
+        return;
+      }
+      
+      try {
+        const result: FaceDetectionResult = await detectFace(videoRef.current);
+        
+        setFaceDetected(result.detected);
+        setFaceConfidence(result.confidence);
+        setFaceBox(result.box || null);
+        
+        // Draw overlay on canvas
+        if (overlayCanvasRef.current && videoRef.current) {
+          const canvas = overlayCanvasRef.current;
+          const video = videoRef.current;
+          const ctx = canvas.getContext('2d');
+          
+          if (ctx) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (result.box) {
+              // Draw face bounding box
+              ctx.strokeStyle = result.detected ? '#22c55e' : '#ef4444';
+              ctx.lineWidth = 3;
+              ctx.strokeRect(result.box.x, result.box.y, result.box.width, result.box.height);
+              
+              // Draw corner accents
+              const cornerLength = 20;
+              ctx.lineWidth = 4;
+              ctx.strokeStyle = '#22c55e';
+              
+              // Top-left
+              ctx.beginPath();
+              ctx.moveTo(result.box.x, result.box.y + cornerLength);
+              ctx.lineTo(result.box.x, result.box.y);
+              ctx.lineTo(result.box.x + cornerLength, result.box.y);
+              ctx.stroke();
+              
+              // Top-right
+              ctx.beginPath();
+              ctx.moveTo(result.box.x + result.box.width - cornerLength, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + cornerLength);
+              ctx.stroke();
+              
+              // Bottom-left
+              ctx.beginPath();
+              ctx.moveTo(result.box.x, result.box.y + result.box.height - cornerLength);
+              ctx.lineTo(result.box.x, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + cornerLength, result.box.y + result.box.height);
+              ctx.stroke();
+              
+              // Bottom-right
+              ctx.beginPath();
+              ctx.moveTo(result.box.x + result.box.width - cornerLength, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + result.box.height);
+              ctx.lineTo(result.box.x + result.box.width, result.box.y + result.box.height - cornerLength);
+              ctx.stroke();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Face detection error:', err);
+      }
+      
+      animationFrameRef.current = requestAnimationFrame(runDetection);
+    };
+    
+    runDetection();
+  };
+
   const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
     if (stream) {
       stream.getTracks().forEach(track => track.stop());
       setStream(null);
     }
+    setFaceDetected(false);
+    setFaceBox(null);
   };
 
   const capturePhoto = () => {
@@ -97,16 +223,63 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
           </div>
         ) : (
           <>
+            {/* Model Loading Status */}
+            {modelsLoading && (
+              <div className="mb-4 p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center gap-2">
+                <Loader2 className="animate-spin text-blue-400" size={16} />
+                <span className="text-blue-400 text-sm">Loading AI Face Recognition...</span>
+              </div>
+            )}
+            
+            {modelsLoaded && (
+              <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
+                <Shield className="text-green-400" size={16} />
+                <span className="text-green-400 text-sm">AI Face Recognition Active</span>
+              </div>
+            )}
+
             <div className="relative rounded-xl overflow-hidden bg-black mb-4">
               <video ref={videoRef} autoPlay playsInline muted className="w-full" />
+              {/* Face detection overlay canvas */}
+              <canvas
+                ref={overlayCanvasRef}
+                className="absolute inset-0 w-full h-full pointer-events-none"
+              />
+              {/* Face detection status badge */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
+                {faceDetected ? (
+                  <div className="bg-green-500/90 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                    <CheckCircle size={16} />
+                    Face Detected ({faceConfidence}%)
+                  </div>
+                ) : modelsLoaded ? (
+                  <div className="bg-gray-700/90 text-gray-200 px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                    <User size={16} />
+                    Position your face in frame
+                  </div>
+                ) : null}
+              </div>
             </div>
             <canvas ref={canvasRef} className="hidden" />
+            
+            {/* Face detection warning if not detected */}
+            {modelsLoaded && !faceDetected && (
+              <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
+                <AlertTriangle className="text-yellow-400" size={16} />
+                <span className="text-yellow-400 text-sm">No face detected - you can still capture</span>
+              </div>
+            )}
             
             <div className="flex gap-3">
               <button
                 onClick={capturePhoto}
-                className="flex-1 py-3 bg-gold-500 text-black rounded-xl font-semibold hover:bg-gold-400"
+                className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                  faceDetected 
+                    ? 'bg-green-500 text-white hover:bg-green-400' 
+                    : 'bg-gold-500 text-black hover:bg-gold-400'
+                }`}
               >
+                {faceDetected && <CheckCircle size={18} />}
                 📸 Capture Photo
               </button>
               <button
