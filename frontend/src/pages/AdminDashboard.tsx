@@ -19,18 +19,20 @@ import {
   Edit,
   Trash2,
   Eye,
-  LogIn
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate, Link } from 'react-router-dom';
 import AdminLayout from '../components/layout/AdminLayout';
-import adminUsersService, { DashboardStats } from '../services/adminUsersService';
+import adminUsersService, { DashboardStats, ActivityLog } from '../services/adminUsersService';
 import adminLogsService, { AdminLog } from '../services/adminLogsService';
 
 const AdminDashboard = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [activityLogs, setActivityLogs] = useState<AdminLog[]>([]);
+  const [loginActivity, setLoginActivity] = useState<ActivityLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,10 +44,11 @@ const AdminDashboard = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch both stats and activity logs
-      const [statsResponse, logsResponse] = await Promise.all([
+      // Fetch stats, admin activity logs, and login activity logs
+      const [statsResponse, logsResponse, loginActivityResponse] = await Promise.all([
         adminUsersService.getDashboardStats(),
-        adminLogsService.getRecentActivity(10)
+        adminLogsService.getRecentActivity(10),
+        adminUsersService.getActivityLogs({ limit: 10 })
       ]);
       
       if (statsResponse.success && statsResponse.data) {
@@ -56,6 +59,10 @@ const AdminDashboard = () => {
       
       if (logsResponse.success && logsResponse.data) {
         setActivityLogs(logsResponse.data.logs);
+      }
+      
+      if (loginActivityResponse.success && loginActivityResponse.data) {
+        setLoginActivity(loginActivityResponse.data.logs);
       }
     } catch (err) {
       setError('Failed to load dashboard data');
@@ -361,6 +368,69 @@ const AdminDashboard = () => {
                     <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p>No admin activity yet</p>
                     <p className="text-xs mt-1">Actions like creating users will appear here</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Login/Logout Activity */}
+            <div className="bg-black-900 border border-gold-500/20 rounded-xl p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg sm:text-xl font-display font-semibold text-white flex items-center gap-2">
+                  <LogIn className="text-purple-500" size={20} />
+                  Login Activity
+                </h2>
+              </div>
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {loginActivity.length > 0 ? (
+                  loginActivity.map((log) => (
+                    <div 
+                      key={log.id}
+                      className="flex items-start gap-3 p-3 bg-black-800 rounded-lg border border-gold-500/10 hover:border-gold-500/20 transition-colors"
+                    >
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        log.activityType === 'login' 
+                          ? 'bg-green-500/20' 
+                          : log.activityType === 'logout' 
+                          ? 'bg-red-500/20' 
+                          : 'bg-blue-500/20'
+                      }`}>
+                        {log.activityType === 'login' ? (
+                          <LogIn className="text-green-400" size={16} />
+                        ) : log.activityType === 'logout' ? (
+                          <LogOut className="text-red-400" size={16} />
+                        ) : log.activityType === 'register' ? (
+                          <UserPlus className="text-blue-400" size={16} />
+                        ) : (
+                          <Activity className="text-gray-400" size={16} />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white">
+                          <span className="font-medium text-gold-400">{log.userName}</span>
+                          <span className="text-gray-400"> {log.activityType === 'login' ? 'logged in' : log.activityType === 'logout' ? 'logged out' : log.activityType}</span>
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{log.email} • {log.role}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs text-gray-400">{formatDate(log.createdAt)}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          log.activityType === 'login' 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : log.activityType === 'logout' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {log.activityType}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <LogIn className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No login activity yet</p>
+                    <p className="text-xs mt-1">User logins and logouts will appear here</p>
                   </div>
                 )}
               </div>

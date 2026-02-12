@@ -93,6 +93,34 @@ export interface DashboardStats {
   }>;
 }
 
+export interface ActivityLog {
+  id: number;
+  userId: number;
+  userName: string;
+  email: string;
+  role: string;
+  activityType: 'login' | 'logout' | 'register' | 'password_change' | 'profile_update' | 'password_reset';
+  ipAddress: string | null;
+  userAgent: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface ActivityLogFilters {
+  page?: number;
+  limit?: number;
+  activity_type?: string;
+  user_id?: number;
+  role?: string;
+  date_from?: string;
+  date_to?: string;
+}
+
+export interface ActivityLogResponse {
+  logs: ActivityLog[];
+  pagination: PaginationInfo;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -245,6 +273,31 @@ export const adminUsersService = {
     } catch (error) {
       console.error('Get dashboard stats error:', error);
       return { success: false, message: 'Failed to fetch stats' };
+    }
+  },
+
+  /**
+   * Get activity logs (login/logout history)
+   */
+  async getActivityLogs(filters: ActivityLogFilters = {}): Promise<ApiResponse<ActivityLogResponse>> {
+    try {
+      const queryParams = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+
+      const url = `${API_BASE_URL}/admin_users.php/activity-logs${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await apiFetch(url, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+
+      return await response.json();
+    } catch (error) {
+      console.error('Get activity logs error:', error);
+      return { success: false, message: 'Failed to fetch activity logs' };
     }
   },
 };

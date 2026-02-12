@@ -71,26 +71,41 @@ class AdminUsersController {
         $headers = getallheaders();
         $authHeader = $headers['Authorization'] ?? '';
         
-        if (!$authHeader || !str_starts_with($authHeader, 'Bearer ')) {
-            return null;
+        // Method 1: Try Bearer token (from user_sessions table)
+        if (!empty($authHeader) && str_starts_with($authHeader, 'Bearer ')) {
+            $token = substr($authHeader, 7);
+            
+            $stmt = $this->db->prepare("
+                SELECT u.id, u.role, u.email, u.first_name, u.last_name
+                FROM user_sessions s
+                JOIN users u ON s.user_id = u.id
+                WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'
+            ");
+            $stmt->execute([$token]);
+            $user = $stmt->fetch();
+            
+            if ($user && $user['role'] === 'admin') {
+                return $user;
+            }
         }
         
-        $token = substr($authHeader, 7);
-        
-        $stmt = $this->db->prepare("
-            SELECT u.id, u.role, u.email, u.first_name, u.last_name
-            FROM user_sessions s
-            JOIN users u ON s.user_id = u.id
-            WHERE s.session_token = ? AND s.expires_at > NOW() AND u.status = 'active'
-        ");
-        $stmt->execute([$token]);
-        $user = $stmt->fetch();
-        
-        if (!$user || $user['role'] !== 'admin') {
-            return null;
+        // Method 2: Try email from header (for proxy auth)
+        $email = $headers['X-Admin-Email'] ?? $_GET['admin_email'] ?? null;
+        if ($email) {
+            $stmt = $this->db->prepare("
+                SELECT id, role, email, first_name, last_name
+                FROM users 
+                WHERE email = ? AND status = 'active'
+            ");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch();
+            
+            if ($user && $user['role'] === 'admin') {
+                return $user;
+            }
         }
         
-        return $user;
+        return null;
     }
     
     /**
@@ -693,6 +708,130 @@ class AdminUsersController {
     }
     
     /**
+     * Get activity logs (login/logout history)
+     */
+    public function getActivityLogs($filters = []) {
+        $admin = $this->verifyAdmin();
+        if (!$admin) {
+            return $this->response(false, 'Unauthorized. Admin access required.', null, 401);
+        }
+        
+        try {
+            $page = isset($filters['page']) ? (int)$filters['page'] : 1;
+            $limit = isset($filters['limit']) ? min((int)$filters['limit'], 100) : 50;
+            $offset = ($page - 1) * $limit;
+            
+            $activityType = $filters['activity_type'] ?? null;
+            $userId = $filters['user_id'] ?? null;
+            $role = $filters['role'] ?? null;
+            $dateFrom = $filters['date_from'] ?? null;
+            $dateTo = $filters['date_to'] ?? null;
+            
+            // Build query
+            $whereConditions = [];
+            $params = [];
+            
+            if ($activityType) {
+                $whereConditions[] = "a.activity_type = ?";
+                $params[] = $activityType;
+            }
+            
+            if ($userId) {
+                $whereConditions[] = "a.user_id = ?";
+                $params[] = $userId;
+            }
+            
+            if ($role) {
+                $whereConditions[] = "u.role = ?";
+                $params[] = $role;
+            }
+            
+            if ($dateFrom) {
+                $whereConditions[] = "a.created_at >= ?";
+                $params[] = $dateFrom . ' 00:00:00';
+            }
+            
+            if ($dateTo) {
+                $whereConditions[] = "a.created_at <= ?";
+                $params[] = $dateTo . ' 23:59:59';
+            }
+            
+            $whereClause = count($whereConditions) > 0 
+                ? 'WHERE ' . implode(' AND ', $whereConditions) 
+                : '';
+            
+            // Get total count
+            $countQuery = "
+                SELECT COUNT(*) as total 
+                FROM user_activity_log a
+                JOIN users u ON a.user_id = u.id
+                $whereClause
+            ";
+            $stmt = $this->db->prepare($countQuery);
+            $stmt->execute($params);
+            $totalCount = $stmt->fetch()['total'];
+            
+            // Get activity logs
+            $query = "
+                SELECT 
+                    a.id,
+                    a.user_id,
+                    u.first_name,
+                    u.last_name,
+                    u.email,
+                    u.role,
+                    a.activity_type,
+                    a.ip_address,
+                    a.user_agent,
+                    a.details,
+                    a.created_at
+                FROM user_activity_log a
+                JOIN users u ON a.user_id = u.id
+                $whereClause
+                ORDER BY a.created_at DESC
+                LIMIT ? OFFSET ?
+            ";
+            
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            $logs = $stmt->fetchAll();
+            
+            // Transform data
+            $transformedLogs = array_map(function($log) {
+                return [
+                    'id' => (int)$log['id'],
+                    'userId' => (int)$log['user_id'],
+                    'userName' => $log['first_name'] . ' ' . $log['last_name'],
+                    'email' => $log['email'],
+                    'role' => $log['role'],
+                    'activityType' => $log['activity_type'],
+                    'ipAddress' => $log['ip_address'],
+                    'userAgent' => $log['user_agent'],
+                    'details' => $log['details'] ? json_decode($log['details'], true) : null,
+                    'createdAt' => $log['created_at']
+                ];
+            }, $logs);
+            
+            return $this->response(true, 'Activity logs retrieved', [
+                'logs' => $transformedLogs,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => (int)$totalCount,
+                    'totalPages' => ceil($totalCount / $limit)
+                ]
+            ]);
+            
+        } catch (PDOException $e) {
+            error_log("Get activity logs error: " . $e->getMessage());
+            return $this->response(false, 'Failed to retrieve activity logs', null, 500);
+        }
+    }
+    
+    /**
      * Get dashboard stats
      */
     public function getDashboardStats() {
@@ -833,6 +972,8 @@ switch ($method) {
     case 'GET':
         if ($action === 'stats') {
             $controller->getDashboardStats();
+        } elseif ($action === 'activity-logs') {
+            $controller->getActivityLogs($data);
         } elseif ($action === 'role' && $id) {
             $controller->getUsersByRole($id);
         } elseif ($id) {
