@@ -118,12 +118,12 @@ function getStockLevels($db) {
                 p.price as product_price,
                 bi.variation_id,
                 bi.quantity,
-                bi.min_stock_level,
+                bi.min_quantity,
                 bi.max_stock_level,
                 bi.last_restocked,
                 CASE 
                     WHEN bi.quantity = 0 THEN 'out_of_stock'
-                    WHEN bi.quantity <= bi.min_stock_level THEN 'low_stock'
+                    WHEN bi.quantity <= bi.min_quantity THEN 'low_stock'
                     WHEN bi.quantity >= bi.max_stock_level THEN 'overstock'
                     ELSE 'in_stock'
                 END as stock_status
@@ -633,8 +633,8 @@ function getDashboardStats($db) {
     // Stock status counts
     $stmt = $db->query("SELECT 
         SUM(CASE WHEN quantity = 0 THEN 1 ELSE 0 END) as out_of_stock,
-        SUM(CASE WHEN quantity > 0 AND quantity <= min_stock_level THEN 1 ELSE 0 END) as low_stock,
-        SUM(CASE WHEN quantity > min_stock_level THEN 1 ELSE 0 END) as in_stock
+        SUM(CASE WHEN quantity > 0 AND quantity <= min_quantity THEN 1 ELSE 0 END) as low_stock,
+        SUM(CASE WHEN quantity > min_quantity THEN 1 ELSE 0 END) as in_stock
         FROM branch_inventory");
     $stats['stock_status'] = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -726,7 +726,7 @@ function checkAndCreateAlerts($db, $branchId, $productId) {
     $alertType = null;
     if ($inventory['quantity'] == 0) {
         $alertType = 'out_of_stock';
-    } elseif ($inventory['quantity'] <= $inventory['min_stock_level']) {
+    } elseif ($inventory['quantity'] <= $inventory['min_quantity']) {
         $alertType = 'low_stock';
     }
     
@@ -746,7 +746,7 @@ function checkAndCreateAlerts($db, $branchId, $productId) {
                 $inventory['variation_id'],
                 $alertType,
                 $inventory['quantity'],
-                $inventory['min_stock_level']
+                $inventory['min_quantity']
             ]);
         }
     }

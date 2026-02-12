@@ -701,9 +701,13 @@ function getCustomers($db) {
     $sql = "SELECT * FROM customers WHERE 1=1";
     $params = [];
     
+    // Use is_active instead of status
     if ($status && $status !== 'all') {
-        $sql .= " AND status = :status";
-        $params[':status'] = $status;
+        if ($status === 'active') {
+            $sql .= " AND is_active = 1";
+        } else if ($status === 'inactive') {
+            $sql .= " AND is_active = 0";
+        }
     }
     
     if ($type && $type !== 'all') {
@@ -724,12 +728,12 @@ function getCustomers($db) {
     $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get stats
+    // Get stats - use is_active and customer_type
     $stats = [
         'total' => $db->query("SELECT COUNT(*) FROM customers")->fetchColumn(),
-        'active' => $db->query("SELECT COUNT(*) FROM customers WHERE status = 'active'")->fetchColumn(),
-        'vip' => $db->query("SELECT COUNT(*) FROM customers WHERE status = 'vip'")->fetchColumn(),
-        'inactive' => $db->query("SELECT COUNT(*) FROM customers WHERE status = 'inactive'")->fetchColumn(),
+        'active' => $db->query("SELECT COUNT(*) FROM customers WHERE is_active = 1")->fetchColumn(),
+        'vip' => $db->query("SELECT COUNT(*) FROM customers WHERE customer_type = 'vip'")->fetchColumn(),
+        'inactive' => $db->query("SELECT COUNT(*) FROM customers WHERE is_active = 0")->fetchColumn(),
     ];
     
     echo json_encode(['success' => true, 'data' => $customers, 'stats' => $stats]);
@@ -765,11 +769,11 @@ function createCustomer($db, $data) {
         INSERT INTO customers (
             user_id, first_name, last_name, email, phone,
             address, city, province, zip_code, country,
-            status, customer_type, notes
+            is_active, customer_type, notes
         ) VALUES (
             :user_id, :first_name, :last_name, :email, :phone,
             :address, :city, :province, :zip_code, :country,
-            :status, :customer_type, :notes
+            :is_active, :customer_type, :notes
         )
     ");
     
@@ -784,8 +788,8 @@ function createCustomer($db, $data) {
         ':province' => $data['province'] ?? '',
         ':zip_code' => $data['zip_code'] ?? '',
         ':country' => $data['country'] ?? 'Philippines',
-        ':status' => $data['status'] ?? 'active',
-        ':customer_type' => $data['customer_type'] ?? 'retail',
+        ':is_active' => ($data['status'] ?? 'active') === 'active' ? 1 : 0,
+        ':customer_type' => $data['customer_type'] ?? 'regular',
         ':notes' => $data['notes'] ?? ''
     ]);
     
@@ -813,7 +817,7 @@ function updateCustomer($db, $data) {
             city = :city,
             province = :province,
             zip_code = :zip_code,
-            status = :status,
+            is_active = :is_active,
             customer_type = :customer_type,
             notes = :notes
         WHERE id = :id
@@ -829,8 +833,8 @@ function updateCustomer($db, $data) {
         ':city' => $data['city'] ?? '',
         ':province' => $data['province'] ?? '',
         ':zip_code' => $data['zip_code'] ?? '',
-        ':status' => $data['status'] ?? 'active',
-        ':customer_type' => $data['customer_type'] ?? 'retail',
+        ':is_active' => ($data['status'] ?? 'active') === 'active' ? 1 : 0,
+        ':customer_type' => $data['customer_type'] ?? 'regular',
         ':notes' => $data['notes'] ?? ''
     ]);
     
