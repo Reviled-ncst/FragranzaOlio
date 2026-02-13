@@ -220,9 +220,9 @@ const Home = () => {
   }
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-x-hidden">
       {/* Hero Section - Black & Gold Theme */}
-      <section className="relative min-h-screen flex items-center justify-center bg-black-950">
+      <section className="relative min-h-screen flex items-center justify-center bg-black-950 overflow-visible">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
@@ -232,7 +232,7 @@ const Home = () => {
         {/* Gold gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-black-950 via-black-900/95 to-gold-900/20" />
 
-        <div className="container-custom relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-6 md:px-8">
+        <div className="w-full max-w-7xl mx-auto relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-6 sm:px-8 lg:px-12">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             {/* Hero Content */}
             <motion.div
@@ -248,7 +248,7 @@ const Home = () => {
                 Discover the Art of
                 <span className="text-gradient-gold block">Luxury Scents</span>
               </h1>
-              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 lg:max-w-lg mx-auto lg:mx-0">
+              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 mx-auto lg:mx-0 pr-2">
                 Experience exquisite fragrances and premium cosmetics crafted with passion, 
                 precision, and the finest ingredients from around the world.
               </p>
