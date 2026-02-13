@@ -14,6 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 // Set timezone to Philippines
 date_default_timezone_set('Asia/Manila');
 
+// OJT Schedule Configuration
+define('OJT_START_TIME', 9);      // 9:00 AM
+define('OJT_END_TIME', 18);       // 6:00 PM  
+define('OJT_LUNCH_START', 12);    // 12:00 PM
+define('OJT_LUNCH_END', 13);      // 1:00 PM
+define('OJT_LUNCH_DURATION', 1);  // 1 hour lunch (auto-deducted)
+define('OJT_DAILY_HOURS', 8);     // Target hours per day
+
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
 
@@ -382,13 +390,36 @@ function clockOut($conn) {
     $clockOut = new DateTime();
     $totalMinutes = ($clockOut->getTimestamp() - $clockIn->getTimestamp()) / 60;
     
-    // Calculate break hours
-    $breakMinutes = 0;
+    // Calculate tracked break hours (if user used break button)
+    $trackedBreakMinutes = 0;
     if ($record['break_start'] && $record['break_end']) {
         $breakStart = new DateTime($record['break_start']);
         $breakEnd = new DateTime($record['break_end']);
-        $breakMinutes = ($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60;
+        $trackedBreakMinutes = ($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60;
     }
+    
+    // Auto-deduct 1 hour lunch (12-1 PM) if shift spans lunch period
+    $clockInHour = (int)$clockIn->format('H');
+    $clockOutHour = (int)$clockOut->format('H');
+    $autoLunchDeduct = 0;
+    
+    // If clocked in before/during lunch AND clocked out after lunch, deduct 1 hour
+    if ($clockInHour < OJT_LUNCH_END && $clockOutHour >= OJT_LUNCH_END) {
+        $autoLunchDeduct = OJT_LUNCH_DURATION * 60; // 60 minutes
+    }
+    
+    // Total break = tracked breaks + auto lunch deduction (avoid double-counting)
+    // If user tracked a break during 12-1pm range, don't auto-deduct
+    $breakHourWasTracked = false;
+    if ($record['break_start']) {
+        $trackedBreakStart = new DateTime($record['break_start']);
+        $trackedHour = (int)$trackedBreakStart->format('H');
+        if ($trackedHour >= OJT_LUNCH_START && $trackedHour < OJT_LUNCH_END) {
+            $breakHourWasTracked = true;
+        }
+    }
+    
+    $breakMinutes = $breakHourWasTracked ? $trackedBreakMinutes : ($trackedBreakMinutes + $autoLunchDeduct);
     
     $workMinutes = $totalMinutes - $breakMinutes;
     $workHours = round($workMinutes / 60, 2);
@@ -396,7 +427,7 @@ function clockOut($conn) {
     $totalHours = round($totalMinutes / 60, 2);
     
     // Calculate overtime (after 8 hours of work)
-    $overtimeHours = max(0, $workHours - 8);
+    $overtimeHours = max(0, $workHours - OJT_DAILY_HOURS);
     
     $stmt = $conn->prepare("
         UPDATE ojt_attendance SET

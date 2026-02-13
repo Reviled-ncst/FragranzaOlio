@@ -433,13 +433,23 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   );
 }
 
+// OJT Schedule Configuration
+const OJT_SCHEDULE = {
+  START_TIME: 9,      // 9:00 AM
+  END_TIME: 18,       // 6:00 PM
+  LUNCH_START: 12,    // 12:00 PM
+  LUNCH_END: 13,      // 1:00 PM
+  LUNCH_DURATION: 1,  // 1 hour (automatically deducted)
+  DAILY_WORK_HOURS: 8, // 9 hours total - 1 hour lunch = 8 hours
+};
+
 // Calculate late penalty
 function calculateLatePenalty(timeIn: string | null): { lateMinutes: number; penaltyHours: number } {
   if (!timeIn) return { lateMinutes: 0, penaltyHours: 0 };
   
   const [hours, minutes] = timeIn.split(':').map(Number);
   const clockInMinutes = hours * 60 + minutes;
-  const startTimeMinutes = 8 * 60; // 8:00 AM
+  const startTimeMinutes = OJT_SCHEDULE.START_TIME * 60; // 9:00 AM
   
   if (clockInMinutes <= startTimeMinutes) {
     return { lateMinutes: 0, penaltyHours: 0 };
@@ -784,6 +794,26 @@ export default function OJTTimesheet() {
             <button onClick={() => setMessage(null)} className="float-right font-bold">×</button>
           </div>
         )}
+
+        {/* OJT Schedule Info */}
+        <div className="bg-black-900/50 border border-gold-500/10 rounded-xl p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-6 text-sm">
+              <div>
+                <span className="text-gray-400">Schedule:</span>
+                <span className="text-white ml-2 font-medium">9:00 AM - 6:00 PM</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Lunch:</span>
+                <span className="text-white ml-2 font-medium">12:00 PM - 1:00 PM</span>
+                <span className="text-gray-500 text-xs ml-1">(auto-deducted)</span>
+              </div>
+            </div>
+            <div className="text-xs text-gray-500">
+              Daily target: 8 hours
+            </div>
+          </div>
+        </div>
 
         {/* Today's Attendance Card */}
         <div className="bg-black-900 border border-gold-500/20 rounded-2xl p-6">
