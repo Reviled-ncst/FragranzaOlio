@@ -95,6 +95,8 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string | null>>({});
   const [touchedFields, setTouchedFields] = useState<Record<string, boolean>>({});
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
   const totalSteps = 4; // Now 4 steps: Role, Basic Info, Contact, Account
 
   // Fetch supervisors when modal opens
@@ -362,6 +364,42 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           setIsLoading(false);
         }
       }
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    
+    const emailError = validators.email(forgotEmail);
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://gadgets-craig-counted-liabilities.trycloudflare.com/backend/api'}/auth.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'forgot-password', email: forgotEmail }),
+      });
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccessMessage('If an account exists with this email, you will receive a password reset link. Please check your email.');
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setSuccessMessage(null);
+          setForgotEmail('');
+        }, 5000);
+      } else {
+        setError(result.message || 'Failed to send reset email. Please try again.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1068,12 +1106,14 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               {/* Header */}
               <div className="pt-8 pb-4 px-8 text-center">
                 <h2 className="font-display text-2xl font-bold text-white mb-2">
-                  {isLogin ? 'Welcome Back' : stepTitles[currentStep - 1]}
+                  {showForgotPassword ? 'Reset Password' : (isLogin ? 'Welcome Back' : stepTitles[currentStep - 1])}
                 </h2>
                 <p className="text-gray-400 text-sm">
-                  {isLogin
-                    ? 'Sign in to access your account'
-                    : `Step ${currentStep} of ${totalSteps}`}
+                  {showForgotPassword
+                    ? 'Enter your email to receive a reset link'
+                    : (isLogin
+                      ? 'Sign in to access your account'
+                      : `Step ${currentStep} of ${totalSteps}`)}
                 </p>
               </div>
 
@@ -1092,9 +1132,59 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               )}
 
               {/* Step Indicator (Register only) */}
-              {!isLogin && <StepIndicator />}
+              {!isLogin && !showForgotPassword && <StepIndicator />}
 
-              {/* Form */}
+              {/* Forgot Password Form */}
+              {showForgotPassword ? (
+                <form onSubmit={handleForgotPassword} className="px-8 pb-8">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                        <input
+                          type="email"
+                          value={forgotEmail}
+                          onChange={(e) => setForgotEmail(e.target.value)}
+                          placeholder="Enter your email"
+                          className="w-full pl-10 pr-3 py-2.5 bg-black-800 border border-gold-500/20 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-gold-500 focus:ring-1 focus:ring-gold-500/50 transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-2.5 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 text-black font-semibold rounded-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={18} className="animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        'Send Reset Link'
+                      )}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setError(null);
+                        setSuccessMessage(null);
+                      }}
+                      className="w-full py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                    >
+                      Back to Sign In
+                    </button>
+                  </div>
+                </form>
+              ) : (
+              /* Form */
               <form onSubmit={handleSubmit} className="px-8 pb-8">
                 {isLogin ? (
                   /* Login Form */
@@ -1151,6 +1241,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                     <div className="flex justify-end">
                       <button
                         type="button"
+                        onClick={() => setShowForgotPassword(true)}
                         className="text-sm text-gold-400 hover:text-gold-300 transition-colors"
                       >
                         Forgot password?
@@ -1252,6 +1343,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                 )}
 
                 {/* Switch mode */}
+                {!showForgotPassword && (
                 <p className="text-center text-gray-400 text-sm mt-6">
                   {isLogin ? "Don't have an account?" : 'Already have an account?'}{' '}
                   <button
@@ -1262,7 +1354,9 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
                     {isLogin ? 'Sign up' : 'Sign in'}
                   </button>
                 </p>
+                )}
               </form>
+              )}
             </motion.div>
           </div>
         </>

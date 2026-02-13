@@ -403,6 +403,102 @@ class AuthController {
     }
     
     /**
+     * Request password reset - sends reset token
+     */
+    public function forgotPassword($email) {
+        try {
+            if (empty($email)) {
+                return $this->response(false, 'Email is required', null, 400);
+            }
+            
+            // Find user by email
+            $stmt = $this->db->prepare("SELECT id, first_name, email FROM users WHERE email = ?");
+            $stmt->execute([strtolower(trim($email))]);
+            $user = $stmt->fetch();
+            
+            // Always return success to prevent email enumeration
+            if (!$user) {
+                return $this->response(true, 'If an account exists with this email, you will receive a password reset link.');
+            }
+            
+            // Generate reset token
+            $resetToken = bin2hex(random_bytes(32));
+            $resetExpires = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            
+            // Store reset token
+            $stmt = $this->db->prepare("
+                UPDATE users 
+                SET password_reset_token = ?, password_reset_expires = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$resetToken, $resetExpires, $user['id']]);
+            
+            // Log activity
+            $this->logActivity($user['id'], 'password_reset_request', ['email' => $email]);
+            
+            // In production, send email here
+            // For development, return the token
+            return $this->response(true, 'If an account exists with this email, you will receive a password reset link.', [
+                'resetToken' => $resetToken, // Remove in production
+                'expiresAt' => $resetExpires
+            ]);
+            
+        } catch (PDOException $e) {
+            error_log("Forgot password error: " . $e->getMessage());
+            return $this->response(false, 'Failed to process request. Please try again.', null, 500);
+        }
+    }
+    
+    /**
+     * Reset password using token
+     */
+    public function resetPassword($data) {
+        try {
+            if (empty($data['token']) || empty($data['password'])) {
+                return $this->response(false, 'Token and new password are required', null, 400);
+            }
+            
+            // Validate password strength
+            if (strlen($data['password']) < 8) {
+                return $this->response(false, 'Password must be at least 8 characters', null, 400);
+            }
+            
+            // Find user with valid reset token
+            $stmt = $this->db->prepare("
+                SELECT id, email 
+                FROM users 
+                WHERE password_reset_token = ? AND password_reset_expires > NOW()
+            ");
+            $stmt->execute([$data['token']]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                return $this->response(false, 'Invalid or expired reset token. Please request a new password reset.', null, 400);
+            }
+            
+            // Hash new password
+            $passwordHash = password_hash($data['password'], PASSWORD_BCRYPT, ['cost' => 12]);
+            
+            // Update password and clear reset token
+            $stmt = $this->db->prepare("
+                UPDATE users 
+                SET password_hash = ?, password_reset_token = NULL, password_reset_expires = NULL
+                WHERE id = ?
+            ");
+            $stmt->execute([$passwordHash, $user['id']]);
+            
+            // Log activity
+            $this->logActivity($user['id'], 'password_reset_complete', ['email' => $user['email']]);
+            
+            return $this->response(true, 'Password has been reset successfully. You can now log in with your new password.');
+            
+        } catch (PDOException $e) {
+            error_log("Reset password error: " . $e->getMessage());
+            return $this->response(false, 'Failed to reset password. Please try again.', null, 500);
+        }
+    }
+    
+    /**
      * Log user activity
      */
     private function logActivity($userId, $type, $details = null) {
@@ -469,6 +565,12 @@ switch ($method) {
                 break;
             case 'check-email':
                 $auth->checkEmail($input['email'] ?? '');
+                break;
+            case 'forgot-password':
+                $auth->forgotPassword($input['email'] ?? '');
+                break;
+            case 'reset-password':
+                $auth->resetPassword($input);
                 break;
             default:
                 http_response_code(400);
