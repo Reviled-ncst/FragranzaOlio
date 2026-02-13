@@ -220,9 +220,9 @@ const Home = () => {
   }
 
   return (
-    <div className="overflow-x-hidden">
+    <div className="overflow-x-hidden w-full max-w-full">
       {/* Hero Section - Black & Gold Theme */}
-      <section className="relative min-h-screen flex items-center justify-center bg-black-950 overflow-visible">
+      <section className="relative min-h-screen flex items-center justify-center bg-black-950 w-full">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
@@ -232,14 +232,14 @@ const Home = () => {
         {/* Gold gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-black-950 via-black-900/95 to-gold-900/20" />
 
-        <div className="w-full max-w-7xl mx-auto relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-6 sm:px-8 lg:px-12">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="w-full max-w-7xl mx-auto relative z-10 pt-16 sm:pt-20 pb-8 sm:pb-0 px-4 sm:px-6 lg:px-8 box-border">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Hero Content */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
-              className="text-center lg:text-left"
+              className="text-center lg:text-left overflow-hidden"
             >
               <span className="inline-block text-gold-400 font-accent text-xs sm:text-sm tracking-[0.2em] sm:tracking-[0.3em] uppercase mb-3 sm:mb-4">
                 Premium Fragrances & Cosmetics
@@ -248,7 +248,7 @@ const Home = () => {
                 Discover the Art of
                 <span className="text-gradient-gold block">Luxury Scents</span>
               </h1>
-              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 mx-auto lg:mx-0 pr-2">
+              <p className="text-gray-300 text-base sm:text-lg md:text-xl mb-6 sm:mb-8 mx-auto lg:mx-0 break-words">
                 Experience exquisite fragrances and premium cosmetics crafted with passion, 
                 precision, and the finest ingredients from around the world.
               </p>
