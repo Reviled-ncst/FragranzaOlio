@@ -13,7 +13,8 @@ import {
   GraduationCap,
   Target,
   BookOpen,
-  User
+  User,
+  Trophy
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -68,6 +69,7 @@ const OJTLayout = ({ children, title = 'OJT Dashboard' }: OJTLayoutProps) => {
     { label: 'Training Progress', icon: Target, path: '/ojt/progress' },
     { label: 'Learning Modules', icon: BookOpen, path: '/ojt/modules' },
     { label: 'Documents', icon: FileText, path: '/ojt/documents' },
+    { label: 'Achievements', icon: Trophy, path: '/ojt/achievements' },
     { label: 'My Profile', icon: User, path: '/profile' },
   ];
 

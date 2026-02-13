@@ -47,6 +47,7 @@ import OJTTasks from './pages/OJTTasks';
 import OJTProgress from './pages/OJTProgress';
 import OJTDocuments from './pages/OJTDocuments';
 import OJTModules from './pages/OJTModules';
+import OJTAchievements from './pages/OJTAchievements';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import SupervisorTrainees from './pages/SupervisorTrainees';
 import SupervisorTimesheets from './pages/SupervisorTimesheets';
@@ -132,6 +133,7 @@ const AppContent = () => {
             <Route path="/ojt/progress" element={<OJTRoute><OJTProgress /></OJTRoute>} />
             <Route path="/ojt/modules" element={<OJTRoute><OJTModules /></OJTRoute>} />
             <Route path="/ojt/documents" element={<OJTRoute><OJTDocuments /></OJTRoute>} />
+            <Route path="/ojt/achievements" element={<OJTRoute><OJTAchievements /></OJTRoute>} />
             
             {/* OJT Supervisor Routes - Protected */}
             <Route path="/supervisor" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />
