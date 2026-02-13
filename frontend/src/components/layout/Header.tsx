@@ -252,7 +252,7 @@ const Header = () => {
           : 'bg-black-950/80 backdrop-blur-sm'
       }`}
     >
-      <div className="container-custom px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <nav className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo - routes to shop for customers, dashboard for staff */}
           <Link to={user?.role === 'customer' ? '/products' : (user?.role ? getRoleConfig(user.role).dashboardPath : '/')} className="flex items-center gap-2 sm:gap-3">
