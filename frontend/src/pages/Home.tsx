@@ -267,9 +267,9 @@ const Home = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative flex justify-center"
+              className="relative flex justify-center overflow-hidden"
             >
-              <div className="relative z-10 w-full max-w-sm md:max-w-md lg:max-w-lg">
+              <div className="relative z-10 w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
                 <Swiper
                   modules={[Autoplay, Pagination, EffectFade, Navigation]}
                   effect="fade"
@@ -298,11 +298,11 @@ const Home = () => {
                   ))}
                 </Swiper>
               </div>
-              {/* Decorative Elements */}
-              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-gold-500/30 rounded-full blur-3xl" />
-              <div className="absolute -top-6 -right-6 w-40 h-40 bg-gold-400/30 rounded-full blur-3xl" />
-              {/* Gold border accent */}
-              <div className="absolute inset-4 border-2 border-gold-500/20 rounded-xl translate-x-4 translate-y-4 -z-10" />
+              {/* Decorative Elements - hidden on mobile */}
+              <div className="hidden sm:block absolute -bottom-6 -left-6 w-32 h-32 bg-gold-500/30 rounded-full blur-3xl" />
+              <div className="hidden sm:block absolute -top-6 -right-6 w-40 h-40 bg-gold-400/30 rounded-full blur-3xl" />
+              {/* Gold border accent - hidden on mobile */}
+              <div className="hidden sm:block absolute inset-4 border-2 border-gold-500/20 rounded-xl translate-x-4 translate-y-4 -z-10" />
             </motion.div>
           </div>
         </div>
