@@ -760,7 +760,7 @@ function getPendingLateRequests($conn) {
     }
     
     // Get late permission requests for trainees assigned to this supervisor
-    $stmt = $conn->prepare(\"
+    $stmt = $conn->prepare("
         SELECT 
             lp.*,
             u.first_name,
@@ -782,7 +782,7 @@ function getPendingLateRequests($conn) {
             END,
             lp.permission_date DESC, 
             lp.created_at DESC
-    \");
+    ");
     $stmt->execute([$supervisorId]);
     
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
