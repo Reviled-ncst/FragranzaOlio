@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
 import { ojtTimesheetService, Timesheet } from '../services/ojtService';
 import OvertimeApproval from '../components/OvertimeApproval';
+import LatePermissionApproval from '../components/LatePermissionApproval';
 
 const SupervisorTimesheets = () => {
   const { user } = useAuth();
@@ -213,6 +214,9 @@ const SupervisorTimesheets = () => {
 
         {/* Overtime Approval Section */}
         <OvertimeApproval supervisorId={Number(user?.id || 0)} />
+
+        {/* Late Clock-in Permission Requests */}
+        <LatePermissionApproval supervisorId={Number(user?.id || 0)} />
 
         {/* Filters */}
         <div className="bg-black-900 border border-gold-500/20 rounded-xl p-4">

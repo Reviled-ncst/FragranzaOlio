@@ -64,6 +64,12 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [modelsLoading, setModelsLoading] = useState(false);
   
+  // Late permission state
+  const [showLatePermissionModal, setShowLatePermissionModal] = useState(false);
+  const [latePermissionReason, setLatePermissionReason] = useState('');
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<'none' | 'pending' | 'approved' | 'denied'>('none');
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -371,6 +377,13 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
         
         setTimeout(() => setSuccess(null), 3000);
       } else {
+        // Check if late permission is required
+        if (data.requires_permission) {
+          setShowLatePermissionModal(true);
+          if (data.existing_status) {
+            setPermissionStatus(data.existing_status);
+          }
+        }
         setError(data.error || 'Failed to process clock action');
       }
     } catch (err: any) {
@@ -435,6 +448,44 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     }
   };
 
+  // Request late clock-in permission
+  const handleRequestLatePermission = async () => {
+    if (!latePermissionReason.trim()) {
+      setError('Please provide a reason for your request');
+      return;
+    }
+    
+    setIsRequestingPermission(true);
+    setError(null);
+    
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/request-late-permission`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trainee_id: userId,
+          reason: latePermissionReason,
+          date: new Date().toISOString().split('T')[0]
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSuccess('Permission request sent to your supervisor');
+        setPermissionStatus('pending');
+        setShowLatePermissionModal(false);
+        setLatePermissionReason('');
+        setTimeout(() => setSuccess(null), 5000);
+      } else {
+        setError(data.error || 'Failed to request permission');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Network error');
+    } finally {
+      setIsRequestingPermission(false);
+    }
+  };
   // Format time
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return '--:--';
@@ -783,6 +834,99 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
                         </button>
                       </>
                     )}
+                  </div>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Late Permission Request Modal */}
+      <AnimatePresence>
+        {showLatePermissionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowLatePermissionModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-black-900 border border-gold-500/30 rounded-xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Clock size={20} className="text-gold-400" />
+                  Late Clock-in Request
+                </h3>
+                <button
+                  onClick={() => setShowLatePermissionModal(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              
+              {permissionStatus === 'pending' ? (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock size={32} className="text-amber-400" />
+                  </div>
+                  <p className="text-amber-400 font-medium mb-2">Request Pending</p>
+                  <p className="text-gray-400 text-sm">
+                    Your late clock-in request is awaiting supervisor approval.
+                  </p>
+                </div>
+              ) : permissionStatus === 'denied' ? (
+                <div className="text-center py-4">
+                  <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <X size={32} className="text-red-400" />
+                  </div>
+                  <p className="text-red-400 font-medium mb-2">Request Denied</p>
+                  <p className="text-gray-400 text-sm">
+                    Your late clock-in request was denied. You will be marked as absent for today.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-400 text-sm mb-4">
+                    The clock-in window has closed (after 6:00 PM). You need supervisor approval to clock in late.
+                  </p>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm text-gray-400 mb-2">Reason for late clock-in *</label>
+                    <textarea
+                      value={latePermissionReason}
+                      onChange={(e) => setLatePermissionReason(e.target.value)}
+                      className="w-full bg-black-800 border border-gray-700 rounded-lg p-3 text-white focus:border-gold-500 focus:outline-none"
+                      rows={3}
+                      placeholder="Explain why you need to clock in late..."
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowLatePermissionModal(false)}
+                      className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRequestLatePermission}
+                      disabled={isRequestingPermission || !latePermissionReason.trim()}
+                      className="flex-1 py-2 px-4 bg-gold-500 hover:bg-gold-600 text-black font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {isRequestingPermission ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        'Request Permission'
+                      )}
+                    </button>
                   </div>
                 </>
               )}
