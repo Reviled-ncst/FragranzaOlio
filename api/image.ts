@@ -15,7 +15,7 @@ interface VercelResponse {
 }
 
 // Backend URL for images - Cloudflare tunnel to local XAMPP
-const BACKEND_URL = process.env.BACKEND_URL || 'https://particular-vegetation-mens-epa.trycloudflare.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://fragranza-backend.fragranza.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
