@@ -182,11 +182,9 @@ function calculateUserStats($conn, $userId) {
     $stmt = $conn->prepare("
         SELECT 
             COUNT(*) as total_tasks,
-            SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved_tasks,
-            SUM(CASE WHEN status = 'approved' AND score = 5 THEN 1 ELSE 0 END) as perfect_tasks,
-            SUM(CASE WHEN status = 'approved' AND revision_count = 0 THEN 1 ELSE 0 END) as first_try_tasks
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as approved_tasks
         FROM ojt_tasks
-        WHERE trainee_id = ?
+        WHERE assigned_to = ?
     ");
     $stmt->execute([$userId]);
     $tasks = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -194,7 +192,7 @@ function calculateUserStats($conn, $userId) {
     // Get assignment progress
     $stmt = $conn->prepare("
         SELECT 
-            start_date, end_date, required_hours
+            start_date, end_date, total_required_hours
         FROM ojt_assignments
         WHERE trainee_id = ?
         LIMIT 1
@@ -203,8 +201,8 @@ function calculateUserStats($conn, $userId) {
     $assignment = $stmt->fetch(PDO::FETCH_ASSOC);
     
     $programProgress = 0;
-    if ($assignment && $assignment['required_hours'] > 0) {
-        $programProgress = min(100, round(($attendance['total_hours'] / $assignment['required_hours']) * 100));
+    if ($assignment && $assignment['total_required_hours'] > 0) {
+        $programProgress = min(100, round(($attendance['total_hours'] / $assignment['total_required_hours']) * 100));
     }
     
     return [
@@ -213,8 +211,8 @@ function calculateUserStats($conn, $userId) {
         'total_hours' => floatval($attendance['total_hours']),
         'total_tasks' => intval($tasks['total_tasks']),
         'approved_tasks' => intval($tasks['approved_tasks']),
-        'perfect_tasks' => intval($tasks['perfect_tasks']),
-        'first_try_tasks' => intval($tasks['first_try_tasks']),
+        'perfect_tasks' => 0, // Placeholder - rating tracking not implemented
+        'first_try_tasks' => 0, // Placeholder - revision tracking not implemented
         'program_progress' => $programProgress
     ];
 }
