@@ -65,7 +65,7 @@ const heroImages = [
     subtitle: "Delicate & Feminine"
   },
   {
-    image: "/assets/images/Men's Perfume/B8 Crimson Moon.png",
+    image: "/assets/images/Men's Perfume/b8 Crimson Moon.png",
     title: "Crimson Moon",
     subtitle: "Mysterious & Intense"
   },
