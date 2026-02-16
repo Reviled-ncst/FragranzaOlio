@@ -296,21 +296,39 @@ function clockIn($conn) {
     }
     
     if ($currentTimeMinutes >= $latestClockIn) {
-        // Check if trainee has permission to clock in late
+        // Check if trainee has APPROVED permission to clock in late
         $today = date('Y-m-d');
         $stmt = $conn->prepare("
             SELECT id FROM ojt_late_permissions 
-            WHERE trainee_id = ? AND permission_date = ? AND used_at IS NULL
+            WHERE trainee_id = ? AND permission_date = ? AND status = 'approved' AND used_at IS NULL
         ");
         $stmt->execute([$traineeId, $today]);
         $hasPermission = $stmt->fetch();
         
         if (!$hasPermission) {
+            // Check if there's a pending request
+            $stmt = $conn->prepare("
+                SELECT status FROM ojt_late_permissions 
+                WHERE trainee_id = ? AND permission_date = ?
+            ");
+            $stmt->execute([$traineeId, $today]);
+            $existingRequest = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $errorMsg = 'Clock-in window has closed for today (after 6:00 PM). ';
+            if ($existingRequest && $existingRequest['status'] === 'pending') {
+                $errorMsg .= 'Your permission request is pending supervisor approval.';
+            } elseif ($existingRequest && $existingRequest['status'] === 'denied') {
+                $errorMsg .= 'Your permission request was denied.';
+            } else {
+                $errorMsg .= 'Request permission from your supervisor to clock in.';
+            }
+            
             http_response_code(400);
             echo json_encode([
                 'success' => false, 
-                'error' => 'Clock-in window has closed for today (after 6:00 PM). Request permission from your supervisor to clock in.',
-                'requires_permission' => true
+                'error' => $errorMsg,
+                'requires_permission' => true,
+                'existing_status' => $existingRequest['status'] ?? null
             ]);
             return;
         }
@@ -742,7 +760,7 @@ function getPendingLateRequests($conn) {
     }
     
     // Get late permission requests for trainees assigned to this supervisor
-    $stmt = $conn->prepare("
+    $stmt = $conn->prepare(\"
         SELECT 
             lp.*,
             u.first_name,
@@ -756,8 +774,15 @@ function getPendingLateRequests($conn) {
         LEFT JOIN users gb ON lp.granted_by = gb.id
         JOIN ojt_assignments oa ON lp.trainee_id = oa.trainee_id AND oa.supervisor_id = ?
         WHERE lp.permission_date >= CURDATE()
-        ORDER BY lp.permission_date DESC, lp.created_at DESC
-    ");
+        ORDER BY 
+            CASE lp.status 
+                WHEN 'pending' THEN 0 
+                WHEN 'approved' THEN 1 
+                WHEN 'denied' THEN 2 
+            END,
+            lp.permission_date DESC, 
+            lp.created_at DESC
+    \");
     $stmt->execute([$supervisorId]);
     
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -800,10 +825,10 @@ function requestLatePermission($conn) {
         return;
     }
     
-    // Create permission request (granted_by is set to supervisor, but used_at is null until granted)
+    // Create permission request with pending status
     $stmt = $conn->prepare("
-        INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason, status)
+        VALUES (?, ?, ?, ?, 'pending')
     ");
     $stmt->execute([$traineeId, $supervisorId, $date, $reason]);
     
@@ -849,13 +874,22 @@ function grantLatePermission($conn) {
     }
     
     if ($approved) {
-        // Insert or update permission
+        // Update permission to approved status
         $stmt = $conn->prepare("
-            INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason)
-            VALUES (?, ?, ?, 'Approved by supervisor')
-            ON DUPLICATE KEY UPDATE granted_by = ?, reason = 'Approved by supervisor'
+            UPDATE ojt_late_permissions 
+            SET status = 'approved', granted_by = ?, approved_at = NOW()
+            WHERE trainee_id = ? AND permission_date = ?
         ");
-        $stmt->execute([$traineeId, $grantedBy, $date, $grantedBy]);
+        $stmt->execute([$grantedBy, $traineeId, $date]);
+        
+        // If no existing request, create new approved permission
+        if ($stmt->rowCount() === 0) {
+            $stmt = $conn->prepare("
+                INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason, status, approved_at)
+                VALUES (?, ?, ?, 'Granted by supervisor', 'approved', NOW())
+            ");
+            $stmt->execute([$traineeId, $grantedBy, $date]);
+        }
         
         // Notify trainee
         createAttendanceNotification($conn, $traineeId, 'Late Clock-in Approved',
@@ -866,13 +900,19 @@ function grantLatePermission($conn) {
             'message' => 'Late clock-in permission granted'
         ]);
     } else {
-        // Delete permission request
-        $stmt = $conn->prepare("DELETE FROM ojt_late_permissions WHERE trainee_id = ? AND permission_date = ?");
-        $stmt->execute([$traineeId, $date]);
+        $deniedReason = $data['denied_reason'] ?? 'Request denied by supervisor';
+        
+        // Update permission to denied status
+        $stmt = $conn->prepare("
+            UPDATE ojt_late_permissions 
+            SET status = 'denied', denied_reason = ?
+            WHERE trainee_id = ? AND permission_date = ?
+        ");
+        $stmt->execute([$deniedReason, $traineeId, $date]);
         
         // Notify trainee
         createAttendanceNotification($conn, $traineeId, 'Late Clock-in Denied',
-            "Your request to clock in late has been denied. You will be marked as absent.");
+            "Your request to clock in late has been denied. Reason: $deniedReason");
         
         echo json_encode([
             'success' => true,
