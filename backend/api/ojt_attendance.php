@@ -73,6 +73,9 @@ function handleGet($conn, $path) {
         case 'history':
             getAttendanceHistory($conn);
             break;
+        case 'date':
+            getAttendanceByDate($conn);
+            break;
         case 'pending-overtime':
             getPendingOvertime($conn);
             break;
@@ -183,6 +186,41 @@ function getTodayAttendance($conn) {
     
     $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'data' => $records]);
+}
+
+function getAttendanceByDate($conn) {
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    $date = isset($_GET['date']) ? $_GET['date'] : null;
+    
+    if (!$traineeId || !$date) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID and date required']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("
+        SELECT 
+            attendance_date as date,
+            time_in,
+            time_out,
+            latitude_in,
+            longitude_in,
+            location_in,
+            latitude_out,
+            longitude_out,
+            location_out
+        FROM ojt_attendance 
+        WHERE trainee_id = ? AND attendance_date = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$traineeId, $date]);
+    $record = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($record) {
+        echo json_encode(['success' => true, 'data' => $record]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'No attendance record found for this date']);
+    }
 }
 
 function getAttendanceHistory($conn) {

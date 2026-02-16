@@ -12,13 +12,16 @@ import {
   X,
   AlertCircle,
   Loader2,
-  FileCheck
+  FileCheck,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
 import { ojtTimesheetService, Timesheet } from '../services/ojtService';
 import OvertimeApproval from '../components/OvertimeApproval';
 import LatePermissionApproval from '../components/LatePermissionApproval';
+import AttendanceLocationMap, { AttendanceLocationData } from '../components/AttendanceLocationMap';
+import { API_BASE_URL, apiFetch } from '../services/api';
 
 const SupervisorTimesheets = () => {
   const { user } = useAuth();
@@ -32,6 +35,33 @@ const SupervisorTimesheets = () => {
   const [selectedTimesheet, setSelectedTimesheet] = useState<Timesheet | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLocationMap, setShowLocationMap] = useState(false);
+  const [selectedLocationData, setSelectedLocationData] = useState<AttendanceLocationData | null>(null);
+
+  // Fetch attendance location for a specific date
+  const fetchAttendanceLocation = async (traineeId: number, date: string, traineeName: string) => {
+    try {
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/date?trainee_id=${traineeId}&date=${date}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setSelectedLocationData({
+          date: data.data.date,
+          time_in: data.data.time_in,
+          time_out: data.data.time_out,
+          latitude_in: data.data.latitude_in,
+          longitude_in: data.data.longitude_in,
+          location_in: data.data.location_in,
+          latitude_out: data.data.latitude_out,
+          longitude_out: data.data.longitude_out,
+          location_out: data.data.location_out,
+          trainee_name: traineeName
+        });
+        setShowLocationMap(true);
+      }
+    } catch (err) {
+      console.error('Error fetching attendance location:', err);
+    }
+  };
 
   const fetchTimesheets = useCallback(async () => {
     if (!user?.id) return;
@@ -447,6 +477,7 @@ const SupervisorTimesheets = () => {
                               <th className="text-left py-3 px-4 text-gray-400 font-medium">Time Out</th>
                               <th className="text-center py-3 px-4 text-gray-400 font-medium">Hours</th>
                               <th className="text-left py-3 px-4 text-gray-400 font-medium hidden sm:table-cell">Tasks</th>
+                              <th className="text-center py-3 px-4 text-gray-400 font-medium">Location</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gold-500/10">
@@ -461,6 +492,15 @@ const SupervisorTimesheets = () => {
                                 <td className="py-3 px-4 text-gray-400 hidden sm:table-cell truncate max-w-[200px]">
                                   {entry.tasks_completed || '-'}
                                 </td>
+                                <td className="py-3 px-4 text-center">
+                                  <button
+                                    onClick={() => fetchAttendanceLocation(selectedTimesheet.trainee_id, entry.entry_date, selectedTimesheet.trainee_name)}
+                                    className="p-1.5 text-gold-400 hover:bg-gold-500/20 rounded-lg transition-colors"
+                                    title="View attendance location"
+                                  >
+                                    <MapPin size={16} />
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -469,6 +509,7 @@ const SupervisorTimesheets = () => {
                               <td colSpan={3} className="py-3 px-4 text-gray-400 font-medium">Total</td>
                               <td className="py-3 px-4 text-center text-gold-400 font-bold">{selectedTimesheet.total_hours}</td>
                               <td className="hidden sm:table-cell"></td>
+                              <td></td>
                             </tr>
                           </tfoot>
                         </table>
@@ -573,6 +614,13 @@ const SupervisorTimesheets = () => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Attendance Location Map Modal */}
+        <AttendanceLocationMap
+          isOpen={showLocationMap}
+          onClose={() => setShowLocationMap(false)}
+          data={selectedLocationData}
+        />
       </div>
     </SupervisorLayout>
   );

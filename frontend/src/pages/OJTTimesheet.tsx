@@ -3,7 +3,8 @@ import { API_BASE_URL, apiFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
 import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult } from '../services/faceRecognitionService';
-import { Shield, Loader2, CheckCircle, User, AlertTriangle } from 'lucide-react';
+import { Shield, Loader2, CheckCircle, User, AlertTriangle, MapPin } from 'lucide-react';
+import AttendanceLocationMap, { AttendanceLocationData, LocationButton } from '../components/AttendanceLocationMap';
 
 interface AttendanceRecord {
   id: number;
@@ -20,6 +21,12 @@ interface AttendanceRecord {
   penalty_hours: number;
   photo_in: string | null;
   photo_out: string | null;
+  latitude_in?: number;
+  longitude_in?: number;
+  location_in?: string;
+  latitude_out?: number;
+  longitude_out?: number;
+  location_out?: string;
 }
 
 interface CameraModalProps {
@@ -501,6 +508,8 @@ export default function OJTTimesheet() {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraAction, setCameraAction] = useState<'in' | 'out'>('in');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showLocationMap, setShowLocationMap] = useState(false);
+  const [selectedLocationData, setSelectedLocationData] = useState<AttendanceLocationData | null>(null);
 
   // Real-time clock
   useEffect(() => {
@@ -911,6 +920,7 @@ export default function OJTTimesheet() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Penalty</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Net Hours</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Overtime</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-400 uppercase">Location</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gold-500/10">
@@ -973,6 +983,32 @@ export default function OJTTimesheet() {
                           <span className="text-gray-500">-</span>
                         )}
                       </td>
+                      <td className="px-4 py-3 text-center">
+                        {record && (record.latitude_in || record.latitude_out) ? (
+                          <button
+                            onClick={() => {
+                              setSelectedLocationData({
+                                date: record.date,
+                                time_in: record.time_in || undefined,
+                                time_out: record.time_out || undefined,
+                                latitude_in: record.latitude_in,
+                                longitude_in: record.longitude_in,
+                                location_in: record.location_in,
+                                latitude_out: record.latitude_out,
+                                longitude_out: record.longitude_out,
+                                location_out: record.location_out
+                              });
+                              setShowLocationMap(true);
+                            }}
+                            className="p-1.5 text-gold-400 hover:bg-gold-500/20 rounded-lg transition-colors"
+                            title="View location"
+                          >
+                            <MapPin size={16} />
+                          </button>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </td>
                     </tr>
                   );
                 })}
@@ -987,6 +1023,7 @@ export default function OJTTimesheet() {
                   <td className="px-4 py-3 text-center text-red-400">-{formatHours(weekTotals.penalty)}</td>
                   <td className="px-4 py-3 text-center text-white">{formatHours(netHours)}</td>
                   <td className="px-4 py-3 text-center text-gold-400">+{formatHours(weekTotals.overtime)}</td>
+                  <td className="px-4 py-3"></td>
                 </tr>
               </tfoot>
             </table>
@@ -1011,6 +1048,13 @@ export default function OJTTimesheet() {
         onCapture={cameraAction === 'in' ? handleClockIn : handleClockOut}
         onClose={() => setShowCamera(false)}
         title={cameraAction === 'in' ? '📸 Clock In Photo' : '📸 Clock Out Photo'}
+      />
+
+      {/* Location Map Modal */}
+      <AttendanceLocationMap
+        isOpen={showLocationMap}
+        onClose={() => setShowLocationMap(false)}
+        data={selectedLocationData}
       />
     </OJTLayout>
   );
