@@ -76,6 +76,12 @@ function handleGet($conn, $path) {
         case 'pending-overtime':
             getPendingOvertime($conn);
             break;
+        case 'pending-late-requests':
+            getPendingLateRequests($conn);
+            break;
+        case 'check-late-permission':
+            checkLatePermission($conn);
+            break;
         default:
             getAttendance($conn);
     }
@@ -94,6 +100,12 @@ function handlePost($conn, $path) {
             break;
         case 'break-end':
             breakEnd($conn);
+            break;
+        case 'request-late-permission':
+            requestLatePermission($conn);
+            break;
+        case 'grant-late-permission':
+            grantLatePermission($conn);
             break;
         default:
             http_response_code(400);
@@ -284,9 +296,27 @@ function clockIn($conn) {
     }
     
     if ($currentTimeMinutes >= $latestClockIn) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Clock-in window has closed for today (after 6:00 PM). You will be marked as absent.']);
-        return;
+        // Check if trainee has permission to clock in late
+        $today = date('Y-m-d');
+        $stmt = $conn->prepare("
+            SELECT id FROM ojt_late_permissions 
+            WHERE trainee_id = ? AND permission_date = ? AND used_at IS NULL
+        ");
+        $stmt->execute([$traineeId, $today]);
+        $hasPermission = $stmt->fetch();
+        
+        if (!$hasPermission) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false, 
+                'error' => 'Clock-in window has closed for today (after 6:00 PM). Request permission from your supervisor to clock in.',
+                'requires_permission' => true
+            ]);
+            return;
+        }
+        
+        // Mark permission as used
+        $conn->prepare("UPDATE ojt_late_permissions SET used_at = NOW() WHERE id = ?")->execute([$hasPermission['id']]);
     }
     
     // Get supervisor if not provided
@@ -672,5 +702,182 @@ function createAttendanceNotification($conn, $userId, $title, $message) {
         VALUES (?, 'attendance', ?, ?, '/ojt/timesheet')
     ");
     $stmt->execute([$userId, $title, $message]);
+}
+
+// Late Permission Functions
+
+function checkLatePermission($conn) {
+    $traineeId = isset($_GET['trainee_id']) ? intval($_GET['trainee_id']) : 0;
+    $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("
+        SELECT lp.*, u.first_name, u.last_name, CONCAT(u.first_name, ' ', u.last_name) as granted_by_name
+        FROM ojt_late_permissions lp
+        JOIN users u ON lp.granted_by = u.id
+        WHERE lp.trainee_id = ? AND lp.permission_date = ?
+    ");
+    $stmt->execute([$traineeId, $date]);
+    $permission = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'has_permission' => $permission ? true : false,
+        'data' => $permission
+    ]);
+}
+
+function getPendingLateRequests($conn) {
+    $supervisorId = isset($_GET['supervisor_id']) ? intval($_GET['supervisor_id']) : 0;
+    
+    if (!$supervisorId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Supervisor ID required']);
+        return;
+    }
+    
+    // Get late permission requests for trainees assigned to this supervisor
+    $stmt = $conn->prepare("
+        SELECT 
+            lp.*,
+            u.first_name,
+            u.last_name,
+            u.email,
+            CONCAT(u.first_name, ' ', u.last_name) as trainee_name,
+            gb.first_name as granted_by_first,
+            gb.last_name as granted_by_last
+        FROM ojt_late_permissions lp
+        JOIN users u ON lp.trainee_id = u.id
+        LEFT JOIN users gb ON lp.granted_by = gb.id
+        JOIN ojt_assignments oa ON lp.trainee_id = oa.trainee_id AND oa.supervisor_id = ?
+        WHERE lp.permission_date >= CURDATE()
+        ORDER BY lp.permission_date DESC, lp.created_at DESC
+    ");
+    $stmt->execute([$supervisorId]);
+    
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+function requestLatePermission($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    $reason = $data['reason'] ?? '';
+    $date = $data['date'] ?? date('Y-m-d');
+    
+    if (!$traineeId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    // Check if permission already exists for this date
+    $stmt = $conn->prepare("SELECT id FROM ojt_late_permissions WHERE trainee_id = ? AND permission_date = ?");
+    $stmt->execute([$traineeId, $date]);
+    if ($stmt->fetch()) {
+        echo json_encode(['success' => false, 'error' => 'Permission request already exists for this date']);
+        return;
+    }
+    
+    // Get supervisor
+    $stmt = $conn->prepare("
+        SELECT supervisor_id FROM ojt_assignments 
+        WHERE trainee_id = ? AND status = 'active' 
+        ORDER BY id DESC LIMIT 1
+    ");
+    $stmt->execute([$traineeId]);
+    $assignment = $stmt->fetch(PDO::FETCH_ASSOC);
+    $supervisorId = $assignment['supervisor_id'] ?? null;
+    
+    if (!$supervisorId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'No supervisor found for this trainee']);
+        return;
+    }
+    
+    // Create permission request (granted_by is set to supervisor, but used_at is null until granted)
+    $stmt = $conn->prepare("
+        INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason)
+        VALUES (?, ?, ?, ?)
+    ");
+    $stmt->execute([$traineeId, $supervisorId, $date, $reason]);
+    
+    // Get trainee name for notification
+    $stmt = $conn->prepare("SELECT first_name, last_name FROM users WHERE id = ?");
+    $stmt->execute([$traineeId]);
+    $trainee = $stmt->fetch(PDO::FETCH_ASSOC);
+    $traineeName = $trainee['first_name'] . ' ' . $trainee['last_name'];
+    
+    // Notify supervisor
+    createAttendanceNotification($conn, $supervisorId, 'Late Clock-in Request',
+        "$traineeName is requesting permission to clock in late. Reason: $reason");
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'Permission request sent to your supervisor'
+    ]);
+}
+
+function grantLatePermission($conn) {
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    $traineeId = intval($data['trainee_id'] ?? 0);
+    $grantedBy = intval($data['granted_by'] ?? 0);
+    $date = $data['date'] ?? date('Y-m-d');
+    $approved = $data['approved'] ?? true;
+    
+    if (!$traineeId || !$grantedBy) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Trainee ID and Granted By ID required']);
+        return;
+    }
+    
+    // Verify granter is admin or supervisor
+    $stmt = $conn->prepare("SELECT role FROM users WHERE id = ?");
+    $stmt->execute([$grantedBy]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$user || !in_array($user['role'], ['admin', 'supervisor', 'ojt_supervisor'])) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Only supervisors or admins can grant late clock-in permission']);
+        return;
+    }
+    
+    if ($approved) {
+        // Insert or update permission
+        $stmt = $conn->prepare("
+            INSERT INTO ojt_late_permissions (trainee_id, granted_by, permission_date, reason)
+            VALUES (?, ?, ?, 'Approved by supervisor')
+            ON DUPLICATE KEY UPDATE granted_by = ?, reason = 'Approved by supervisor'
+        ");
+        $stmt->execute([$traineeId, $grantedBy, $date, $grantedBy]);
+        
+        // Notify trainee
+        createAttendanceNotification($conn, $traineeId, 'Late Clock-in Approved',
+            "Your request to clock in late has been approved. You can now clock in.");
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Late clock-in permission granted'
+        ]);
+    } else {
+        // Delete permission request
+        $stmt = $conn->prepare("DELETE FROM ojt_late_permissions WHERE trainee_id = ? AND permission_date = ?");
+        $stmt->execute([$traineeId, $date]);
+        
+        // Notify trainee
+        createAttendanceNotification($conn, $traineeId, 'Late Clock-in Denied',
+            "Your request to clock in late has been denied. You will be marked as absent.");
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Late clock-in permission denied'
+        ]);
+    }
 }
 ?>
