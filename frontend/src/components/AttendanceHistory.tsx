@@ -29,7 +29,7 @@ interface AttendanceRecord {
   location_out: string | null;
   photo_in: string | null;
   photo_out: string | null;
-  face_verified_in: boolean;
+  face_verified: boolean;
   face_verified_out: boolean;
 }
 
@@ -217,7 +217,7 @@ const AttendanceHistory = ({ userId }: AttendanceHistoryProps) => {
                   </td>
                   <td className="py-3 px-4 text-center">
                     <span className="text-green-400 font-medium">{formatTime(record.time_in)}</span>
-                    {record.face_verified_in && (
+                    {record.face_verified && (
                       <CheckCircle size={12} className="inline ml-1 text-green-500" />
                     )}
                   </td>
