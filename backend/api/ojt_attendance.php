@@ -17,6 +17,7 @@ date_default_timezone_set('Asia/Manila');
 // OJT Schedule Configuration
 define('OJT_START_TIME', 9);      // 9:00 AM
 define('OJT_END_TIME', 18);       // 6:00 PM  
+define('OJT_EARLY_CLOCK_IN', 30); // Can clock in 30 minutes before start
 define('OJT_LUNCH_START', 12);    // 12:00 PM
 define('OJT_LUNCH_END', 13);      // 1:00 PM
 define('OJT_LUNCH_DURATION', 1);  // 1 hour lunch (auto-deducted)
@@ -264,6 +265,27 @@ function clockIn($conn) {
     if (!$traineeId) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Trainee ID required']);
+        return;
+    }
+    
+    // Validate clock-in window: 8:30 AM to 6:00 PM
+    $currentHour = (int)date('G');
+    $currentMinute = (int)date('i');
+    $currentTimeMinutes = ($currentHour * 60) + $currentMinute;
+    
+    $earliestClockIn = (OJT_START_TIME * 60) - OJT_EARLY_CLOCK_IN; // 8:30 AM = 510 minutes
+    $latestClockIn = OJT_END_TIME * 60; // 6:00 PM = 1080 minutes
+    
+    if ($currentTimeMinutes < $earliestClockIn) {
+        $earlyTime = sprintf('%d:%02d AM', floor($earliestClockIn / 60), $earliestClockIn % 60);
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => "Clock-in not available yet. You can clock in starting at $earlyTime."]);
+        return;
+    }
+    
+    if ($currentTimeMinutes >= $latestClockIn) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Clock-in window has closed for today (after 6:00 PM). You will be marked as absent.']);
         return;
     }
     
