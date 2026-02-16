@@ -147,6 +147,19 @@ export const productService = {
       });
 
       const result = await response.json();
+      
+      // Transform flat category fields into nested category object
+      if (result.success && result.data) {
+        result.data = result.data.map((product: any) => ({
+          ...product,
+          category: product.category_id ? {
+            id: product.category_id,
+            name: product.category_name || 'Uncategorized',
+            slug: product.category_slug || 'uncategorized',
+          } : null,
+        }));
+      }
+      
       return result;
     } catch (error: any) {
       console.error(' Error fetching products:', error);
@@ -169,6 +182,20 @@ export const productService = {
         credentials: 'include',
       });
       const result = await response.json();
+      
+      // Transform flat category fields into nested category object
+      if (result.success && result.data) {
+        const product = result.data;
+        result.data = {
+          ...product,
+          category: product.category_id ? {
+            id: product.category_id,
+            name: product.category_name || 'Uncategorized',
+            slug: product.category_slug || 'uncategorized',
+          } : null,
+        };
+      }
+      
       return result;
     } catch (error: any) {
       console.error('Product error:', error);
@@ -185,6 +212,20 @@ export const productService = {
         credentials: 'include',
       });
       const result = await response.json();
+      
+      // Transform flat category fields into nested category object
+      if (result.success && result.data) {
+        const product = result.data;
+        result.data = {
+          ...product,
+          category: product.category_id ? {
+            id: product.category_id,
+            name: product.category_name || 'Uncategorized',
+            slug: product.category_slug || 'uncategorized',
+          } : null,
+        };
+      }
+      
       return result;
     } catch (error: any) {
       console.error('Product error:', error);
