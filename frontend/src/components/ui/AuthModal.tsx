@@ -5,6 +5,7 @@ import authService from '../../services/authServicePHP';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { getDashboardForRole } from '../utils/RoleBasedRoute';
+import { apiFetch, API_BASE_URL } from '../../services/api';
 
 // User role constants
 export type UserRole = 'customer' | 'sales' | 'admin' | 'ojt' | 'ojt_supervisor';
@@ -379,7 +380,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://gadgets-craig-counted-liabilities.trycloudflare.com/backend/api'}/auth.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'forgot-password', email: forgotEmail }),
