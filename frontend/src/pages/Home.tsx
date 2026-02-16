@@ -302,7 +302,7 @@ const Home = () => {
               <div className="hidden sm:block absolute -bottom-6 -left-6 w-32 h-32 bg-gold-500/30 rounded-full blur-3xl" />
               <div className="hidden sm:block absolute -top-6 -right-6 w-40 h-40 bg-gold-400/30 rounded-full blur-3xl" />
               {/* Gold border accent - hidden on mobile */}
-              <div className="hidden sm:block absolute inset-4 border-2 border-gold-500/20 rounded-xl translate-x-4 translate-y-4 -z-10" />
+              <div className="hidden sm:block absolute inset-0 border-2 border-gold-500/30 rounded-xl -z-10" />
             </motion.div>
           </div>
         </div>
