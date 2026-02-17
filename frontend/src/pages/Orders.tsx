@@ -38,6 +38,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
 import RatingModal, { ReviewData } from '../components/RatingModal';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 const statusConfig: Record<OrderStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   ordered: { label: 'Ordered', icon: Clock, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
@@ -90,6 +91,83 @@ const Orders = () => {
   // Rating Modal state
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [ratingOrder, setRatingOrder] = useState<Order | null>(null);
+
+  // Confirm Dialog state
+  type ConfirmAction = 'complete' | 'cancel' | 'return' | null;
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    action: ConfirmAction;
+    orderId: number | null;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    action: null,
+    orderId: null,
+    isLoading: false,
+  });
+
+  const confirmDialogConfig = {
+    complete: {
+      title: 'Confirm Order Receipt',
+      message: 'Please confirm that you have received your order. This will mark it as completed and allow you to rate the products.',
+      confirmText: 'Yes, I Received It',
+      variant: 'success' as const,
+    },
+    cancel: {
+      title: 'Cancel Order',
+      message: 'Are you sure you want to cancel this order? This action cannot be undone.',
+      confirmText: 'Yes, Cancel Order',
+      variant: 'danger' as const,
+    },
+    return: {
+      title: 'Request Return/Refund',
+      message: 'Would you like to request a return or refund for this order? Our team will contact you to process your request.',
+      confirmText: 'Submit Request',
+      variant: 'warning' as const,
+    },
+  };
+
+  const openConfirmDialog = (action: ConfirmAction, orderId: number) => {
+    setConfirmDialog({ isOpen: true, action, orderId, isLoading: false });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ isOpen: false, action: null, orderId: null, isLoading: false });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmDialog.action || !confirmDialog.orderId) return;
+    
+    setConfirmDialog(prev => ({ ...prev, isLoading: true }));
+    
+    try {
+      let result;
+      switch (confirmDialog.action) {
+        case 'complete':
+          result = await orderService.completeOrder(confirmDialog.orderId);
+          break;
+        case 'cancel':
+          result = await orderService.cancelOrder(confirmDialog.orderId);
+          break;
+        case 'return':
+          result = await orderService.requestReturn(confirmDialog.orderId);
+          break;
+      }
+      
+      if (result?.success) {
+        closeConfirmDialog();
+        if (selectedOrder) handleCloseModal();
+        refreshOrders();
+      } else {
+        alert(result?.message || 'Action failed. Please try again.');
+        setConfirmDialog(prev => ({ ...prev, isLoading: false }));
+      }
+    } catch (error) {
+      console.error('Action failed:', error);
+      alert('An error occurred. Please try again.');
+      setConfirmDialog(prev => ({ ...prev, isLoading: false }));
+    }
+  };
 
   // Open rating modal for an order
   const openRatingModal = (order: Order) => {
@@ -687,16 +765,9 @@ const Orders = () => {
                             </div>
                           </div>
                           <button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm('Confirm that you have received your order?')) {
-                                const result = await orderService.completeOrder(order.id);
-                                if (result.success) {
-                                  refreshOrders();
-                                } else {
-                                  alert(result.message || 'Failed to complete order');
-                                }
-                              }
+                              openConfirmDialog('complete', order.id);
                             }}
                             className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02]"
                           >
@@ -757,16 +828,9 @@ const Orders = () => {
                         {/* Cancel for pending orders */}
                         {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
                           <button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm('Cancel this order?')) {
-                                const result = await orderService.cancelOrder(order.id);
-                                if (result.success) {
-                                  refreshOrders();
-                                } else {
-                                  alert(result.message || 'Failed to cancel order');
-                                }
-                              }
+                              openConfirmDialog('cancel', order.id);
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/30 hover:bg-red-500/10 text-red-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
                           >
@@ -778,17 +842,9 @@ const Orders = () => {
                         {/* Return/Refund for completed orders */}
                         {(order.status === 'delivered' || order.status === 'picked_up' || order.status === 'completed') && (
                           <button
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm('Request a return/refund for this order?')) {
-                                const result = await orderService.requestReturn(order.id);
-                                if (result.success) {
-                                  alert('Return request submitted!');
-                                  refreshOrders();
-                                } else {
-                                  alert(result.message || 'Failed to request return');
-                                }
-                              }
+                              openConfirmDialog('return', order.id);
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-500/30 hover:bg-orange-500/10 text-orange-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
                           >
@@ -998,17 +1054,7 @@ const Orders = () => {
   {/* Cancel button for orders that haven't shipped yet */}
                   {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(selectedOrder.status) && (
                     <button
-                      onClick={async () => {
-                        if (window.confirm('Are you sure you want to cancel this order?')) {
-                          const result = await orderService.cancelOrder(selectedOrder.id);
-                          if (result.success) {
-                            handleCloseModal();
-                            refreshOrders();
-                          } else {
-                            alert(result.message || 'Failed to cancel order');
-                          }
-                        }
-                      }}
+                      onClick={() => openConfirmDialog('cancel', selectedOrder.id)}
                       className="flex items-center justify-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
                     >
                       <XCircle size={18} />
@@ -1019,18 +1065,7 @@ const Orders = () => {
                   {/* Mark as Completed for delivered/picked_up orders */}
                   {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up') && (
                     <button
-                      onClick={async () => {
-                        if (window.confirm('Confirm that you have received your order? This will mark it as completed.')) {
-                          const result = await orderService.completeOrder(selectedOrder.id);
-                          if (result.success) {
-                            alert('Order marked as completed! You can now rate your products.');
-                            handleCloseModal();
-                            refreshOrders();
-                          } else {
-                            alert(result.message || 'Failed to complete order');
-                          }
-                        }
-                      }}
+                      onClick={() => openConfirmDialog('complete', selectedOrder.id)}
                       className="flex items-center justify-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
                     >
                       <CheckCircle size={18} />
@@ -1052,18 +1087,7 @@ const Orders = () => {
                         Rate Products
                       </button>
                       <button
-                        onClick={async () => {
-                          if (window.confirm('Are you sure you want to request a return/refund for this order?')) {
-                            const result = await orderService.requestReturn(selectedOrder.id);
-                            if (result.success) {
-                              alert('Return request submitted successfully. We will contact you shortly.');
-                              handleCloseModal();
-                              refreshOrders();
-                            } else {
-                              alert(result.message || 'Failed to request return');
-                            }
-                          }
-                        }}
+                        onClick={() => openConfirmDialog('return', selectedOrder.id)}
                         className="flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
                       >
                         <RotateCcw size={18} />
@@ -1262,6 +1286,20 @@ const Orders = () => {
           order={ratingOrder}
           onSubmit={handleSubmitReviews}
         />
+
+        {/* Confirm Dialog */}
+        {confirmDialog.action && (
+          <ConfirmDialog
+            isOpen={confirmDialog.isOpen}
+            onClose={closeConfirmDialog}
+            onConfirm={handleConfirmAction}
+            title={confirmDialogConfig[confirmDialog.action].title}
+            message={confirmDialogConfig[confirmDialog.action].message}
+            confirmText={confirmDialogConfig[confirmDialog.action].confirmText}
+            variant={confirmDialogConfig[confirmDialog.action].variant}
+            isLoading={confirmDialog.isLoading}
+          />
+        )}
       </div>
     </div>
   );
