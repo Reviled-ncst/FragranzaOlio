@@ -661,14 +661,30 @@ function createOrder($db, $data) {
 }
 
 function updateOrderStatus($db, $data) {
+    error_log("updateOrderStatus called with: " . json_encode($data));
+    
     if (empty($data['id']) || empty($data['status'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Order ID and status required']);
         return;
     }
     
-    $orderId = $data['id'];
-    $newStatus = $data['status'];
+    $orderId = intval($data['id']); // Ensure it's an integer
+    $newStatus = trim($data['status']);
+    
+    // Validate status is a valid value
+    $validStatuses = ['ordered', 'paid_waiting_approval', 'cod_waiting_approval', 'paid_ready_pickup', 
+                      'processing', 'in_transit', 'waiting_client', 'delivered', 'picked_up', 
+                      'completed', 'cancelled', 'return_requested', 'return_approved', 'returned', 
+                      'refund_requested', 'refunded'];
+    
+    if (!in_array($newStatus, $validStatuses)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Invalid status: ' . $newStatus]);
+        return;
+    }
+    
+    error_log("Updating order $orderId to status: $newStatus");
     
     $sql = "UPDATE orders SET status = :status";
     $params = [':id' => $orderId, ':status' => $newStatus];
@@ -725,6 +741,14 @@ function updateOrderStatus($db, $data) {
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     
+    $rowsAffected = $stmt->rowCount();
+    error_log("Order $orderId update executed. Rows affected: $rowsAffected. SQL: $sql");
+    
+    if ($rowsAffected === 0) {
+        // Order might not exist or status was already the same
+        error_log("Warning: No rows affected for order $orderId status update to $newStatus");
+    }
+    
     // Log status change in history
     try {
         $historyStmt = $db->prepare("
@@ -739,9 +763,10 @@ function updateOrderStatus($db, $data) {
         ]);
     } catch (Exception $e) {
         // Table might not exist yet, ignore
+        error_log("History logging failed: " . $e->getMessage());
     }
     
-    echo json_encode(['success' => true, 'message' => 'Order status updated']);
+    echo json_encode(['success' => true, 'message' => 'Order status updated to ' . $newStatus, 'rows_affected' => $rowsAffected]);
 }
 
 function updateOrder($db, $data) {

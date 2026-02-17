@@ -223,11 +223,13 @@ const orderService = {
       const response: any = await api.get('/sales.php', {
         params: {
           action: 'orders',
-          customer_email: email
+          customer_email: email,
+          _t: Date.now() // Cache busting
         }
       });
       
       console.log('🔍 orderService.getMyOrders: Raw response:', response);
+      console.log('🔍 orderService.getMyOrders: Order statuses:', response.data?.map((o: any) => ({ id: o.id, status: o.status })));
       
       return {
         success: response.success ?? true,

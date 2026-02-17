@@ -138,13 +138,17 @@ const Orders = () => {
   const handleConfirmAction = async () => {
     if (!confirmDialog.action || !confirmDialog.orderId) return;
     
+    console.log('🔄 handleConfirmAction:', confirmDialog.action, 'for order:', confirmDialog.orderId);
+    
     setConfirmDialog(prev => ({ ...prev, isLoading: true }));
     
     try {
       let result;
       switch (confirmDialog.action) {
         case 'complete':
+          console.log('📦 Calling completeOrder for:', confirmDialog.orderId);
           result = await orderService.completeOrder(confirmDialog.orderId);
+          console.log('📦 completeOrder result:', result);
           break;
         case 'cancel':
           result = await orderService.cancelOrder(confirmDialog.orderId);
@@ -155,10 +159,12 @@ const Orders = () => {
       }
       
       if (result?.success) {
+        console.log('✅ Action successful, refreshing orders...');
         closeConfirmDialog();
         if (selectedOrder) handleCloseModal();
         refreshOrders();
       } else {
+        console.error('❌ Action failed:', result);
         alert(result?.message || 'Action failed. Please try again.');
         setConfirmDialog(prev => ({ ...prev, isLoading: false }));
       }
