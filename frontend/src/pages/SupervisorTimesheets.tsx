@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Loader2,
   FileCheck,
-  MapPin
+  MapPin,
+  Camera
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
@@ -54,6 +55,9 @@ const SupervisorTimesheets = () => {
           latitude_out: data.data.latitude_out,
           longitude_out: data.data.longitude_out,
           location_out: data.data.location_out,
+          photo_in: data.data.photo_in,
+          photo_out: data.data.photo_out,
+          face_verified: data.data.face_verified,
           trainee_name: traineeName
         });
         setShowLocationMap(true);
@@ -477,7 +481,12 @@ const SupervisorTimesheets = () => {
                               <th className="text-left py-3 px-4 text-gray-400 font-medium">Time Out</th>
                               <th className="text-center py-3 px-4 text-gray-400 font-medium">Hours</th>
                               <th className="text-left py-3 px-4 text-gray-400 font-medium hidden sm:table-cell">Tasks</th>
-                              <th className="text-center py-3 px-4 text-gray-400 font-medium">Location</th>
+                              <th className="text-center py-3 px-4 text-gray-400 font-medium">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Camera size={14} />
+                                  <MapPin size={14} />
+                                </div>
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gold-500/10">
@@ -495,10 +504,11 @@ const SupervisorTimesheets = () => {
                                 <td className="py-3 px-4 text-center">
                                   <button
                                     onClick={() => fetchAttendanceLocation(selectedTimesheet.trainee_id, entry.entry_date, selectedTimesheet.trainee_name)}
-                                    className="p-1.5 text-gold-400 hover:bg-gold-500/20 rounded-lg transition-colors"
-                                    title="View attendance location"
+                                    className="p-1.5 text-gold-400 hover:bg-gold-500/20 rounded-lg transition-colors flex items-center gap-1"
+                                    title="View selfie & location"
                                   >
-                                    <MapPin size={16} />
+                                    <Camera size={14} />
+                                    <MapPin size={14} />
                                   </button>
                                 </td>
                               </tr>

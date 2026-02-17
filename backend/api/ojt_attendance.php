@@ -208,7 +208,10 @@ function getAttendanceByDate($conn) {
             location_in,
             latitude_out,
             longitude_out,
-            location_out
+            location_out,
+            photo_in,
+            photo_out,
+            face_verified
         FROM ojt_attendance 
         WHERE trainee_id = ? AND attendance_date = ?
         LIMIT 1

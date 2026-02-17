@@ -984,7 +984,7 @@ export default function OJTTimesheet() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {record && (record.latitude_in || record.latitude_out) ? (
+                        {record && (record.latitude_in || record.latitude_out || record.photo_in || record.photo_out) ? (
                           <button
                             onClick={() => {
                               setSelectedLocationData({
@@ -996,12 +996,14 @@ export default function OJTTimesheet() {
                                 location_in: record.location_in,
                                 latitude_out: record.latitude_out,
                                 longitude_out: record.longitude_out,
-                                location_out: record.location_out
+                                location_out: record.location_out,
+                                photo_in: record.photo_in || undefined,
+                                photo_out: record.photo_out || undefined
                               });
                               setShowLocationMap(true);
                             }}
                             className="p-1.5 text-gold-400 hover:bg-gold-500/20 rounded-lg transition-colors"
-                            title="View location"
+                            title="View location & selfie"
                           >
                             <MapPin size={16} />
                           </button>

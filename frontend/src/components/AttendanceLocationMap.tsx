@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, X, Clock, LogIn, LogOut, Navigation } from 'lucide-react';
+import { MapPin, X, Clock, LogIn, LogOut, Navigation, Camera, CheckCircle, User, ZoomIn } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getImageUrl } from '../services/api';
 
 // Fix for default marker icon in Leaflet with Vite
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -76,6 +77,9 @@ export interface AttendanceLocationData {
   latitude_out?: number;
   longitude_out?: number;
   location_out?: string;
+  photo_in?: string;
+  photo_out?: string;
+  face_verified?: boolean;
   trainee_name?: string;
 }
 
@@ -87,12 +91,15 @@ interface AttendanceLocationMapProps {
 
 export default function AttendanceLocationMap({ isOpen, onClose, data }: AttendanceLocationMapProps) {
   const [mapType, setMapType] = useState<'standard' | 'satellite'>('standard');
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
 
   if (!isOpen || !data) return null;
 
   const hasClockIn = data.latitude_in && data.longitude_in;
   const hasClockOut = data.latitude_out && data.longitude_out;
   const hasAnyLocation = hasClockIn || hasClockOut;
+  const hasPhotoIn = !!data.photo_in;
+  const hasPhotoOut = !!data.photo_out;
 
   // Calculate center and bounds
   let center: [number, number] = [14.5995, 120.9842]; // Default to Manila
@@ -251,18 +258,60 @@ export default function AttendanceLocationMap({ isOpen, onClose, data }: Attenda
 
           {/* Location Details */}
           <div className="p-5 border-t border-gold-500/20">
+            {/* Face Verification Badge */}
+            {data.face_verified && (
+              <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <CheckCircle className="text-emerald-400" size={16} />
+                <span className="text-sm text-emerald-400 font-medium">Face Verified</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Clock In */}
-              <div className={`p-4 rounded-xl border ${hasClockIn ? 'bg-green-500/10 border-green-500/30' : 'bg-black-800 border-gold-500/10'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                    <LogIn className="text-green-400" size={16} />
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400">Clock In</div>
-                    <div className="text-white font-semibold">{formatTime(data.time_in)}</div>
+              <div className={`p-4 rounded-xl border ${hasClockIn || hasPhotoIn ? 'bg-green-500/10 border-green-500/30' : 'bg-black-800 border-gold-500/10'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <LogIn className="text-green-400" size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Clock In</div>
+                      <div className="text-white font-semibold">{formatTime(data.time_in)}</div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Selfie Photo */}
+                {hasPhotoIn && (
+                  <div className="mb-3">
+                    <div className="relative group cursor-pointer" onClick={() => setFullscreenPhoto(getImageUrl(data.photo_in))}>
+                      <img 
+                        src={getImageUrl(data.photo_in)} 
+                        alt="Clock-in selfie"
+                        className="w-full h-32 object-cover rounded-lg border border-green-500/30"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <ZoomIn className="text-white" size={24} />
+                      </div>
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-green-500/80 text-xs text-white rounded flex items-center gap-1">
+                        <Camera size={10} /> Selfie
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {!hasPhotoIn && (
+                  <div className="mb-3 h-32 bg-black-800 rounded-lg border border-gold-500/10 flex items-center justify-center">
+                    <div className="text-center">
+                      <User className="w-8 h-8 text-gray-600 mx-auto mb-1" />
+                      <p className="text-xs text-gray-500">No selfie captured</p>
+                    </div>
+                  </div>
+                )}
+
                 {hasClockIn ? (
                   <>
                     {data.location_in && (
@@ -284,16 +333,59 @@ export default function AttendanceLocationMap({ isOpen, onClose, data }: Attenda
               </div>
 
               {/* Clock Out */}
-              <div className={`p-4 rounded-xl border ${hasClockOut ? 'bg-red-500/10 border-red-500/30' : 'bg-black-800 border-gold-500/10'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-                    <LogOut className="text-red-400" size={16} />
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-400">Clock Out</div>
-                    <div className="text-white font-semibold">{formatTime(data.time_out)}</div>
+              <div className={`p-4 rounded-xl border ${hasClockOut || hasPhotoOut ? 'bg-red-500/10 border-red-500/30' : 'bg-black-800 border-gold-500/10'}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <LogOut className="text-red-400" size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-400">Clock Out</div>
+                      <div className="text-white font-semibold">{formatTime(data.time_out)}</div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Selfie Photo */}
+                {hasPhotoOut && (
+                  <div className="mb-3">
+                    <div className="relative group cursor-pointer" onClick={() => setFullscreenPhoto(getImageUrl(data.photo_out))}>
+                      <img 
+                        src={getImageUrl(data.photo_out)} 
+                        alt="Clock-out selfie"
+                        className="w-full h-32 object-cover rounded-lg border border-red-500/30"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                        <ZoomIn className="text-white" size={24} />
+                      </div>
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-red-500/80 text-xs text-white rounded flex items-center gap-1">
+                        <Camera size={10} /> Selfie
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {!hasPhotoOut && data.time_out && (
+                  <div className="mb-3 h-32 bg-black-800 rounded-lg border border-gold-500/10 flex items-center justify-center">
+                    <div className="text-center">
+                      <User className="w-8 h-8 text-gray-600 mx-auto mb-1" />
+                      <p className="text-xs text-gray-500">No selfie captured</p>
+                    </div>
+                  </div>
+                )}
+
+                {!data.time_out && (
+                  <div className="mb-3 h-32 bg-black-800 rounded-lg border border-gold-500/10 flex items-center justify-center">
+                    <div className="text-center">
+                      <Clock className="w-8 h-8 text-gray-600 mx-auto mb-1" />
+                      <p className="text-xs text-gray-500">Not clocked out yet</p>
+                    </div>
+                  </div>
+                )}
+
                 {hasClockOut ? (
                   <>
                     {data.location_out && (
@@ -310,12 +402,44 @@ export default function AttendanceLocationMap({ isOpen, onClose, data }: Attenda
                     </button>
                   </>
                 ) : (
-                  <p className="text-sm text-gray-500">{data.time_out ? 'No location data' : 'Not clocked out yet'}</p>
+                  <p className="text-sm text-gray-500">{data.time_out ? 'No location data' : ''}</p>
                 )}
               </div>
             </div>
           </div>
         </motion.div>
+
+        {/* Fullscreen Photo Viewer */}
+        <AnimatePresence>
+          {fullscreenPhoto && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/95 flex items-center justify-center z-[60]"
+              onClick={() => setFullscreenPhoto(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.8 }}
+                className="relative max-w-3xl max-h-[90vh] p-4"
+              >
+                <button
+                  onClick={() => setFullscreenPhoto(null)}
+                  className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/80 transition-colors z-10"
+                >
+                  <X size={24} />
+                </button>
+                <img
+                  src={fullscreenPhoto}
+                  alt="Attendance selfie"
+                  className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </AnimatePresence>
   );
