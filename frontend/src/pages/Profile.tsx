@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, LogOut, Edit2, Save, X, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +34,29 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
   const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
+  
+  // Check and sync verification status with Firebase on load
+  useEffect(() => {
+    const syncVerification = async () => {
+      if (!user?.email || user.emailVerified) return;
+      
+      setIsCheckingVerification(true);
+      try {
+        const result = await firebaseEmailService.syncVerificationStatus(user.email);
+        if (result.verified && result.synced) {
+          // Update local user state
+          updateUser({ ...user, emailVerified: true });
+        }
+      } catch (error) {
+        console.error('Failed to sync verification status:', error);
+      } finally {
+        setIsCheckingVerification(false);
+      }
+    };
+    
+    syncVerification();
+  }, [user?.email]); // Only run when email changes
   
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',

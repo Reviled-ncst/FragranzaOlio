@@ -36,8 +36,15 @@ const VerifyEmail = () => {
       // If we have an email param but no action code, this means Firebase already
       // verified the email (handleCodeInApp: false) and redirected here via continueUrl
       if (emailParam && !actionCode) {
+        const email = decodeURIComponent(emailParam);
+        // Sync verification status with PHP backend
+        try {
+          await firebaseEmailService.syncVerificationStatus(email);
+        } catch (e) {
+          console.error('Failed to sync verification with backend:', e);
+        }
         setStatus('success');
-        setMessage(`Your email (${decodeURIComponent(emailParam)}) has been verified successfully! You can now log in.`);
+        setMessage(`Your email (${email}) has been verified successfully! You can now log in.`);
         return;
       }
 

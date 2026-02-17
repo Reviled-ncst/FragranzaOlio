@@ -13,6 +13,7 @@ import {
   sendPasswordResetEmail as firebaseSendPasswordReset,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { API_BASE_URL, apiFetch } from './api';
 
 /**
  * Generate a deterministic service password for Firebase
@@ -167,6 +168,49 @@ export const firebaseEmailService = {
       await deleteUser(userCredential.user);
     } catch (error) {
       console.error('Failed to delete Firebase user:', error);
+    }
+  },
+
+  /**
+   * Check Firebase verification status and sync with PHP backend
+   * Returns true if email is verified (either in Firebase or no Firebase account exists)
+   */
+  async syncVerificationStatus(email: string): Promise<{ verified: boolean; synced: boolean }> {
+    const servicePassword = getServicePassword(email);
+    
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, servicePassword);
+      const isVerified = userCredential.user.emailVerified;
+      await signOut(auth);
+      
+      if (isVerified) {
+        // Sync with PHP backend
+        try {
+          await apiFetch(`${API_BASE_URL}/auth.php`, {
+            method: 'POST',
+            body: JSON.stringify({
+              action: 'mark-email-verified',
+              email: email,
+            }),
+          });
+          console.log('✅ Email verification synced with backend');
+          return { verified: true, synced: true };
+        } catch (syncError) {
+          console.error('Failed to sync verification with backend:', syncError);
+          return { verified: true, synced: false };
+        }
+      }
+      
+      return { verified: false, synced: false };
+    } catch (error: any) {
+      // If user doesn't exist in Firebase, treat as needing verification
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        // No Firebase account - need to send verification
+        return { verified: false, synced: false };
+      }
+      console.error('Error checking verification status:', error);
+      // On error, assume not verified to be safe
+      return { verified: false, synced: false };
     }
   },
 };

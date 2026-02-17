@@ -368,6 +368,35 @@ class AuthController {
     }
     
     /**
+     * Mark email as verified (called by frontend after Firebase verification)
+     */
+    public function markEmailVerified($email) {
+        try {
+            if (empty($email)) {
+                return $this->response(false, 'Email is required', null, 400);
+            }
+            
+            // Update user's email_verified status
+            $stmt = $this->db->prepare("
+                UPDATE users 
+                SET email_verified = 1, status = 'active'
+                WHERE email = ?
+            ");
+            $stmt->execute([$email]);
+            
+            if ($stmt->rowCount() === 0) {
+                return $this->response(false, 'User not found', null, 404);
+            }
+            
+            return $this->response(true, 'Email marked as verified');
+            
+        } catch (PDOException $e) {
+            error_log("Mark email verified error: " . $e->getMessage());
+            return $this->response(false, 'Failed to update verification status', null, 500);
+        }
+    }
+    
+    /**
      * Send verification email
      */
     private function sendVerificationEmail($email, $firstName, $token) {
@@ -657,6 +686,9 @@ switch ($method) {
                 break;
             case 'resend-verification':
                 $auth->resendVerification($input['email'] ?? '');
+                break;
+            case 'mark-email-verified':
+                $auth->markEmailVerified($input['email'] ?? '');
                 break;
             default:
                 http_response_code(400);
