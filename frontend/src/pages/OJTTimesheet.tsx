@@ -593,6 +593,37 @@ export default function OJTTimesheet() {
   }, [fetchAttendance]);
 
   // Clock In
+  // Helper to get current position
+  const getCurrentLocation = (): Promise<{latitude: number; longitude: number; location: string} | null> => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null);
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          // Try to get address from coordinates using reverse geocoding
+          let location = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await response.json();
+            if (data.display_name) {
+              location = data.display_name;
+            }
+          } catch {
+            // Keep coordinates as fallback
+          }
+          resolve({ latitude, longitude, location });
+        },
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+  };
+
   const handleClockIn = async (photo: string) => {
     if (!user) return;
     setActionLoading(true);
@@ -602,6 +633,9 @@ export default function OJTTimesheet() {
       const now = new Date();
       const timeIn = now.toTimeString().slice(0, 8);
       const { lateMinutes, penaltyHours } = calculateLatePenalty(timeIn);
+      
+      // Get current location
+      const locationData = await getCurrentLocation();
 
       const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/clock-in`, {
         method: 'POST',
@@ -610,7 +644,10 @@ export default function OJTTimesheet() {
           trainee_id: user.id,
           photo: photo,
           late_minutes: lateMinutes,
-          penalty_hours: penaltyHours
+          penalty_hours: penaltyHours,
+          latitude: locationData?.latitude || null,
+          longitude: locationData?.longitude || null,
+          location: locationData?.location || null
         })
       });
 
@@ -638,12 +675,18 @@ export default function OJTTimesheet() {
     setShowCamera(false);
 
     try {
+      // Get current location
+      const locationData = await getCurrentLocation();
+
       const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/clock-out`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trainee_id: user.id,
-          photo: photo
+          photo: photo,
+          latitude: locationData?.latitude || null,
+          longitude: locationData?.longitude || null,
+          location: locationData?.location || null
         })
       });
 
