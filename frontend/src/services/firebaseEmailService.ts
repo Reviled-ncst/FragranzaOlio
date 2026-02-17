@@ -122,6 +122,7 @@ export const firebaseEmailService = {
 
   /**
    * Resend verification email
+   * For legacy users without Firebase accounts, creates one first
    */
   async resendVerification(email: string, password: string): Promise<{ success: boolean; message: string }> {
     try {
@@ -150,11 +151,36 @@ export const firebaseEmailService = {
     } catch (error: any) {
       console.error('❌ Resend verification error:', error);
 
+      // If user doesn't exist in Firebase, create account and send verification
+      if (error.code === 'auth/user-not-found') {
+        try {
+          // Create Firebase account for legacy user
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const firebaseUser = userCredential.user;
+
+          await sendEmailVerification(firebaseUser, {
+            url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
+            handleCodeInApp: false,
+          });
+
+          await signOut(auth);
+
+          return {
+            success: true,
+            message: 'Verification email sent! Check your inbox.',
+          };
+        } catch (createError: any) {
+          console.error('❌ Create Firebase user error:', createError);
+          if (createError.code === 'auth/weak-password') {
+            return { success: false, message: 'Password is too weak for email verification. Please update your password first.' };
+          }
+          return { success: false, message: 'Failed to send verification email.' };
+        }
+      }
+
       let message = 'Failed to send verification email';
       if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         message = 'Invalid password';
-      } else if (error.code === 'auth/user-not-found') {
-        message = 'No account found with this email';
       } else if (error.code === 'auth/too-many-requests') {
         message = 'Too many requests. Please wait before trying again.';
       }
