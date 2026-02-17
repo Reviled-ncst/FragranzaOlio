@@ -99,6 +99,8 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const totalSteps = 4; // Now 4 steps: Role, Basic Info, Contact, Account
 
   // Fetch supervisors when modal opens
@@ -278,7 +280,8 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         const isVerified = await firebaseEmailService.checkEmailVerified(formData.email, formData.password);
         
         if (!isVerified) {
-          setError('Please verify your email before logging in. Check your inbox for the verification link.');
+          setError('Please verify your email before logging in.');
+          setShowResendVerification(true);
           setIsLoading(false);
           return;
         }
@@ -413,11 +416,40 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email || !formData.password) {
+      setError('Please enter your email and password above');
+      return;
+    }
+    
+    setIsResendingVerification(true);
+    setError(null);
+    
+    try {
+      const result = await firebaseEmailService.resendVerification(formData.email, formData.password);
+      
+      if (result.success) {
+        setSuccessMessage(result.message || 'Verification email sent! Check your inbox.');
+        setShowResendVerification(false);
+        setTimeout(() => {
+          setSuccessMessage(null);
+        }, 5000);
+      } else {
+        setError(result.message || 'Failed to send verification email.');
+      }
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     setError(null); // Clear general error on input change
+    setShowResendVerification(false); // Clear resend verification state
     
     // Real-time validation for touched fields
     if (touchedFields[name]) {
@@ -438,6 +470,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setSuccessMessage(null);
     setFieldErrors({});
     setTouchedFields({});
+    setShowResendVerification(false);
     setFormData({
       email: '',
       password: '',
@@ -1131,6 +1164,27 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               {error && (
                 <div className="mx-8 mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <p className="text-red-400 text-sm text-center">{error}</p>
+                  {/* Resend Verification Button */}
+                  {showResendVerification && isLogin && (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={isResendingVerification}
+                      className="mt-3 w-full py-2 bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-gold-400 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isResendingVerification ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail size={14} />
+                          Resend Verification Email
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
 
