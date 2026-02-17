@@ -63,6 +63,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminOJT from './pages/AdminOJT';
 import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 
 // Smart Dashboard Redirect Component
 const SmartDashboard = () => {
@@ -101,6 +102,7 @@ const AppContent = () => {
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/products" element={<ProductsPage />} />
             <Route path="/products/:id" element={<ProductDetail />} />
             <Route path="/about" element={<About />} />

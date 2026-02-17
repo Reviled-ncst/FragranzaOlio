@@ -31,10 +31,13 @@ import {
   CircleDot,
   Undo2,
   ArrowLeft,
-  Star
+  Star,
+  Sparkles,
+  Gift
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
+import RatingModal, { ReviewData } from '../components/RatingModal';
 
 const statusConfig: Record<OrderStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
   ordered: { label: 'Ordered', icon: Clock, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
@@ -83,6 +86,31 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilterGroup>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
+  
+  // Rating Modal state
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [ratingOrder, setRatingOrder] = useState<Order | null>(null);
+
+  // Open rating modal for an order
+  const openRatingModal = (order: Order) => {
+    setRatingOrder(order);
+    setRatingModalOpen(true);
+  };
+
+  // Handle review submission
+  const handleSubmitReviews = async (reviews: ReviewData[]): Promise<boolean> => {
+    try {
+      const result = await orderService.submitReviews(reviews);
+      if (result.success) {
+        refreshOrders();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to submit reviews:', error);
+      return false;
+    }
+  };
 
   // Fetch orders on load
   useEffect(() => {
@@ -532,7 +560,7 @@ const Orders = () => {
 
         {/* Orders List */}
         {!isLoading && filteredOrders.length > 0 && (
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-4 sm:space-y-5">
             {filteredOrders.map((order, index) => {
               const StatusIcon = statusConfig[order.status]?.icon || Clock;
               const statusStyle = statusConfig[order.status] || statusConfig.ordered;
@@ -544,19 +572,19 @@ const Orders = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="bg-black-900 border border-gold-500/20 rounded-lg sm:rounded-xl p-4 sm:p-6 hover:border-gold-500/40 transition-colors"
+                  className="group bg-gradient-to-br from-black-900 via-black-900/95 to-black-950 border border-gold-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 hover:border-gold-500/40 transition-all duration-300 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-gold-500/5"
                 >
                   {/* Order Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                     <div className="flex items-start sm:items-center gap-3">
                       <div className="flex-shrink-0">
-                        <div className={`w-10 h-10 rounded-full ${statusStyle.bgColor} flex items-center justify-center`}>
+                        <div className={`w-11 h-11 rounded-xl ${statusStyle.bgColor} flex items-center justify-center ring-2 ring-white/5 shadow-lg`}>
                           <StatusIcon className={`w-5 h-5 ${statusStyle.color}`} />
                         </div>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="text-sm sm:text-base text-white font-semibold">
+                          <p className="text-sm sm:text-base text-white font-bold tracking-tight">
                             Order #{order.order_number}
                           </p>
                           <button
@@ -585,13 +613,13 @@ const Orders = () => {
                     </div>
                     
                     <div className="flex items-center gap-3 sm:gap-4">
-                      <span className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 rounded-full text-xs sm:text-sm ${statusStyle.bgColor} ${statusStyle.color}`}>
+                      <span className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium ${statusStyle.bgColor} ${statusStyle.color} ring-1 ring-white/10`}>
                         <StatusIcon size={14} />
                         {statusStyle.label}
                       </span>
                       <button
                         onClick={() => openOrderDetails(order)}
-                        className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base text-gold-500 hover:text-gold-400 transition-colors"
+                        className="flex items-center gap-1.5 sm:gap-2 text-sm sm:text-base text-gold-500 hover:text-gold-400 transition-colors group-hover:scale-105"
                       >
                         <Eye size={16} className="sm:w-[18px] sm:h-[18px]" />
                         <span className="hidden sm:inline">View Details</span>
@@ -601,8 +629,8 @@ const Orders = () => {
                   </div>
 
                   {/* Shipping Info */}
-                  <div className="flex items-center gap-2 text-gray-400 text-sm mb-3">
-                    <ShippingIcon size={14} />
+                  <div className="flex items-center gap-2 text-gray-500 text-sm mb-4 pl-1">
+                    <ShippingIcon size={14} className="text-gray-600" />
                     <span>
                       {order.shipping_method === 'store_pickup' 
                         ? 'Store Pickup' 
@@ -610,20 +638,20 @@ const Orders = () => {
                     </span>
                     {order.tracking_number && (
                       <>
-                        <span className="text-gray-600">•</span>
-                        <span>Tracking: {order.tracking_number}</span>
+                        <span className="text-gray-700">•</span>
+                        <span className="text-gold-500/70">Tracking: {order.tracking_number}</span>
                       </>
                     )}
                   </div>
 
                   {/* Order Items Preview */}
-                  <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="flex gap-2.5 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {order.items?.slice(0, 4).map(item => (
-                      <div key={item.id} className="flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 bg-black-800 rounded-lg overflow-hidden">
+                      <div key={item.id} className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 bg-black-800 rounded-xl overflow-hidden ring-1 ring-white/5 hover:ring-gold-500/30 transition-all">
                         {item.image ? (
                           <img src={item.image} alt={item.product_name} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center">
+                          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-black-800 to-black-900">
                             <Package className="w-6 h-6 text-gray-600" />
                           </div>
                         )}
@@ -640,13 +668,22 @@ const Orders = () => {
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
                     {/* Action Banner for delivered/picked_up - Prominent CTA */}
                     {(order.status === 'delivered' || order.status === 'picked_up') && (
-                      <div className="mb-3 p-3 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 rounded-lg">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-start gap-2">
-                            <PackageCheck className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                      <div className="mb-3 p-3 bg-gradient-to-r from-emerald-500/20 via-green-500/15 to-teal-500/10 border border-green-500/30 rounded-xl overflow-hidden relative">
+                        {/* Decorative icons */}
+                        <div className="absolute top-1 right-10 opacity-20">
+                          <Gift className="w-4 h-4 text-green-400" />
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                              <PackageCheck className="w-5 h-5 text-green-400" />
+                            </div>
                             <div>
-                              <p className="text-green-400 font-medium text-sm">Your order has been {order.status === 'delivered' ? 'delivered' : 'picked up'}!</p>
-                              <p className="text-gray-400 text-xs mt-0.5">Please confirm receipt to complete your order and unlock ratings</p>
+                              <p className="text-green-400 font-semibold text-sm">
+                                {order.status === 'delivered' ? 'Your order has arrived!' : 'Order picked up successfully!'}
+                              </p>
+                              <p className="text-gray-400 text-xs mt-0.5">Confirm receipt to complete your order and unlock ratings</p>
                             </div>
                           </div>
                           <button
@@ -661,7 +698,7 @@ const Orders = () => {
                                 }
                               }
                             }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/40"
+                            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02]"
                           >
                             <CheckCircle size={16} />
                             Confirm & Complete
@@ -672,21 +709,31 @@ const Orders = () => {
 
                     {/* Rating Banner for completed orders */}
                     {order.status === 'completed' && (
-                      <div className="mb-3 p-3 bg-gradient-to-r from-gold-500/20 to-amber-500/10 border border-gold-500/30 rounded-lg">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="flex items-start gap-2">
-                            <Star className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
+                      <div className="mb-3 p-3 bg-gradient-to-r from-gold-500/20 via-amber-500/15 to-yellow-500/10 border border-gold-500/30 rounded-xl overflow-hidden relative">
+                        {/* Decorative sparkles */}
+                        <div className="absolute top-1 right-12 opacity-30">
+                          <Sparkles className="w-4 h-4 text-gold-400" />
+                        </div>
+                        <div className="absolute bottom-1 right-6 opacity-20">
+                          <Star className="w-3 h-3 text-gold-400" />
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Star className="w-5 h-5 text-gold-400" />
+                            </div>
                             <div>
-                              <p className="text-gold-400 font-medium text-sm">Order completed! How was your experience?</p>
-                              <p className="text-gray-400 text-xs mt-0.5">Share your feedback and help others make better choices</p>
+                              <p className="text-gold-400 font-semibold text-sm">Share your experience!</p>
+                              <p className="text-gray-400 text-xs mt-0.5">Help others by rating the products you received</p>
                             </div>
                           </div>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              alert('Rating feature coming soon!');
+                              openRatingModal(order);
                             }}
-                            className="flex items-center justify-center gap-2 px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black text-sm font-semibold rounded-lg transition-all shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40"
+                            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-black text-sm font-bold rounded-lg transition-all shadow-lg shadow-gold-500/25 hover:shadow-gold-500/40 hover:scale-[1.02]"
                           >
                             <Star size={16} />
                             Rate Products
@@ -697,10 +744,10 @@ const Orders = () => {
                     
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                       <div className="flex items-center gap-4">
-                        <span className="text-gray-400 text-xs sm:text-sm">
+                        <span className="text-gray-500 text-xs sm:text-sm bg-black-800 px-2.5 py-1 rounded-full">
                           {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
                         </span>
-                        <span className="text-gold-500 text-sm sm:text-base font-semibold">
+                        <span className="text-gold-400 text-base sm:text-lg font-bold">
                           Total: ₱{(order.total_amount || 0).toLocaleString()}
                         </span>
                       </div>
@@ -996,8 +1043,8 @@ const Orders = () => {
                     <>
                       <button
                         onClick={() => {
-                          // TODO: Open rating modal
-                          alert('Rating feature coming soon! You can rate products from this order.');
+                          handleCloseModal();
+                          openRatingModal(selectedOrder);
                         }}
                         className="flex items-center justify-center gap-2 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
                       >
@@ -1204,6 +1251,17 @@ const Orders = () => {
             </div>
           )}
         </AnimatePresence>
+
+        {/* Rating Modal */}
+        <RatingModal
+          isOpen={ratingModalOpen}
+          onClose={() => {
+            setRatingModalOpen(false);
+            setRatingOrder(null);
+          }}
+          order={ratingOrder}
+          onSubmit={handleSubmitReviews}
+        />
       </div>
     </div>
   );

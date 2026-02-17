@@ -55,11 +55,10 @@ CREATE TABLE IF NOT EXISTS order_status_history (
     order_id INT NOT NULL,
     status VARCHAR(50) NOT NULL,
     note TEXT,
-    changed_by INT,
+    changed_by VARCHAR(100), -- Can be user_id or 'system' for auto-complete
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_status_history_order (order_id),
     INDEX idx_status_history_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

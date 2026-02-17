@@ -14,6 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit();
 // Include CORS middleware
 require_once __DIR__ . '/../middleware/cors.php';
 
+// Include Email Service
+require_once __DIR__ . '/../services/EmailService.php';
+
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -148,8 +151,8 @@ class AuthController {
             // Log activity
             $this->logActivity($userId, 'register', $data);
             
-            // TODO: Send verification email
-            // $this->sendVerificationEmail($data['email'], $verificationToken);
+            // Send verification email
+            $this->sendVerificationEmail($data['email'], trim($data['firstName']), $verificationToken);
             
             return $this->response(true, 'Registration successful! Please check your email to verify your account.', [
                 'userId' => $userId,
@@ -365,6 +368,86 @@ class AuthController {
     }
     
     /**
+     * Send verification email
+     */
+    private function sendVerificationEmail($email, $firstName, $token) {
+        try {
+            // Load email config
+            $emailConfig = require __DIR__ . '/../config/email.php';
+            $siteUrl = $emailConfig['site_url'] ?? 'https://fragranza-web.vercel.app';
+            
+            // Create verification URL
+            $verifyUrl = $siteUrl . '/verify-email?token=' . $token;
+            
+            // Send email
+            $emailService = getEmailService();
+            $sent = $emailService->sendVerificationEmail($email, $firstName, $token, $verifyUrl);
+            
+            if (!$sent) {
+                error_log("Failed to send verification email to: $email");
+            }
+            
+            return $sent;
+        } catch (Exception $e) {
+            error_log("Send verification email error: " . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Resend verification email
+     */
+    public function resendVerification($email) {
+        try {
+            if (empty($email)) {
+                return $this->response(false, 'Email is required', null, 400);
+            }
+            
+            // Find user
+            $stmt = $this->db->prepare("
+                SELECT id, first_name, email, email_verified, status 
+                FROM users WHERE email = ?
+            ");
+            $stmt->execute([strtolower(trim($email))]);
+            $user = $stmt->fetch();
+            
+            if (!$user) {
+                return $this->response(false, 'Email not found', null, 404);
+            }
+            
+            if ($user['email_verified']) {
+                return $this->response(false, 'Email is already verified', null, 400);
+            }
+            
+            // Generate new verification token
+            $verificationToken = bin2hex(random_bytes(32));
+            $verificationExpires = date('Y-m-d H:i:s', strtotime('+24 hours'));
+            
+            // Update user with new token
+            $stmt = $this->db->prepare("
+                UPDATE users SET 
+                    email_verification_token = ?,
+                    email_verification_expires = ?
+                WHERE id = ?
+            ");
+            $stmt->execute([$verificationToken, $verificationExpires, $user['id']]);
+            
+            // Send verification email
+            $sent = $this->sendVerificationEmail($user['email'], $user['first_name'], $verificationToken);
+            
+            if ($sent) {
+                return $this->response(true, 'Verification email sent! Please check your inbox.');
+            } else {
+                return $this->response(false, 'Failed to send verification email. Please try again later.', null, 500);
+            }
+            
+        } catch (PDOException $e) {
+            error_log("Resend verification error: " . $e->getMessage());
+            return $this->response(false, 'Failed to resend verification email', null, 500);
+        }
+    }
+    
+    /**
      * Check if email exists
      */
     public function checkEmail($email) {
@@ -571,6 +654,9 @@ switch ($method) {
                 break;
             case 'reset-password':
                 $auth->resetPassword($input);
+                break;
+            case 'resend-verification':
+                $auth->resendVerification($input['email'] ?? '');
                 break;
             default:
                 http_response_code(400);

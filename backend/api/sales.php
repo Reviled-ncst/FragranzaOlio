@@ -84,9 +84,11 @@ function handleGetRequests($db, $action) {
             getUserSettings($db, $_GET['user_id'] ?? null);
             break;
         case 'reviews':
+        case 'product-reviews':
             getProductReviews($db, $_GET['product_id'] ?? null);
             break;
         case 'order_reviews':
+        case 'order-reviews':
             getOrderReviewStatus($db, $_GET['order_id'] ?? null);
             break;
         default:
@@ -102,6 +104,9 @@ function handlePostRequests($db, $action) {
             break;
         case 'review':
             createReview($db, $data);
+            break;
+        case 'reviews':
+            createReviewsBatch($db, $data);
             break;
         case 'customer':
             createCustomer($db, $data);
@@ -2005,3 +2010,124 @@ function createReview($db, $data) {
     }
 }
 
+/**
+ * Batch create reviews for multiple products in an order
+ */
+function createReviewsBatch($db, $data) {
+    if (empty($data['reviews']) || !is_array($data['reviews'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Reviews array required']);
+        return;
+    }
+    
+    $reviews = $data['reviews'];
+    $successCount = 0;
+    $errors = [];
+    
+    try {
+        $db->beginTransaction();
+        
+        foreach ($reviews as $index => $reviewData) {
+            // Validate required fields
+            if (empty($reviewData['product_id']) || empty($reviewData['rating'])) {
+                $errors[] = "Review #$index: Product ID and rating required";
+                continue;
+            }
+            
+            $rating = intval($reviewData['rating']);
+            if ($rating < 1 || $rating > 5) {
+                $errors[] = "Review #$index: Rating must be between 1 and 5";
+                continue;
+            }
+            
+            // Check if already reviewed
+            if (!empty($reviewData['order_item_id'])) {
+                $checkStmt = $db->prepare("SELECT reviewed FROM order_items WHERE id = :id");
+                $checkStmt->execute([':id' => $reviewData['order_item_id']]);
+                $existingItem = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($existingItem && $existingItem['reviewed']) {
+                    continue; // Skip already reviewed items
+                }
+            }
+            
+            // Verify order status if order_id provided
+            $isVerifiedPurchase = false;
+            if (!empty($reviewData['order_id'])) {
+                $orderStmt = $db->prepare("SELECT status FROM orders WHERE id = :id");
+                $orderStmt->execute([':id' => $reviewData['order_id']]);
+                $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($order && in_array($order['status'], ['delivered', 'picked_up', 'completed'])) {
+                    $isVerifiedPurchase = true;
+                }
+            }
+            
+            // Insert review
+            $stmt = $db->prepare("
+                INSERT INTO product_reviews (
+                    product_id, order_id, order_item_id, user_id,
+                    customer_name, customer_email, rating,
+                    title, review, is_verified_purchase, status
+                ) VALUES (
+                    :product_id, :order_id, :order_item_id, :user_id,
+                    :customer_name, :customer_email, :rating,
+                    :title, :review, :is_verified_purchase, :status
+                )
+            ");
+            
+            $stmt->execute([
+                ':product_id' => $reviewData['product_id'],
+                ':order_id' => $reviewData['order_id'] ?? null,
+                ':order_item_id' => $reviewData['order_item_id'] ?? null,
+                ':user_id' => $reviewData['user_id'] ?? null,
+                ':customer_name' => $reviewData['customer_name'] ?? null,
+                ':customer_email' => $reviewData['customer_email'] ?? null,
+                ':rating' => $rating,
+                ':title' => $reviewData['title'] ?? null,
+                ':review' => $reviewData['review'] ?? null,
+                ':is_verified_purchase' => $isVerifiedPurchase ? 1 : 0,
+                ':status' => $isVerifiedPurchase ? 'approved' : 'pending'
+            ]);
+            
+            $reviewId = $db->lastInsertId();
+            
+            // Mark order item as reviewed
+            if (!empty($reviewData['order_item_id'])) {
+                $updateStmt = $db->prepare("UPDATE order_items SET reviewed = 1, review_id = :review_id WHERE id = :id");
+                $updateStmt->execute([':review_id' => $reviewId, ':id' => $reviewData['order_item_id']]);
+            }
+            
+            // Update product average rating
+            if ($isVerifiedPurchase) {
+                $updateProductStmt = $db->prepare("
+                    UPDATE products SET
+                        average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = :pid AND status = 'approved'),
+                        review_count = (SELECT COUNT(*) FROM product_reviews WHERE product_id = :pid2 AND status = 'approved')
+                    WHERE id = :pid3
+                ");
+                $updateProductStmt->execute([
+                    ':pid' => $reviewData['product_id'],
+                    ':pid2' => $reviewData['product_id'],
+                    ':pid3' => $reviewData['product_id']
+                ]);
+            }
+            
+            $successCount++;
+        }
+        
+        $db->commit();
+        
+        echo json_encode([
+            'success' => $successCount > 0,
+            'message' => $successCount . ' review(s) submitted successfully' . (count($errors) > 0 ? ', ' . count($errors) . ' failed' : ''),
+            'submitted' => $successCount,
+            'errors' => $errors
+        ]);
+        
+    } catch (Exception $e) {
+        $db->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to submit reviews: ' . $e->getMessage()]);
+    }
+}

@@ -407,6 +407,78 @@ export const authService = {
       return [];
     }
   },
+
+  /**
+   * Verify email with token
+   */
+  async verifyEmail(token: string): Promise<AuthResponse> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php?action=verify-email&token=${encodeURIComponent(token)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          message: result.message || 'Verification failed',
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || 'Email verified successfully!',
+      };
+    } catch (error: any) {
+      console.error('❌ Verify email error:', error);
+      return {
+        success: false,
+        message: error.message || 'Network error during verification',
+      };
+    }
+  },
+
+  /**
+   * Resend verification email
+   */
+  async resendVerification(email: string): Promise<AuthResponse> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'resend-verification',
+          email: email,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          message: result.message || 'Failed to resend verification email',
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || 'Verification email sent!',
+      };
+    } catch (error: any) {
+      console.error('❌ Resend verification error:', error);
+      return {
+        success: false,
+        message: error.message || 'Network error',
+      };
+    }
+  },
 };
 
 export default authService;

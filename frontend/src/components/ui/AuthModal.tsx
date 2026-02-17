@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff, Calendar, Phone, MapPin, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle, Building2, Briefcase, GraduationCap, UserCheck } from 'lucide-react';
 import authService from '../../services/authServicePHP';
+import { firebaseEmailService } from '../../services/firebaseEmailService';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { getDashboardForRole } from '../utils/RoleBasedRoute';
@@ -273,6 +274,15 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       // Handle Login
       setIsLoading(true);
       try {
+        // Check if email is verified via Firebase
+        const isVerified = await firebaseEmailService.checkEmailVerified(formData.email, formData.password);
+        
+        if (!isVerified) {
+          setError('Please verify your email before logging in. Check your inbox for the verification link.');
+          setIsLoading(false);
+          return;
+        }
+
         const result = await authService.login({
           email: formData.email,
           password: formData.password,
@@ -322,6 +332,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
         
         setIsLoading(true);
         try {
+          // Register with PHP backend
           const result = await authService.register({
             firstName: formData.firstName,
             lastName: formData.lastName,
@@ -348,7 +359,10 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           });
           
           if (result.success) {
-            setSuccessMessage(result.message);
+            // Send verification email via Firebase
+            await firebaseEmailService.sendVerificationEmail(formData.email, formData.password);
+            
+            setSuccessMessage('Registration successful! Please check your email to verify your account.');
             setTimeout(() => {
               // Switch to login after successful registration
               setIsLogin(true);
@@ -380,12 +394,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     
     setIsLoading(true);
     try {
-      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'forgot-password', email: forgotEmail }),
-      });
-      const result = await response.json();
+      const result = await firebaseEmailService.sendPasswordResetEmail(forgotEmail);
       
       if (result.success) {
         setSuccessMessage('If an account exists with this email, you will receive a password reset link. Please check your email.');

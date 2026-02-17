@@ -458,6 +458,102 @@ const orderService = {
         message: error.response?.data?.message || 'Failed to complete order'
       };
     }
+  },
+
+  // ===================
+  // REVIEW OPERATIONS
+  // ===================
+
+  /**
+   * Submit reviews for products in an order
+   */
+  async submitReviews(reviews: Array<{
+    product_id: number;
+    order_id: number;
+    order_item_id: number;
+    rating: number;
+    title?: string;
+    review?: string;
+    images?: string[];
+  }>): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response: any = await api.post('/sales.php?action=reviews', { reviews });
+      
+      return {
+        success: response.success ?? true,
+        message: response.message || 'Reviews submitted successfully'
+      };
+    } catch (error: any) {
+      console.error('Failed to submit reviews:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to submit reviews'
+      };
+    }
+  },
+
+  /**
+   * Get review status for an order (which items have been reviewed)
+   */
+  async getOrderReviewStatus(orderId: number): Promise<{ success: boolean; data?: { reviewed: number[]; unreviewed: number[] } }> {
+    try {
+      const response: any = await api.get('/sales.php', {
+        params: {
+          action: 'order-reviews',
+          order_id: orderId
+        }
+      });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get order review status:', error);
+      return { success: false };
+    }
+  },
+
+  /**
+   * Get reviews for a specific product
+   */
+  async getProductReviews(productId: number, page = 1, limit = 10): Promise<{ 
+    success: boolean; 
+    data?: Array<{
+      id: number;
+      rating: number;
+      title: string;
+      review: string;
+      customer_name: string;
+      is_verified_purchase: boolean;
+      helpful_count: number;
+      created_at: string;
+    }>;
+    stats?: {
+      average_rating: number;
+      total_reviews: number;
+      rating_breakdown: Record<number, number>;
+    };
+  }> {
+    try {
+      const response: any = await api.get('/sales.php', {
+        params: {
+          action: 'product-reviews',
+          product_id: productId,
+          page,
+          limit
+        }
+      });
+      
+      return {
+        success: true,
+        data: response.data,
+        stats: response.stats
+      };
+    } catch (error) {
+      console.error('Failed to get product reviews:', error);
+      return { success: false };
+    }
   }
 };
 

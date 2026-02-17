@@ -43,6 +43,7 @@ const getRoleConfig = (role: UserRole) => {
       color: 'bg-blue-500',
       dashboardPath: '/products',
       menuItems: [
+        { path: '/profile', label: 'My Profile', icon: User },
         { path: '/orders', label: 'My Orders', icon: Package },
         { path: '/addresses', label: 'My Addresses', icon: MapPin },
         { path: '/wishlist', label: 'Wishlist', icon: Heart },
