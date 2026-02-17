@@ -53,6 +53,7 @@ import SupervisorTrainees from './pages/SupervisorTrainees';
 import SupervisorTimesheets from './pages/SupervisorTimesheets';
 import SupervisorTasks from './pages/SupervisorTasks';
 import SupervisorReports from './pages/SupervisorReports';
+import SupervisorAttendance from './pages/SupervisorAttendance';
 import Cart from './pages/Cart';
 import Wishlist from './pages/Wishlist';
 import Orders from './pages/Orders';
@@ -142,7 +143,7 @@ const AppContent = () => {
             <Route path="/supervisor/trainees" element={<SupervisorRoute><SupervisorTrainees /></SupervisorRoute>} />
             <Route path="/supervisor/timesheets" element={<SupervisorRoute><SupervisorTimesheets /></SupervisorRoute>} />
             <Route path="/supervisor/tasks" element={<SupervisorRoute><SupervisorTasks /></SupervisorRoute>} />
-            <Route path="/supervisor/attendance" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />
+            <Route path="/supervisor/attendance" element={<SupervisorRoute><SupervisorAttendance /></SupervisorRoute>} />
             <Route path="/supervisor/reports" element={<SupervisorRoute><SupervisorReports /></SupervisorRoute>} />
             <Route path="/supervisor/documents" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />
             <Route path="/supervisor/settings" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />

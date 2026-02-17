@@ -76,6 +76,9 @@ function handleGet($conn, $path) {
         case 'date':
             getAttendanceByDate($conn);
             break;
+        case 'by-date':
+            getAttendanceByDateForSupervisor($conn);
+            break;
         case 'pending-overtime':
             getPendingOvertime($conn);
             break;
@@ -224,6 +227,49 @@ function getAttendanceByDate($conn) {
     } else {
         echo json_encode(['success' => false, 'error' => 'No attendance record found for this date']);
     }
+}
+
+function getAttendanceByDateForSupervisor($conn) {
+    $supervisorId = isset($_GET['supervisor_id']) ? intval($_GET['supervisor_id']) : 0;
+    $date = isset($_GET['date']) ? $_GET['date'] : date('Y-m-d');
+    
+    if (!$supervisorId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Supervisor ID required']);
+        return;
+    }
+    
+    $stmt = $conn->prepare("
+        SELECT 
+            a.id,
+            a.trainee_id,
+            u.first_name,
+            u.last_name,
+            u.email,
+            a.attendance_date,
+            a.time_in,
+            a.time_out,
+            a.status,
+            a.late_minutes,
+            a.work_hours,
+            a.photo_in,
+            a.photo_out,
+            a.location_in,
+            a.location_out,
+            a.latitude_in,
+            a.longitude_in,
+            a.latitude_out,
+            a.longitude_out,
+            a.face_verified
+        FROM ojt_attendance a
+        JOIN users u ON a.trainee_id = u.id
+        WHERE a.supervisor_id = ? AND a.attendance_date = ?
+        ORDER BY a.time_in DESC
+    ");
+    $stmt->execute([$supervisorId, $date]);
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode(['success' => true, 'data' => $records]);
 }
 
 function getAttendanceHistory($conn) {
