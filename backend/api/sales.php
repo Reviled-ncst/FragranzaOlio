@@ -736,6 +736,39 @@ function updateOrderStatus($db, $data) {
         $sql .= ", delivered_at = NOW()";
     }
     
+    // Handle return/refund processing - restore inventory
+    if ($newStatus === 'returned' || $newStatus === 'refunded') {
+        // Mark payment as refunded
+        $sql .= ", payment_status = 'refunded'";
+        
+        // Restore inventory for order items
+        try {
+            // Get order items
+            $itemsStmt = $db->prepare("SELECT product_id, variation_id, quantity FROM order_items WHERE order_id = :order_id");
+            $itemsStmt->execute([':order_id' => $orderId]);
+            $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($items as $item) {
+                // Restore stock to variation if variation_id exists
+                if (!empty($item['variation_id'])) {
+                    $restoreStmt = $db->prepare("UPDATE product_variations SET stock = stock + :qty WHERE id = :variation_id");
+                    $restoreStmt->execute([':qty' => $item['quantity'], ':variation_id' => $item['variation_id']]);
+                    error_log("Restored {$item['quantity']} units to variation {$item['variation_id']}");
+                }
+                
+                // Also update main product stock if tracking at product level
+                if (!empty($item['product_id'])) {
+                    $restoreProductStmt = $db->prepare("UPDATE products SET stock = stock + :qty WHERE id = :product_id");
+                    $restoreProductStmt->execute([':qty' => $item['quantity'], ':product_id' => $item['product_id']]);
+                    error_log("Restored {$item['quantity']} units to product {$item['product_id']}");
+                }
+            }
+            error_log("Inventory restored for returned/refunded order $orderId");
+        } catch (Exception $e) {
+            error_log("Failed to restore inventory for order $orderId: " . $e->getMessage());
+        }
+    }
+    
     $sql .= " WHERE id = :id";
     
     $stmt = $db->prepare($sql);

@@ -93,7 +93,7 @@ const Orders = () => {
   const [ratingOrder, setRatingOrder] = useState<Order | null>(null);
 
   // Confirm Dialog state
-  type ConfirmAction = 'complete' | 'cancel' | 'return' | null;
+  type ConfirmAction = 'confirm_delivery' | 'complete' | 'cancel' | 'return' | null;
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     action: ConfirmAction;
@@ -107,10 +107,16 @@ const Orders = () => {
   });
 
   const confirmDialogConfig = {
-    complete: {
-      title: 'Confirm Order Receipt',
-      message: 'Please confirm that you have received your order. This will mark it as completed and allow you to rate the products.',
+    confirm_delivery: {
+      title: 'Confirm Delivery Received',
+      message: 'Please confirm that you have received your order. This will update the status to delivered.',
       confirmText: 'Yes, I Received It',
+      variant: 'success' as const,
+    },
+    complete: {
+      title: 'Complete Order',
+      message: 'Confirm that your order is complete? This will finalize the order and allow you to rate the products.',
+      confirmText: 'Yes, Complete Order',
       variant: 'success' as const,
     },
     cancel: {
@@ -145,6 +151,11 @@ const Orders = () => {
     try {
       let result;
       switch (confirmDialog.action) {
+        case 'confirm_delivery':
+          console.log('📦 Calling confirmDelivery for:', confirmDialog.orderId);
+          result = await orderService.updateOrderStatus(confirmDialog.orderId, 'delivered');
+          console.log('📦 confirmDelivery result:', result);
+          break;
         case 'complete':
           console.log('📦 Calling completeOrder for:', confirmDialog.orderId);
           result = await orderService.completeOrder(confirmDialog.orderId);
@@ -750,7 +761,41 @@ const Orders = () => {
 
                   {/* Order Total & Actions */}
                   <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
-                    {/* Action Banner for delivered/picked_up - Prominent CTA */}
+                    {/* Action Banner for ordered - Confirm Delivery */}
+                    {order.status === 'ordered' && (
+                      <div className="mb-3 p-3 bg-gradient-to-r from-blue-500/20 via-indigo-500/15 to-purple-500/10 border border-blue-500/30 rounded-xl overflow-hidden relative">
+                        {/* Decorative icons */}
+                        <div className="absolute top-1 right-10 opacity-20">
+                          <Package className="w-4 h-4 text-blue-400" />
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                              <Truck className="w-5 h-5 text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-blue-400 font-semibold text-sm">
+                                Order is being prepared
+                              </p>
+                              <p className="text-gray-400 text-xs mt-0.5">Received your order? Click to confirm delivery</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openConfirmDialog('confirm_delivery', order.id);
+                            }}
+                            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02]"
+                          >
+                            <PackageCheck size={16} />
+                            Confirm Delivery
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Action Banner for delivered/picked_up - Mark as Complete */}
                     {(order.status === 'delivered' || order.status === 'picked_up') && (
                       <div className="mb-3 p-3 bg-gradient-to-r from-emerald-500/20 via-green-500/15 to-teal-500/10 border border-green-500/30 rounded-xl overflow-hidden relative">
                         {/* Decorative icons */}
@@ -1057,7 +1102,18 @@ const Orders = () => {
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-col sm:flex-row gap-3">
-  {/* Cancel button for orders that haven't shipped yet */}
+                  {/* Confirm Delivery for ordered status */}
+                  {selectedOrder.status === 'ordered' && (
+                    <button
+                      onClick={() => openConfirmDialog('confirm_delivery', selectedOrder.id)}
+                      className="flex items-center justify-center gap-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
+                    >
+                      <PackageCheck size={18} />
+                      Confirm Delivery
+                    </button>
+                  )}
+
+                  {/* Cancel button for orders that haven't shipped yet */}
                   {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(selectedOrder.status) && (
                     <button
                       onClick={() => openConfirmDialog('cancel', selectedOrder.id)}

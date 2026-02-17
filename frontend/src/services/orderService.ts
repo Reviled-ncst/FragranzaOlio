@@ -467,6 +467,34 @@ const orderService = {
     }
   },
 
+  /**
+   * Update order status (generic status update)
+   */
+  async updateOrderStatus(orderId: number, status: OrderStatus, notes?: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('📦 Updating order status:', orderId, 'to:', status);
+      
+      const response: any = await api.put('/sales.php?action=order-status', {
+        id: orderId,
+        status: status,
+        notes: notes
+      });
+      
+      console.log('📦 Update status response:', response);
+      
+      return {
+        success: true,
+        message: response.message || `Order status updated to ${status}`
+      };
+    } catch (error: any) {
+      console.error('📦 Update status error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to update order status'
+      };
+    }
+  },
+
   // ===================
   // REVIEW OPERATIONS
   // ===================
