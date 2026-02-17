@@ -618,28 +618,83 @@ const SalesOrders = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'ordered': return 'bg-blue-500/20 text-blue-400';
+      case 'paid_waiting_approval': return 'bg-yellow-500/20 text-yellow-400';
+      case 'cod_waiting_approval': return 'bg-yellow-500/20 text-yellow-400';
+      case 'paid_ready_pickup': return 'bg-cyan-500/20 text-cyan-400';
+      case 'processing': return 'bg-purple-500/20 text-purple-400';
+      case 'in_transit': return 'bg-indigo-500/20 text-indigo-400';
+      case 'waiting_client': return 'bg-orange-500/20 text-orange-400';
       case 'delivered': return 'bg-green-500/20 text-green-400';
-      case 'processing': return 'bg-blue-500/20 text-blue-400';
+      case 'picked_up': return 'bg-green-500/20 text-green-400';
+      case 'completed': return 'bg-emerald-500/20 text-emerald-400';
+      case 'cancelled': return 'bg-red-500/20 text-red-400';
+      case 'return_requested': return 'bg-orange-500/20 text-orange-400';
+      case 'return_approved': return 'bg-yellow-500/20 text-yellow-400';
+      case 'returned': return 'bg-gray-500/20 text-gray-400';
+      case 'refund_requested': return 'bg-orange-500/20 text-orange-400';
+      case 'refunded': return 'bg-gray-500/20 text-gray-400';
+      // Legacy statuses
       case 'pending': return 'bg-yellow-500/20 text-yellow-400';
       case 'confirmed': return 'bg-cyan-500/20 text-cyan-400';
       case 'shipped': return 'bg-purple-500/20 text-purple-400';
-      case 'cancelled': return 'bg-red-500/20 text-red-400';
-      case 'refunded': return 'bg-orange-500/20 text-orange-400';
       default: return 'bg-gray-500/20 text-gray-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      case 'ordered': return <Package size={14} />;
+      case 'paid_waiting_approval': return <Clock size={14} />;
+      case 'cod_waiting_approval': return <Clock size={14} />;
+      case 'paid_ready_pickup': return <CheckCircle size={14} />;
+      case 'processing': return <RefreshCw size={14} />;
+      case 'in_transit': return <Truck size={14} />;
+      case 'waiting_client': return <Clock size={14} />;
       case 'delivered': return <CheckCircle size={14} />;
-      case 'processing': return <Clock size={14} />;
+      case 'picked_up': return <CheckCircle size={14} />;
+      case 'completed': return <CheckCircle size={14} />;
+      case 'cancelled': return <XCircle size={14} />;
+      case 'return_requested': return <RefreshCw size={14} />;
+      case 'return_approved': return <CheckCircle size={14} />;
+      case 'returned': return <RefreshCw size={14} />;
+      case 'refund_requested': return <RefreshCw size={14} />;
+      case 'refunded': return <RefreshCw size={14} />;
+      // Legacy
       case 'pending': return <Clock size={14} />;
       case 'confirmed': return <CheckCircle size={14} />;
       case 'shipped': return <Truck size={14} />;
-      case 'cancelled': return <XCircle size={14} />;
-      case 'refunded': return <RefreshCw size={14} />;
       default: return <Package size={14} />;
     }
+  };
+
+  // Get quick action for a status
+  const getQuickAction = (status: string): { label: string; nextStatus: string; color: string } | null => {
+    switch (status) {
+      case 'ordered':
+        return { label: 'Process', nextStatus: 'processing', color: 'bg-purple-500 hover:bg-purple-600' };
+      case 'paid_waiting_approval':
+      case 'cod_waiting_approval':
+        return { label: 'Approve', nextStatus: 'processing', color: 'bg-green-500 hover:bg-green-600' };
+      case 'processing':
+        return { label: 'Ship', nextStatus: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600' };
+      case 'in_transit':
+        return { label: 'Delivered', nextStatus: 'delivered', color: 'bg-green-500 hover:bg-green-600' };
+      case 'delivered':
+      case 'picked_up':
+        return { label: 'Complete', nextStatus: 'completed', color: 'bg-emerald-500 hover:bg-emerald-600' };
+      case 'return_requested':
+        return { label: 'Approve Return', nextStatus: 'returned', color: 'bg-orange-500 hover:bg-orange-600' };
+      case 'refund_requested':
+        return { label: 'Process Refund', nextStatus: 'refunded', color: 'bg-orange-500 hover:bg-orange-600' };
+      default:
+        return null;
+    }
+  };
+
+  // Format status for display
+  const formatStatus = (status: string) => {
+    return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
   const formatDate = (dateString: string) => {
@@ -1056,7 +1111,7 @@ const SalesOrders = () => {
                       </div>
                       <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                         {getStatusIcon(order.status)}
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                        {formatStatus(order.status)}
                       </span>
                     </div>
                     
@@ -1090,13 +1145,14 @@ const SalesOrders = () => {
                           <Eye size={14} />
                           View
                         </button>
-                        {(order.status === 'pending' || order.status === 'confirmed') && (
+                        {/* Quick action button based on status */}
+                        {getQuickAction(order.status) && (
                           <button 
-                            onClick={() => completeTransaction(order.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500/20 rounded-lg text-green-400 text-xs"
+                            onClick={() => updateOrderStatus(order.id, getQuickAction(order.status)!.nextStatus)}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs ${getQuickAction(order.status)!.color}`}
                           >
                             <CheckCircle size={14} />
-                            Complete
+                            {getQuickAction(order.status)!.label}
                           </button>
                         )}
                       </div>
@@ -1144,7 +1200,7 @@ const SalesOrders = () => {
                           <td className="py-4 px-6">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                               {getStatusIcon(order.status)}
-                              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                              {formatStatus(order.status)}
                             </span>
                           </td>
                           <td className="py-4 px-6">
@@ -1168,13 +1224,24 @@ const SalesOrders = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {(order.status === 'pending' || order.status === 'confirmed') && (
+                              {/* Quick action button based on status */}
+                              {getQuickAction(order.status) && (
                                 <button 
-                                  onClick={() => completeTransaction(order.id)}
-                                  className="p-2 hover:bg-green-500/20 rounded-lg text-gray-400 hover:text-green-400"
-                                  title="Complete Transaction"
+                                  onClick={() => updateOrderStatus(order.id, getQuickAction(order.status)!.nextStatus)}
+                                  className={`px-3 py-1.5 rounded-lg text-white text-xs font-medium ${getQuickAction(order.status)!.color}`}
+                                  title={getQuickAction(order.status)!.label}
                                 >
-                                  <CheckCircle size={18} />
+                                  {getQuickAction(order.status)!.label}
+                                </button>
+                              )}
+                              {/* Cancel button for pending orders */}
+                              {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
+                                <button 
+                                  onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                  className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400"
+                                  title="Cancel Order"
+                                >
+                                  <XCircle size={18} />
                                 </button>
                               )}
                             </div>
@@ -1229,7 +1296,7 @@ const SalesOrders = () => {
                   <div className="flex flex-wrap items-center gap-3">
                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${getStatusColor(selectedOrder.status)}`}>
                       {getStatusIcon(selectedOrder.status)}
-                      {selectedOrder.status.charAt(0).toUpperCase() + selectedOrder.status.slice(1)}
+                      {formatStatus(selectedOrder.status)}
                     </span>
                     <span className={`px-3 py-1.5 rounded-full text-sm font-medium ${
                       selectedOrder.payment_status === 'paid' ? 'bg-green-500/20 text-green-400' :
@@ -1246,13 +1313,13 @@ const SalesOrders = () => {
                         <Printer size={14} />
                         Print Invoice
                       </button>
-                      {(selectedOrder.status === 'pending' || selectedOrder.status === 'confirmed') && (
+                      {getQuickAction(selectedOrder.status) && (
                         <button
-                          onClick={() => completeTransaction(selectedOrder.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 rounded-lg text-black font-medium text-sm hover:bg-green-600"
+                          onClick={() => updateOrderStatus(selectedOrder.id, getQuickAction(selectedOrder.status)!.nextStatus)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-medium text-sm ${getQuickAction(selectedOrder.status)!.color}`}
                         >
                           <CheckCircle size={14} />
-                          Complete
+                          {getQuickAction(selectedOrder.status)!.label}
                         </button>
                       )}
                     </div>
@@ -1348,11 +1415,36 @@ const SalesOrders = () => {
                     </div>
                   </div>
 
+                  {/* Quick Actions */}
+                  {getQuickAction(selectedOrder.status) && (
+                    <div className="bg-gradient-to-r from-gold-500/10 to-amber-500/5 border border-gold-500/30 rounded-lg p-4">
+                      <p className="text-gray-400 text-sm mb-3">Quick Action</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => updateOrderStatus(selectedOrder.id, getQuickAction(selectedOrder.status)!.nextStatus)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium ${getQuickAction(selectedOrder.status)!.color}`}
+                        >
+                          <CheckCircle size={16} />
+                          {getQuickAction(selectedOrder.status)!.label}
+                        </button>
+                        {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(selectedOrder.status) && (
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
+                          >
+                            <XCircle size={16} />
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Update Status */}
                   <div>
-                    <p className="text-gray-400 text-sm mb-2">Update Status</p>
+                    <p className="text-gray-400 text-sm mb-2">All Statuses</p>
                     <div className="flex flex-wrap gap-2">
-                      {['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'completed', 'cancelled'].map((status) => (
+                      {['ordered', 'paid_waiting_approval', 'cod_waiting_approval', 'paid_ready_pickup', 'processing', 'in_transit', 'waiting_client', 'delivered', 'picked_up', 'completed', 'cancelled', 'return_requested', 'return_approved', 'returned', 'refund_requested', 'refunded'].map((status) => (
                         <button
                           key={status}
                           onClick={() => updateOrderStatus(selectedOrder.id, status)}
@@ -1363,7 +1455,7 @@ const SalesOrders = () => {
                               : 'bg-black-800 text-gray-400 hover:text-white border border-gold-500/30'
                           }`}
                         >
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                          {formatStatus(status)}
                         </button>
                       ))}
                     </div>
