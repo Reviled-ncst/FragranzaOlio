@@ -10,9 +10,19 @@ import {
   signOut,
   deleteUser,
   signInWithEmailAndPassword,
-  sendPasswordResetEmail,
+  sendPasswordResetEmail as firebaseSendPasswordReset,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+
+/**
+ * Generate a deterministic service password for Firebase
+ * Since we only use Firebase for email, not auth, we use a consistent password
+ * This avoids password mismatch issues between PHP and Firebase
+ */
+const getServicePassword = (email: string): string => {
+  // Use a consistent password based on email - Firebase requires 6+ chars
+  return `firebase-email-service-${email.toLowerCase().replace(/[^a-z0-9]/g, '')}-secure`;
+};
 
 /**
  * Firebase Email Service - Only for email delivery
@@ -21,71 +31,61 @@ import { auth } from '../config/firebase';
 export const firebaseEmailService = {
   /**
    * Send verification email using Firebase
-   * Creates a temporary Firebase user just for email delivery
+   * Creates a Firebase user for email delivery using service password
    */
-  async sendVerificationEmail(email: string, password: string): Promise<{ success: boolean; message: string }> {
+  async sendVerificationEmail(email: string, _password?: string): Promise<{ success: boolean; message: string }> {
+    const servicePassword = getServicePassword(email);
+    
     try {
-      // Create Firebase user (just for email delivery)
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
+      // First try to sign in (user might already exist with service password)
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, servicePassword);
+        const firebaseUser = userCredential.user;
 
-      // Send verification email
-      await sendEmailVerification(firebaseUser, {
-        url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
-        handleCodeInApp: false,
-      });
+        if (firebaseUser.emailVerified) {
+          await signOut(auth);
+          return { success: true, message: 'Email already verified!' };
+        }
 
-      console.log('📧 Firebase verification email sent to:', email);
+        await sendEmailVerification(firebaseUser, {
+          url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
+          handleCodeInApp: false,
+        });
+        await signOut(auth);
+        return { success: true, message: 'Verification email sent! Please check your inbox.' };
+      } catch (signInError: any) {
+        // User doesn't exist, create new account
+        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, servicePassword);
+          const firebaseUser = userCredential.user;
 
-      // Sign out immediately (we only use Firebase for email delivery)
-      await signOut(auth);
+          await sendEmailVerification(firebaseUser, {
+            url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
+            handleCodeInApp: false,
+          });
 
-      return {
-        success: true,
-        message: 'Verification email sent! Please check your inbox.',
-      };
+          console.log('📧 Firebase verification email sent to:', email);
+          await signOut(auth);
+          return { success: true, message: 'Verification email sent! Please check your inbox.' };
+        }
+        throw signInError;
+      }
     } catch (error: any) {
       console.error('❌ Firebase email error:', error);
 
-      // Handle case where Firebase user already exists
+      // Handle email-already-in-use with different password (legacy issue)
       if (error.code === 'auth/email-already-in-use') {
-        // Try to resend verification to existing Firebase user
-        try {
-          const userCredential = await signInWithEmailAndPassword(auth, email, password);
-          const firebaseUser = userCredential.user;
-
-          if (!firebaseUser.emailVerified) {
-            await sendEmailVerification(firebaseUser, {
-              url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
-              handleCodeInApp: false,
-            });
-            await signOut(auth);
-            return {
-              success: true,
-              message: 'Verification email resent! Please check your inbox.',
-            };
-          } else {
-            await signOut(auth);
-            return {
-              success: true,
-              message: 'Email already verified!',
-            };
-          }
-        } catch (signInError: any) {
-          return {
-            success: false,
-            message: signInError.code === 'auth/wrong-password' 
-              ? 'Invalid credentials for resending verification'
-              : 'Failed to send verification email',
-          };
-        }
+        return { 
+          success: false, 
+          message: 'Account exists with different credentials. Please contact support.' 
+        };
       }
 
       let message = 'Failed to send verification email';
       if (error.code === 'auth/invalid-email') {
         message = 'Invalid email address';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'Password is too weak';
+      } else if (error.code === 'auth/too-many-requests') {
+        message = 'Too many requests. Please wait a few minutes before trying again.';
       }
 
       return { success: false, message };
@@ -97,22 +97,17 @@ export const firebaseEmailService = {
    * Returns true if: user doesn't exist in Firebase (legacy user), or user is verified
    * Returns false only if: user exists in Firebase but is not verified
    */
-  async checkEmailVerified(email: string, password: string): Promise<boolean> {
+  async checkEmailVerified(email: string, _password?: string): Promise<boolean> {
+    const servicePassword = getServicePassword(email);
+    
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, servicePassword);
       const isVerified = userCredential.user.emailVerified;
       await signOut(auth);
       return isVerified;
     } catch (error: any) {
       // If user doesn't exist in Firebase, treat as verified (legacy user)
-      // Only return false if we know they exist but aren't verified
-      if (error.code === 'auth/user-not-found') {
-        // Legacy user - no Firebase account, allow login
-        return true;
-      }
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        // User exists but wrong password - they may have a Firebase account
-        // We can't check verification, so allow PHP to handle auth
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         return true;
       }
       // For other errors (network, etc.), allow login to proceed
@@ -122,75 +117,11 @@ export const firebaseEmailService = {
 
   /**
    * Resend verification email
-   * For legacy users without Firebase accounts, creates one first
+   * Uses service password - no need for user password
    */
-  async resendVerification(email: string, password: string): Promise<{ success: boolean; message: string }> {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-
-      if (firebaseUser.emailVerified) {
-        await signOut(auth);
-        return {
-          success: true,
-          message: 'Your email is already verified! You can log in now.',
-        };
-      }
-
-      await sendEmailVerification(firebaseUser, {
-        url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
-        handleCodeInApp: false,
-      });
-
-      await signOut(auth);
-
-      return {
-        success: true,
-        message: 'Verification email sent! Check your inbox.',
-      };
-    } catch (error: any) {
-      console.error('❌ Resend verification error:', error);
-
-      // If user doesn't exist in Firebase (user-not-found or invalid-credential in newer SDKs)
-      // Try to create a Firebase account for this legacy user
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-        try {
-          // Create Firebase account for legacy user
-          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-          const firebaseUser = userCredential.user;
-
-          await sendEmailVerification(firebaseUser, {
-            url: `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`,
-            handleCodeInApp: false,
-          });
-
-          await signOut(auth);
-
-          return {
-            success: true,
-            message: 'Verification email sent! Check your inbox.',
-          };
-        } catch (createError: any) {
-          console.error('❌ Create Firebase user error:', createError);
-          
-          // If email already in use, the password was wrong for existing Firebase account
-          if (createError.code === 'auth/email-already-in-use') {
-            return { success: false, message: 'Invalid password. Please enter the correct password for your account.' };
-          }
-          if (createError.code === 'auth/weak-password') {
-            return { success: false, message: 'Password is too weak for email verification. Please update your password first.' };
-          }
-          return { success: false, message: 'Failed to send verification email.' };
-        }
-      }
-
-      let message = 'Failed to send verification email';
-      if (error.code === 'auth/too-many-requests') {
-        message = 'Too many requests. Please wait before trying again.';
-      }
-
-      return { success: false, message };
-    }
+  async resendVerification(email: string, _password?: string): Promise<{ success: boolean; message: string }> {
+    // Just call sendVerificationEmail which handles everything
+    return this.sendVerificationEmail(email);
   },
 
   /**
@@ -198,7 +129,7 @@ export const firebaseEmailService = {
    */
   async sendPasswordResetEmail(email: string): Promise<{ success: boolean; message: string }> {
     try {
-      await sendPasswordResetEmail(auth, email, {
+      await firebaseSendPasswordReset(auth, email, {
         url: `${window.location.origin}/login`,
         handleCodeInApp: false,
       });
@@ -228,9 +159,11 @@ export const firebaseEmailService = {
   /**
    * Delete Firebase user (cleanup)
    */
-  async deleteFirebaseUser(email: string, password: string): Promise<void> {
+  async deleteFirebaseUser(email: string): Promise<void> {
+    const servicePassword = getServicePassword(email);
+    
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, servicePassword);
       await deleteUser(userCredential.user);
     } catch (error) {
       console.error('Failed to delete Firebase user:', error);

@@ -417,8 +417,8 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   };
 
   const handleResendVerification = async () => {
-    if (!formData.email || !formData.password) {
-      setError('Please enter your email and password above');
+    if (!formData.email) {
+      setError('Please enter your email above');
       return;
     }
     
@@ -426,7 +426,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setError(null);
     
     try {
-      const result = await firebaseEmailService.resendVerification(formData.email, formData.password);
+      const result = await firebaseEmailService.resendVerification(formData.email);
       
       if (result.success) {
         setSuccessMessage(result.message || 'Verification email sent! Check your inbox.');
