@@ -15,7 +15,7 @@ interface VercelResponse {
 }
 
 // Backend URL - Use environment variable or default to Cloudflare tunnel
-const BACKEND_URL = process.env.BACKEND_URL || 'https://revolution-shared-favourite-farming.trycloudflare.com/FragranzaWeb';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://wax-harris-anchor-latex.trycloudflare.com/FragranzaWeb';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
