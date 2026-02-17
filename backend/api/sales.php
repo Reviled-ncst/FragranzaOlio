@@ -187,7 +187,52 @@ function handleDeleteRequests($db, $action) {
 // ORDERS
 // =====================================================
 
+// Auto-complete delivered/picked_up orders after 7 days
+function autoCompleteDeliveredOrders($db) {
+    try {
+        // First, find orders to auto-complete
+        $findStmt = $db->prepare("
+            SELECT id FROM orders 
+            WHERE status IN ('delivered', 'picked_up') 
+            AND updated_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+        ");
+        $findStmt->execute();
+        $orderIds = $findStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if (count($orderIds) === 0) {
+            return 0;
+        }
+        
+        // Update each order
+        foreach ($orderIds as $orderId) {
+            $updateStmt = $db->prepare("
+                UPDATE orders 
+                SET status = 'completed', 
+                    updated_at = NOW(),
+                    notes = CONCAT(COALESCE(notes, ''), ' [Auto-completed after 7 days]')
+                WHERE id = :id
+            ");
+            $updateStmt->execute([':id' => $orderId]);
+            
+            // Add to status history
+            $historyStmt = $db->prepare("
+                INSERT INTO order_status_history (order_id, status, note, changed_by)
+                VALUES (:order_id, 'completed', 'Auto-completed after 7 days', 'system')
+            ");
+            $historyStmt->execute([':order_id' => $orderId]);
+        }
+        
+        return count($orderIds);
+    } catch (Exception $e) {
+        // Silent fail - don't break order loading
+        return 0;
+    }
+}
+
 function getOrders($db) {
+    // Auto-complete old delivered orders
+    autoCompleteDeliveredOrders($db);
+    
     $status = $_GET['status'] ?? null;
     $search = $_GET['search'] ?? null;
     $customerEmail = $_GET['customer_email'] ?? null;

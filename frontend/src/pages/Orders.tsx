@@ -861,7 +861,29 @@ const Orders = () => {
                     </button>
                   )}
                   
-                  {/* Request Return/Refund for delivered or completed orders */}
+                  {/* Mark as Completed for delivered/picked_up orders */}
+                  {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up') && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Confirm that you have received your order? This will mark it as completed.')) {
+                          const result = await orderService.completeOrder(selectedOrder.id);
+                          if (result.success) {
+                            alert('Order marked as completed! You can now rate your products.');
+                            handleCloseModal();
+                            refreshOrders();
+                          } else {
+                            alert(result.message || 'Failed to complete order');
+                          }
+                        }
+                      }}
+                      className="flex items-center justify-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
+                    >
+                      <CheckCircle size={18} />
+                      Mark as Completed
+                    </button>
+                  )}
+                  
+                  {/* Rate Products and Return/Refund for delivered, picked_up, or completed orders */}
                   {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up' || selectedOrder.status === 'completed') && (
                     <>
                       <button
