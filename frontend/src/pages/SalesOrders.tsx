@@ -672,13 +672,16 @@ const SalesOrders = () => {
   const getQuickAction = (status: string): { label: string; nextStatus: string; color: string } | null => {
     switch (status) {
       case 'ordered':
+      case 'pending': // Legacy
         return { label: 'Process', nextStatus: 'processing', color: 'bg-purple-500 hover:bg-purple-600' };
       case 'paid_waiting_approval':
       case 'cod_waiting_approval':
+      case 'confirmed': // Legacy
         return { label: 'Approve', nextStatus: 'processing', color: 'bg-green-500 hover:bg-green-600' };
       case 'processing':
         return { label: 'Ship', nextStatus: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600' };
       case 'in_transit':
+      case 'shipped': // Legacy
         return { label: 'Delivered', nextStatus: 'delivered', color: 'bg-green-500 hover:bg-green-600' };
       case 'delivered':
       case 'picked_up':
@@ -1155,6 +1158,16 @@ const SalesOrders = () => {
                             {getQuickAction(order.status)!.label}
                           </button>
                         )}
+                        {/* Cancel button for pending orders */}
+                        {['ordered', 'pending', 'paid_waiting_approval', 'cod_waiting_approval', 'confirmed'].includes(order.status) && (
+                          <button 
+                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs"
+                          >
+                            <XCircle size={14} />
+                            Cancel
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1235,7 +1248,7 @@ const SalesOrders = () => {
                                 </button>
                               )}
                               {/* Cancel button for pending orders */}
-                              {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
+                              {['ordered', 'pending', 'paid_waiting_approval', 'cod_waiting_approval', 'confirmed'].includes(order.status) && (
                                 <button 
                                   onClick={() => updateOrderStatus(order.id, 'cancelled')}
                                   className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400"
@@ -1420,7 +1433,7 @@ const SalesOrders = () => {
                     <p className="text-gray-400 text-sm mb-3">Order Actions</p>
                     <div className="flex flex-wrap gap-2">
                       {/* Pending orders - Approve or Cancel */}
-                      {selectedOrder.status === 'ordered' && (
+                      {(selectedOrder.status === 'ordered' || selectedOrder.status === 'pending') && (
                         <>
                           <button
                             onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
@@ -1440,7 +1453,7 @@ const SalesOrders = () => {
                       )}
 
                       {/* Payment approval - Approve or Reject */}
-                      {(selectedOrder.status === 'paid_waiting_approval' || selectedOrder.status === 'cod_waiting_approval') && (
+                      {(selectedOrder.status === 'paid_waiting_approval' || selectedOrder.status === 'cod_waiting_approval' || selectedOrder.status === 'confirmed') && (
                         <>
                           <button
                             onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
@@ -1491,7 +1504,7 @@ const SalesOrders = () => {
                       )}
 
                       {/* In Transit - Mark delivered or waiting */}
-                      {selectedOrder.status === 'in_transit' && (
+                      {(selectedOrder.status === 'in_transit' || selectedOrder.status === 'shipped') && (
                         <>
                           <button
                             onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
