@@ -79,13 +79,40 @@ const Checkout = () => {
   
   // Load selected items and saved addresses
   useEffect(() => {
-    const selectedIds = sessionStorage.getItem('checkoutItems');
-    if (selectedIds) {
-      const ids: number[] = JSON.parse(selectedIds);
-      const selected = items.filter(item => ids.includes(item.id));
-      setCheckoutItems(selected);
+    // Check for Buy Now item first
+    const buyNowData = sessionStorage.getItem('buyNowItem');
+    if (buyNowData) {
+      const { productId, variationId } = JSON.parse(buyNowData);
+      // Find the matching cart item
+      const buyNowItem = items.find(
+        item => item.productId === productId && 
+               (variationId ? item.variationId === variationId : !item.variationId)
+      );
+      if (buyNowItem) {
+        setCheckoutItems([buyNowItem]);
+        // Clear the buyNow flag only after successfully finding the item
+        sessionStorage.removeItem('buyNowItem');
+      } else if (items.length > 0) {
+        // Items loaded but buyNow item not found - might be timing issue, wait for next update
+        // If items exist but our item isn't there, use all items
+        setCheckoutItems(items);
+        sessionStorage.removeItem('buyNowItem');
+      }
+      // If items.length === 0, wait for cart to load
     } else {
-      setCheckoutItems(items);
+      // Check for selected items from cart page
+      const selectedIds = sessionStorage.getItem('checkoutItems');
+      if (selectedIds) {
+        const ids: number[] = JSON.parse(selectedIds);
+        const selected = items.filter(item => ids.includes(item.id));
+        if (selected.length > 0) {
+          setCheckoutItems(selected);
+        } else if (items.length > 0) {
+          setCheckoutItems(items);
+        }
+      } else {
+        setCheckoutItems(items);
+      }
     }
 
     // Load saved addresses
