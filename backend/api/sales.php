@@ -83,6 +83,12 @@ function handleGetRequests($db, $action) {
         case 'settings':
             getUserSettings($db, $_GET['user_id'] ?? null);
             break;
+        case 'reviews':
+            getProductReviews($db, $_GET['product_id'] ?? null);
+            break;
+        case 'order_reviews':
+            getOrderReviewStatus($db, $_GET['order_id'] ?? null);
+            break;
         default:
             getDashboardStats($db);
     }
@@ -93,6 +99,9 @@ function handlePostRequests($db, $action) {
     switch ($action) {
         case 'order':
             createOrder($db, $data);
+            break;
+        case 'review':
+            createReview($db, $data);
             break;
         case 'customer':
             createCustomer($db, $data);
@@ -608,8 +617,11 @@ function updateOrderStatus($db, $data) {
         return;
     }
     
+    $orderId = $data['id'];
+    $newStatus = $data['status'];
+    
     $sql = "UPDATE orders SET status = :status";
-    $params = [':id' => $data['id'], ':status' => $data['status']];
+    $params = [':id' => $orderId, ':status' => $newStatus];
     
     // Update payment status if provided
     if (!empty($data['payment_status'])) {
@@ -617,25 +629,44 @@ function updateOrderStatus($db, $data) {
         $params[':payment_status'] = $data['payment_status'];
     }
     
-    // For COD and store_payment orders, auto-mark as paid when delivered/completed
-    if (($data['status'] === 'delivered' || $data['status'] === 'completed') && empty($data['payment_status'])) {
-        // Check if this is a COD or store payment order
+    // Add tracking URL if provided (for Lalamove/courier links)
+    if (!empty($data['tracking_url'])) {
+        $sql .= ", tracking_url = :tracking_url";
+        $params[':tracking_url'] = $data['tracking_url'];
+    }
+    
+    // Add courier name if provided
+    if (!empty($data['courier_name'])) {
+        $sql .= ", courier_name = :courier_name";
+        $params[':courier_name'] = $data['courier_name'];
+    }
+    
+    // Add estimated delivery if provided
+    if (!empty($data['estimated_delivery'])) {
+        $sql .= ", estimated_delivery = :estimated_delivery";
+        $params[':estimated_delivery'] = $data['estimated_delivery'];
+    }
+    
+    // For COD/COP orders, auto-mark as paid when delivered/picked_up/completed
+    if (in_array($newStatus, ['delivered', 'picked_up', 'completed']) && empty($data['payment_status'])) {
         $checkStmt = $db->prepare("SELECT payment_method FROM orders WHERE id = :id");
-        $checkStmt->execute([':id' => $data['id']]);
+        $checkStmt->execute([':id' => $orderId]);
         $order = $checkStmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($order && in_array($order['payment_method'], ['cod', 'store_payment', 'COD'])) {
+        if ($order && in_array($order['payment_method'], ['cod', 'cop', 'store_payment', 'COD'])) {
             $sql .= ", payment_status = 'paid'";
         }
     }
     
-    if ($data['status'] === 'shipped' && !empty($data['tracking_number'])) {
+    // Handle in_transit status with tracking info
+    if ($newStatus === 'in_transit' && !empty($data['tracking_number'])) {
         $sql .= ", tracking_number = :tracking, courier = :courier, shipped_at = NOW()";
         $params[':tracking'] = $data['tracking_number'];
-        $params[':courier'] = $data['courier'] ?? null;
+        $params[':courier'] = $data['courier'] ?? $data['courier_name'] ?? null;
     }
     
-    if ($data['status'] === 'delivered') {
+    // Set delivered_at timestamp
+    if ($newStatus === 'delivered' || $newStatus === 'picked_up') {
         $sql .= ", delivered_at = NOW()";
     }
     
@@ -643,6 +674,22 @@ function updateOrderStatus($db, $data) {
     
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
+    
+    // Log status change in history
+    try {
+        $historyStmt = $db->prepare("
+            INSERT INTO order_status_history (order_id, status, note, changed_by)
+            VALUES (:order_id, :status, :note, :changed_by)
+        ");
+        $historyStmt->execute([
+            ':order_id' => $orderId,
+            ':status' => $newStatus,
+            ':note' => $data['note'] ?? null,
+            ':changed_by' => $data['changed_by'] ?? null
+        ]);
+    } catch (Exception $e) {
+        // Table might not exist yet, ignore
+    }
     
     echo json_encode(['success' => true, 'message' => 'Order status updated']);
 }
@@ -1695,3 +1742,221 @@ function getDashboardStats($db) {
         ]
     ]);
 }
+
+// =====================================================
+// PRODUCT REVIEWS FUNCTIONS
+// =====================================================
+
+function getProductReviews($db, $productId) {
+    if (!$productId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Product ID required']);
+        return;
+    }
+    
+    $stmt = $db->prepare("
+        SELECT 
+            r.*,
+            COALESCE(r.customer_name, CONCAT(u.first_name, ' ', u.last_name)) as reviewer_name
+        FROM product_reviews r
+        LEFT JOIN users u ON r.user_id = u.id
+        WHERE r.product_id = :product_id AND r.status = 'approved'
+        ORDER BY r.created_at DESC
+    ");
+    $stmt->execute([':product_id' => $productId]);
+    $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Get rating stats
+    $statsStmt = $db->prepare("
+        SELECT 
+            COUNT(*) as total,
+            AVG(rating) as average,
+            SUM(CASE WHEN rating = 5 THEN 1 ELSE 0 END) as five_star,
+            SUM(CASE WHEN rating = 4 THEN 1 ELSE 0 END) as four_star,
+            SUM(CASE WHEN rating = 3 THEN 1 ELSE 0 END) as three_star,
+            SUM(CASE WHEN rating = 2 THEN 1 ELSE 0 END) as two_star,
+            SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) as one_star
+        FROM product_reviews
+        WHERE product_id = :product_id AND status = 'approved'
+    ");
+    $statsStmt->execute([':product_id' => $productId]);
+    $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'reviews' => $reviews,
+            'stats' => [
+                'total' => (int)$stats['total'],
+                'average' => round((float)$stats['average'], 1),
+                'distribution' => [
+                    5 => (int)$stats['five_star'],
+                    4 => (int)$stats['four_star'],
+                    3 => (int)$stats['three_star'],
+                    2 => (int)$stats['two_star'],
+                    1 => (int)$stats['one_star']
+                ]
+            ]
+        ]
+    ]);
+}
+
+function getOrderReviewStatus($db, $orderId) {
+    if (!$orderId) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Order ID required']);
+        return;
+    }
+    
+    // Check if order is eligible for review (delivered or picked_up)
+    $orderStmt = $db->prepare("
+        SELECT id, status FROM orders WHERE id = :id
+    ");
+    $orderStmt->execute([':id' => $orderId]);
+    $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$order) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Order not found']);
+        return;
+    }
+    
+    $canReview = in_array($order['status'], ['delivered', 'picked_up', 'completed']);
+    
+    // Get items and their review status
+    $itemsStmt = $db->prepare("
+        SELECT 
+            oi.id as order_item_id,
+            oi.product_id,
+            oi.product_name,
+            oi.variation,
+            oi.reviewed,
+            pr.id as review_id,
+            pr.rating,
+            pr.review
+        FROM order_items oi
+        LEFT JOIN product_reviews pr ON pr.order_item_id = oi.id
+        WHERE oi.order_id = :order_id
+    ");
+    $itemsStmt->execute([':order_id' => $orderId]);
+    $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'can_review' => $canReview,
+            'order_status' => $order['status'],
+            'items' => $items
+        ]
+    ]);
+}
+
+function createReview($db, $data) {
+    if (empty($data['product_id']) || empty($data['rating'])) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Product ID and rating required']);
+        return;
+    }
+    
+    $rating = intval($data['rating']);
+    if ($rating < 1 || $rating > 5) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Rating must be between 1 and 5']);
+        return;
+    }
+    
+    // Check if already reviewed (for order items)
+    if (!empty($data['order_item_id'])) {
+        $checkStmt = $db->prepare("SELECT reviewed FROM order_items WHERE id = :id");
+        $checkStmt->execute([':id' => $data['order_item_id']]);
+        $existingItem = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existingItem && $existingItem['reviewed']) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'You have already reviewed this item']);
+            return;
+        }
+    }
+    
+    // Verify order status if order_id provided
+    $isVerifiedPurchase = false;
+    if (!empty($data['order_id'])) {
+        $orderStmt = $db->prepare("SELECT status FROM orders WHERE id = :id");
+        $orderStmt->execute([':id' => $data['order_id']]);
+        $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$order || !in_array($order['status'], ['delivered', 'picked_up', 'completed'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Order must be delivered before reviewing']);
+            return;
+        }
+        $isVerifiedPurchase = true;
+    }
+    
+    try {
+        $db->beginTransaction();
+        
+        $stmt = $db->prepare("
+            INSERT INTO product_reviews (
+                product_id, order_id, order_item_id, user_id,
+                customer_name, customer_email, rating,
+                title, review, is_verified_purchase, status
+            ) VALUES (
+                :product_id, :order_id, :order_item_id, :user_id,
+                :customer_name, :customer_email, :rating,
+                :title, :review, :is_verified_purchase, :status
+            )
+        ");
+        
+        $stmt->execute([
+            ':product_id' => $data['product_id'],
+            ':order_id' => $data['order_id'] ?? null,
+            ':order_item_id' => $data['order_item_id'] ?? null,
+            ':user_id' => $data['user_id'] ?? null,
+            ':customer_name' => $data['customer_name'] ?? null,
+            ':customer_email' => $data['customer_email'] ?? null,
+            ':rating' => $rating,
+            ':title' => $data['title'] ?? null,
+            ':review' => $data['review'] ?? null,
+            ':is_verified_purchase' => $isVerifiedPurchase ? 1 : 0,
+            ':status' => $isVerifiedPurchase ? 'approved' : 'pending' // Auto-approve verified purchases
+        ]);
+        
+        $reviewId = $db->lastInsertId();
+        
+        // Mark order item as reviewed
+        if (!empty($data['order_item_id'])) {
+            $updateStmt = $db->prepare("UPDATE order_items SET reviewed = 1, review_id = :review_id WHERE id = :id");
+            $updateStmt->execute([':review_id' => $reviewId, ':id' => $data['order_item_id']]);
+        }
+        
+        // Update product average rating if auto-approved
+        if ($isVerifiedPurchase) {
+            $updateProductStmt = $db->prepare("
+                UPDATE products SET
+                    average_rating = (SELECT AVG(rating) FROM product_reviews WHERE product_id = :pid AND status = 'approved'),
+                    review_count = (SELECT COUNT(*) FROM product_reviews WHERE product_id = :pid2 AND status = 'approved')
+                WHERE id = :pid3
+            ");
+            $updateProductStmt->execute([
+                ':pid' => $data['product_id'],
+                ':pid2' => $data['product_id'],
+                ':pid3' => $data['product_id']
+            ]);
+        }
+        
+        $db->commit();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => $isVerifiedPurchase ? 'Review submitted successfully!' : 'Review submitted for moderation',
+            'review_id' => $reviewId
+        ]);
+        
+    } catch (Exception $e) {
+        $db->rollBack();
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to submit review: ' . $e->getMessage()]);
+    }
+}
+

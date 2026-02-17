@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Thumbs, FreeMode, Navigation } from 'swiper/modules';
@@ -28,6 +28,7 @@ import Button from '../components/ui/Button';
 import { productService, Product as APIProduct, ProductVariation } from '../services/productServicePHP';
 import { useAuth } from '../context/AuthContext';
 import { useAuthModal } from '../context/AuthModalContext';
+import { useCart } from '../context/CartContext';
 import { getImageUrl } from '../services/api';
 
 // Transform API product to display format
@@ -84,8 +85,10 @@ const transformAPIProduct = (product: APIProduct): DisplayProduct => ({
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { openAuthModal } = useAuthModal();
+  const { addToCart } = useCart();
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperType | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeTab, setActiveTab] = useState('description');
@@ -495,7 +498,17 @@ const ProductDetail = () => {
                       openAuthModal('login');
                       return;
                     }
-                    // TODO: Add to cart logic
+                    // Add to cart
+                    addToCart({
+                      productId: product.id,
+                      name: product.name,
+                      variation: selectedVariation?.volume || product.volume || 'Default',
+                      variationId: selectedVariation?.id,
+                      price: currentPrice,
+                      quantity: quantity,
+                      image: selectedVariation?.image ? getImageUrl(selectedVariation.image) : product.image,
+                      maxStock: selectedVariation?.stock || product.stock_quantity,
+                    });
                   }}
                 >
                   <ShoppingBag size={16} className="mr-2" />
@@ -528,7 +541,20 @@ const ProductDetail = () => {
                     openAuthModal('login');
                     return;
                   }
-                  // TODO: Buy now logic
+                  // Add to cart and navigate to checkout
+                  addToCart({
+                    productId: product.id,
+                    name: product.name,
+                    variation: selectedVariation?.volume || product.volume || 'Default',
+                    variationId: selectedVariation?.id,
+                    price: currentPrice,
+                    quantity: quantity,
+                    image: selectedVariation?.image ? getImageUrl(selectedVariation.image) : product.image,
+                    maxStock: selectedVariation?.stock || product.stock_quantity,
+                  });
+                  // Store item for checkout and navigate
+                  sessionStorage.setItem('checkoutItems', JSON.stringify([product.id]));
+                  navigate('/checkout');
                 }}
               >
                 Buy Now

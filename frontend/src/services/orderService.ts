@@ -5,22 +5,48 @@
 
 import api from './api';
 
-// Types
+// Types - Order Flow:
+// ordered → paid_waiting_approval / cod_waiting_approval → paid_ready_pickup / processing → in_transit → delivered/picked_up → completed → return_requested/refund_requested
 export type OrderStatus = 
-  | 'pending' 
-  | 'confirmed' 
-  | 'processing' 
-  | 'in_transit' 
-  | 'delivered' 
-  | 'completed'
-  | 'cancelled' 
-  | 'return_requested' 
-  | 'return_approved' 
-  | 'returned' 
-  | 'refunded';
+  | 'ordered'              // Initial state after checkout
+  | 'paid_waiting_approval' // Paid (GCash/Maya/Bank) waiting for admin approval
+  | 'cod_waiting_approval'  // COD/COP waiting for admin confirmation
+  | 'paid_ready_pickup'     // Paid and ready for store pickup
+  | 'processing'            // Being prepared for delivery
+  | 'in_transit'           // Out for delivery (with Lalamove/courier)
+  | 'waiting_client'       // At delivery point, waiting for client
+  | 'delivered'            // Successfully delivered
+  | 'picked_up'            // Successfully picked up at store
+  | 'completed'            // Order finalized
+  | 'cancelled'            // Order cancelled
+  | 'return_requested'     // Customer requested return
+  | 'return_approved'      // Return approved
+  | 'returned'             // Item returned
+  | 'refund_requested'     // Customer requested refund
+  | 'refunded';            // Refund completed
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded' | 'partial';
-export type PaymentMethod = 'cod' | 'gcash' | 'maya' | 'bank_transfer' | 'card' | 'store_payment';
+export type PaymentMethod = 'cod' | 'cop' | 'gcash' | 'maya' | 'bank_transfer' | 'card' | 'store_payment';
+
+// Order status display info
+export const ORDER_STATUS_CONFIG: Record<OrderStatus, { label: string; color: string; description: string; step: number }> = {
+  ordered: { label: 'Ordered', color: 'blue', description: 'Order placed successfully', step: 1 },
+  paid_waiting_approval: { label: 'Payment Verification', color: 'yellow', description: 'Waiting for payment verification', step: 2 },
+  cod_waiting_approval: { label: 'Awaiting Confirmation', color: 'yellow', description: 'COD/COP order awaiting confirmation', step: 2 },
+  paid_ready_pickup: { label: 'Ready for Pickup', color: 'green', description: 'Order is ready for store pickup', step: 3 },
+  processing: { label: 'Processing', color: 'purple', description: 'Order is being prepared', step: 3 },
+  in_transit: { label: 'In Transit', color: 'blue', description: 'Order is on the way', step: 4 },
+  waiting_client: { label: 'Awaiting Client', color: 'orange', description: 'Rider waiting at delivery location', step: 4 },
+  delivered: { label: 'Delivered', color: 'green', description: 'Order has been delivered', step: 5 },
+  picked_up: { label: 'Picked Up', color: 'green', description: 'Order has been picked up', step: 5 },
+  completed: { label: 'Completed', color: 'emerald', description: 'Order completed', step: 6 },
+  cancelled: { label: 'Cancelled', color: 'red', description: 'Order has been cancelled', step: 0 },
+  return_requested: { label: 'Return Requested', color: 'orange', description: 'Return request pending', step: 7 },
+  return_approved: { label: 'Return Approved', color: 'yellow', description: 'Return has been approved', step: 7 },
+  returned: { label: 'Returned', color: 'gray', description: 'Item has been returned', step: 8 },
+  refund_requested: { label: 'Refund Requested', color: 'orange', description: 'Refund request pending', step: 7 },
+  refunded: { label: 'Refunded', color: 'gray', description: 'Refund completed', step: 8 }
+};
 
 export interface OrderItem {
   id: number;
@@ -64,7 +90,16 @@ export interface Order {
   
   // Tracking
   tracking_number?: string;
+  tracking_url?: string;      // Lalamove/courier tracking link
+  courier_name?: string;      // e.g., "Lalamove", "LBC", etc.
   estimated_delivery?: string;
+  
+  // Status history for timeline
+  status_history?: Array<{
+    status: OrderStatus;
+    timestamp: string;
+    note?: string;
+  }>;
   
   // Items
   items: OrderItem[];
