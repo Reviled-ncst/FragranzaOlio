@@ -30,7 +30,8 @@ import {
   PackageCheck,
   CircleDot,
   Undo2,
-  ArrowLeft
+  ArrowLeft,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
@@ -54,6 +55,20 @@ const statusConfig: Record<OrderStatus, { label: string; icon: React.ElementType
   refunded: { label: 'Refunded', icon: RotateCcw, color: 'text-gray-400', bgColor: 'bg-gray-400/10' },
 };
 
+// Grouped status filter options
+type StatusFilterGroup = 'all' | 'ordered' | 'processing' | 'in_transit' | 'completed' | 'return_refund' | 'finalized' | 'cancelled';
+
+const STATUS_GROUPS: Record<StatusFilterGroup, OrderStatus[]> = {
+  all: [],
+  ordered: ['ordered'],
+  processing: ['paid_waiting_approval', 'cod_waiting_approval', 'processing', 'paid_ready_pickup'],
+  in_transit: ['in_transit', 'waiting_client'],
+  completed: ['delivered', 'picked_up', 'completed'], // These can be rated
+  return_refund: ['return_requested', 'return_approved', 'refund_requested'],
+  finalized: ['returned', 'refunded'],
+  cancelled: ['cancelled'],
+};
+
 const Orders = () => {
   const { user, isAuthenticated } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
@@ -65,7 +80,7 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [isLoadingInvoice, setIsLoadingInvoice] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilterGroup>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedOrderNumber, setCopiedOrderNumber] = useState<string | null>(null);
 
@@ -111,9 +126,10 @@ const Orders = () => {
   useEffect(() => {
     let filtered = [...orders];
 
-    // Status filter
+    // Status filter (grouped)
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(o => o.status === statusFilter);
+      const allowedStatuses = STATUS_GROUPS[statusFilter];
+      filtered = filtered.filter(o => allowedStatuses.includes(o.status));
     }
 
     // Search filter
@@ -439,26 +455,17 @@ const Orders = () => {
             <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'all')}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilterGroup)}
               className="appearance-none bg-black-900 border border-gold-500/20 rounded-lg pl-10 pr-10 py-2.5 text-white focus:border-gold-500/50 focus:outline-none cursor-pointer"
             >
-              <option value="all">All Status</option>
+              <option value="all">All Orders</option>
               <option value="ordered">Ordered</option>
-              <option value="paid_waiting_approval">Payment Verification</option>
-              <option value="cod_waiting_approval">Awaiting Confirmation</option>
-              <option value="paid_ready_pickup">Ready for Pickup</option>
               <option value="processing">Processing</option>
-              <option value="in_transit">In Transit</option>
-              <option value="waiting_client">Awaiting Client</option>
-              <option value="delivered">Delivered</option>
-              <option value="picked_up">Picked Up</option>
-              <option value="completed">Completed</option>
+              <option value="in_transit">In Transit / Pickup</option>
+              <option value="completed">Completed ⭐</option>
+              <option value="return_refund">Return/Refund Requests</option>
+              <option value="finalized">Returned/Refunded</option>
               <option value="cancelled">Cancelled</option>
-              <option value="return_requested">Return Requested</option>
-              <option value="return_approved">Return Approved</option>
-              <option value="returned">Returned</option>
-              <option value="refund_requested">Refund Requested</option>
-              <option value="refunded">Refunded</option>
             </select>
           </div>
         </div>
@@ -855,25 +862,37 @@ const Orders = () => {
                   )}
                   
                   {/* Request Return/Refund for delivered or completed orders */}
-                  {(selectedOrder.status === 'delivered' || selectedOrder.status === 'completed') && (
-                    <button
-                      onClick={async () => {
-                        if (window.confirm('Are you sure you want to request a return/refund for this order?')) {
-                          const result = await orderService.requestReturn(selectedOrder.id);
-                          if (result.success) {
-                            alert('Return request submitted successfully. We will contact you shortly.');
-                            handleCloseModal();
-                            refreshOrders();
-                          } else {
-                            alert(result.message || 'Failed to request return');
+                  {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up' || selectedOrder.status === 'completed') && (
+                    <>
+                      <button
+                        onClick={() => {
+                          // TODO: Open rating modal
+                          alert('Rating feature coming soon! You can rate products from this order.');
+                        }}
+                        className="flex items-center justify-center gap-2 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
+                      >
+                        <Star size={18} />
+                        Rate Products
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to request a return/refund for this order?')) {
+                            const result = await orderService.requestReturn(selectedOrder.id);
+                            if (result.success) {
+                              alert('Return request submitted successfully. We will contact you shortly.');
+                              handleCloseModal();
+                              refreshOrders();
+                            } else {
+                              alert(result.message || 'Failed to request return');
+                            }
                           }
-                        }
-                      }}
-                      className="flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
-                    >
-                      <RotateCcw size={18} />
-                      Request Return/Refund
-                    </button>
+                        }}
+                        className="flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
+                      >
+                        <RotateCcw size={18} />
+                        Request Return/Refund
+                      </button>
+                    </>
                   )}
                   
                   <button
