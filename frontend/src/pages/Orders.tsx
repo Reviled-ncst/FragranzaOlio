@@ -637,75 +637,120 @@ const Orders = () => {
                   </div>
 
                   {/* Order Total & Actions */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
-                    <div className="flex items-center gap-4">
-                      <span className="text-gray-400 text-xs sm:text-sm">
-                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-gold-500 text-sm sm:text-base font-semibold">
-                        Total: ₱{(order.total_amount || 0).toLocaleString()}
-                      </span>
-                    </div>
+                  <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
+                    {/* Action Banner for delivered/picked_up - Prominent CTA */}
+                    {(order.status === 'delivered' || order.status === 'picked_up') && (
+                      <div className="mb-3 p-3 bg-gradient-to-r from-green-500/20 to-emerald-500/10 border border-green-500/30 rounded-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            <PackageCheck className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-green-400 font-medium text-sm">Your order has been {order.status === 'delivered' ? 'delivered' : 'picked up'}!</p>
+                              <p className="text-gray-400 text-xs mt-0.5">Please confirm receipt to complete your order and unlock ratings</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Confirm that you have received your order?')) {
+                                const result = await orderService.completeOrder(order.id);
+                                if (result.success) {
+                                  refreshOrders();
+                                } else {
+                                  alert(result.message || 'Failed to complete order');
+                                }
+                              }
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-green-500/20 hover:shadow-green-500/40"
+                          >
+                            <CheckCircle size={16} />
+                            Confirm & Complete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rating Banner for completed orders */}
+                    {order.status === 'completed' && (
+                      <div className="mb-3 p-3 bg-gradient-to-r from-gold-500/20 to-amber-500/10 border border-gold-500/30 rounded-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            <Star className="w-5 h-5 text-gold-400 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-gold-400 font-medium text-sm">Order completed! How was your experience?</p>
+                              <p className="text-gray-400 text-xs mt-0.5">Share your feedback and help others make better choices</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              alert('Rating feature coming soon!');
+                            }}
+                            className="flex items-center justify-center gap-2 px-4 py-2 bg-gold-500 hover:bg-gold-600 text-black text-sm font-semibold rounded-lg transition-all shadow-lg shadow-gold-500/20 hover:shadow-gold-500/40"
+                          >
+                            <Star size={16} />
+                            Rate Products
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     
-                    {/* Quick Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      {/* Mark as Completed for delivered/picked_up */}
-                      {(order.status === 'delivered' || order.status === 'picked_up') && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (window.confirm('Confirm that you have received your order?')) {
-                              const result = await orderService.completeOrder(order.id);
-                              if (result.success) {
-                                refreshOrders();
-                              } else {
-                                alert(result.message || 'Failed to complete order');
-                              }
-                            }
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <CheckCircle size={14} />
-                          <span className="hidden sm:inline">Mark Completed</span>
-                          <span className="sm:hidden">Complete</span>
-                        </button>
-                      )}
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-4">
+                        <span className="text-gray-400 text-xs sm:text-sm">
+                          {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-gold-500 text-sm sm:text-base font-semibold">
+                          Total: ₱{(order.total_amount || 0).toLocaleString()}
+                        </span>
+                      </div>
                       
-                      {/* Rate Products for delivered/picked_up/completed */}
-                      {(order.status === 'delivered' || order.status === 'picked_up' || order.status === 'completed') && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            alert('Rating feature coming soon!');
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <Star size={14} />
-                          <span className="hidden sm:inline">Rate</span>
-                          <span className="sm:hidden">⭐</span>
-                        </button>
-                      )}
-                      
-                      {/* Cancel for pending orders */}
-                      {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            if (window.confirm('Cancel this order?')) {
-                              const result = await orderService.cancelOrder(order.id);
-                              if (result.success) {
-                                refreshOrders();
-                              } else {
-                                alert(result.message || 'Failed to cancel order');
+                      {/* Secondary Actions */}
+                      <div className="flex flex-wrap gap-2">
+                        {/* Cancel for pending orders */}
+                        {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Cancel this order?')) {
+                                const result = await orderService.cancelOrder(order.id);
+                                if (result.success) {
+                                  refreshOrders();
+                                } else {
+                                  alert(result.message || 'Failed to cancel order');
+                                }
                               }
-                            }
-                          }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
-                        >
-                          <XCircle size={14} />
-                          <span>Cancel</span>
-                        </button>
-                      )}
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-red-500/30 hover:bg-red-500/10 text-red-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <XCircle size={14} />
+                            <span>Cancel Order</span>
+                          </button>
+                        )}
+                        
+                        {/* Return/Refund for completed orders */}
+                        {(order.status === 'delivered' || order.status === 'picked_up' || order.status === 'completed') && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Request a return/refund for this order?')) {
+                                const result = await orderService.requestReturn(order.id);
+                                if (result.success) {
+                                  alert('Return request submitted!');
+                                  refreshOrders();
+                                } else {
+                                  alert(result.message || 'Failed to request return');
+                                }
+                              }
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-500/30 hover:bg-orange-500/10 text-orange-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                          >
+                            <RotateCcw size={14} />
+                            <span className="hidden sm:inline">Return/Refund</span>
+                            <span className="sm:hidden">Return</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
