@@ -151,8 +151,9 @@ export const firebaseEmailService = {
     } catch (error: any) {
       console.error('❌ Resend verification error:', error);
 
-      // If user doesn't exist in Firebase, create account and send verification
-      if (error.code === 'auth/user-not-found') {
+      // If user doesn't exist in Firebase (user-not-found or invalid-credential in newer SDKs)
+      // Try to create a Firebase account for this legacy user
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         try {
           // Create Firebase account for legacy user
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -171,6 +172,11 @@ export const firebaseEmailService = {
           };
         } catch (createError: any) {
           console.error('❌ Create Firebase user error:', createError);
+          
+          // If email already in use, the password was wrong for existing Firebase account
+          if (createError.code === 'auth/email-already-in-use') {
+            return { success: false, message: 'Invalid password. Please enter the correct password for your account.' };
+          }
           if (createError.code === 'auth/weak-password') {
             return { success: false, message: 'Password is too weak for email verification. Please update your password first.' };
           }
@@ -179,9 +185,7 @@ export const firebaseEmailService = {
       }
 
       let message = 'Failed to send verification email';
-      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        message = 'Invalid password';
-      } else if (error.code === 'auth/too-many-requests') {
+      if (error.code === 'auth/too-many-requests') {
         message = 'Too many requests. Please wait before trying again.';
       }
 
