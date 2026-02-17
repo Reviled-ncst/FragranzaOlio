@@ -488,10 +488,10 @@ const ProductDetail = () => {
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-8">
+              <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
                 <Button 
                   variant="primary" 
-                  className="flex-1 min-w-[140px] sm:min-w-[200px] text-sm sm:text-base"
+                  className="flex-1 min-w-[120px] text-sm sm:text-base"
                   disabled={product.stock_status === 'out_of_stock' || (selectedVariation ? selectedVariation.stock === 0 : false)}
                   onClick={() => {
                     if (!isAuthenticated) {
@@ -514,6 +514,37 @@ const ProductDetail = () => {
                   <ShoppingBag size={16} className="mr-2" />
                   Add to Cart
                 </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 min-w-[120px] text-sm sm:text-base"
+                  disabled={product.stock_status === 'out_of_stock' || (selectedVariation ? selectedVariation.stock === 0 : false)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      openAuthModal('login');
+                      return;
+                    }
+                    // Add to cart and navigate to checkout
+                    addToCart({
+                      productId: product.id,
+                      name: product.name,
+                      variation: selectedVariation?.volume || product.volume || 'Default',
+                      variationId: selectedVariation?.id,
+                      price: currentPrice,
+                      quantity: quantity,
+                      image: selectedVariation?.image ? getImageUrl(selectedVariation.image) : product.image,
+                      maxStock: selectedVariation?.stock || product.stock_quantity,
+                    });
+                    // Store item for checkout and navigate
+                    sessionStorage.setItem('checkoutItems', JSON.stringify([product.id]));
+                    navigate('/checkout');
+                  }}
+                >
+                  Buy Now
+                </Button>
+              </div>
+              
+              {/* Wishlist & Share */}
+              <div className="flex gap-2 sm:gap-3 mb-4 sm:mb-8">
                 <button 
                   className="p-3 sm:p-4 border border-gold-500/30 rounded-lg text-gold-500 hover:bg-gold-500/10 transition-colors"
                   onClick={() => {
@@ -530,35 +561,6 @@ const ProductDetail = () => {
                   <Share2 size={18} />
                 </button>
               </div>
-
-              {/* Buy Now */}
-              <Button 
-                variant="outline" 
-                className="w-full"
-                disabled={product.stock_status === 'out_of_stock' || (selectedVariation ? selectedVariation.stock === 0 : false)}
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    openAuthModal('login');
-                    return;
-                  }
-                  // Add to cart and navigate to checkout
-                  addToCart({
-                    productId: product.id,
-                    name: product.name,
-                    variation: selectedVariation?.volume || product.volume || 'Default',
-                    variationId: selectedVariation?.id,
-                    price: currentPrice,
-                    quantity: quantity,
-                    image: selectedVariation?.image ? getImageUrl(selectedVariation.image) : product.image,
-                    maxStock: selectedVariation?.stock || product.stock_quantity,
-                  });
-                  // Store item for checkout and navigate
-                  sessionStorage.setItem('checkoutItems', JSON.stringify([product.id]));
-                  navigate('/checkout');
-                }}
-              >
-                Buy Now
-              </Button>
             </motion.div>
           </div>
         </div>
