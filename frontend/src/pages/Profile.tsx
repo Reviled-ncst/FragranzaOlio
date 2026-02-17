@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, LogOut, Edit2, Save, X } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, LogOut, Edit2, Save, X, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
 import AdminLayout from '../components/layout/AdminLayout';
+import { firebaseEmailService } from '../services/firebaseEmailService';
 
 // Helper component for role-based layout wrapper
 const RoleBasedWrapper = ({ role, children }: { role: string | undefined, children: React.ReactNode }) => {
@@ -31,6 +32,10 @@ const Profile = () => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [showResendPassword, setShowResendPassword] = useState(false);
+  const [resendPassword, setResendPassword] = useState('');
   
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
@@ -98,6 +103,32 @@ const Profile = () => {
       zipCode: user?.zipCode || '',
     });
     setIsEditing(false);
+  };
+
+  const handleResendVerification = async () => {
+    if (!resendPassword) {
+      setVerificationMessage({ type: 'error', text: 'Please enter your password' });
+      return;
+    }
+    
+    setIsResendingVerification(true);
+    setVerificationMessage(null);
+    
+    try {
+      const result = await firebaseEmailService.resendVerification(user.email, resendPassword);
+      
+      if (result.success) {
+        setVerificationMessage({ type: 'success', text: result.message || 'Verification email sent!' });
+        setShowResendPassword(false);
+        setResendPassword('');
+      } else {
+        setVerificationMessage({ type: 'error', text: result.message || 'Failed to send verification email' });
+      }
+    } catch {
+      setVerificationMessage({ type: 'error', text: 'An error occurred. Please try again.' });
+    } finally {
+      setIsResendingVerification(false);
+    }
   };
 
   const getInitials = () => {
@@ -262,13 +293,86 @@ const Profile = () => {
                 </div>
 
                 {/* Email */}
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm text-gray-400 mb-1.5 flex items-center gap-2">
                     <Mail size={14} />
                     Email Address
                   </label>
-                  <p className="text-white py-2.5">{user.email}</p>
-                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-white py-2.5">{user.email}</p>
+                      <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                    </div>
+                    
+                    {/* Verification Status */}
+                    <div className="flex flex-col gap-2">
+                      {user.emailVerified ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                          <CheckCircle size={14} />
+                          Email Verified
+                        </span>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                            <AlertCircle size={14} />
+                            Not Verified
+                          </span>
+                          {!showResendPassword ? (
+                            <button
+                              onClick={() => setShowResendPassword(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/30 hover:bg-gold-500/30 transition-colors"
+                            >
+                              <RefreshCw size={14} />
+                              Resend Verification
+                            </button>
+                          ) : (
+                            <div className="flex flex-col gap-2">
+                              <input
+                                type="password"
+                                value={resendPassword}
+                                onChange={(e) => setResendPassword(e.target.value)}
+                                placeholder="Enter password"
+                                className="px-3 py-1.5 text-sm bg-black-800 border border-gold-500/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-gold-500"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleResendVerification}
+                                  disabled={isResendingVerification}
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gold-500 text-black hover:bg-gold-400 transition-colors disabled:opacity-50"
+                                >
+                                  {isResendingVerification ? (
+                                    <>
+                                      <Loader2 size={14} className="animate-spin" />
+                                      Sending...
+                                    </>
+                                  ) : (
+                                    'Send'
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setShowResendPassword(false);
+                                    setResendPassword('');
+                                    setVerificationMessage(null);
+                                  }}
+                                  className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* Verification Message */}
+                      {verificationMessage && (
+                        <p className={`text-xs ${verificationMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                          {verificationMessage.text}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Phone */}
