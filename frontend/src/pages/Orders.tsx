@@ -636,14 +636,77 @@ const Orders = () => {
                     )}
                   </div>
 
-                  {/* Order Total */}
-                  <div className="flex justify-between items-center mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
-                    <span className="text-gray-400 text-xs sm:text-sm">
-                      {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
-                    </span>
-                    <span className="text-gold-500 text-sm sm:text-base font-semibold">
-                      Total: ₱{(order.total_amount || 0).toLocaleString()}
-                    </span>
+                  {/* Order Total & Actions */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gold-500/10">
+                    <div className="flex items-center gap-4">
+                      <span className="text-gray-400 text-xs sm:text-sm">
+                        {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
+                      </span>
+                      <span className="text-gold-500 text-sm sm:text-base font-semibold">
+                        Total: ₱{(order.total_amount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    
+                    {/* Quick Action Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                      {/* Mark as Completed for delivered/picked_up */}
+                      {(order.status === 'delivered' || order.status === 'picked_up') && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Confirm that you have received your order?')) {
+                              const result = await orderService.completeOrder(order.id);
+                              if (result.success) {
+                                refreshOrders();
+                              } else {
+                                alert(result.message || 'Failed to complete order');
+                              }
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <CheckCircle size={14} />
+                          <span className="hidden sm:inline">Mark Completed</span>
+                          <span className="sm:hidden">Complete</span>
+                        </button>
+                      )}
+                      
+                      {/* Rate Products for delivered/picked_up/completed */}
+                      {(order.status === 'delivered' || order.status === 'picked_up' || order.status === 'completed') && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert('Rating feature coming soon!');
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-gold-500/10 hover:bg-gold-500/20 text-gold-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <Star size={14} />
+                          <span className="hidden sm:inline">Rate</span>
+                          <span className="sm:hidden">⭐</span>
+                        </button>
+                      )}
+                      
+                      {/* Cancel for pending orders */}
+                      {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(order.status) && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (window.confirm('Cancel this order?')) {
+                              const result = await orderService.cancelOrder(order.id);
+                              if (result.success) {
+                                refreshOrders();
+                              } else {
+                                alert(result.message || 'Failed to cancel order');
+                              }
+                            }
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs sm:text-sm font-medium rounded-lg transition-colors"
+                        >
+                          <XCircle size={14} />
+                          <span>Cancel</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </motion.div>
               );
