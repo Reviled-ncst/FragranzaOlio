@@ -15,7 +15,7 @@ interface VercelResponse {
 }
 
 // Backend URL for images - Cloudflare tunnel to local XAMPP
-const BACKEND_URL = process.env.BACKEND_URL || 'https://wax-harris-anchor-latex.trycloudflare.com/FragranzaWeb';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://turner-removing-baking-moment.trycloudflare.com/FragranzaWeb';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -41,7 +41,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const imagePath = Array.isArray(path) ? path.join('/') : path;
   
   // Build the full image URL - images are served from backend root
-  const imageUrl = `${BACKEND_URL}/backend${imagePath}`;
+  // Ensure path has leading slash
+  const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
+  const imageUrl = `${BACKEND_URL}/backend${normalizedPath}`;
 
   try {
     const response = await fetch(imageUrl, {

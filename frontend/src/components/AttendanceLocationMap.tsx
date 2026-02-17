@@ -318,7 +318,7 @@ export default function AttendanceLocationMap({ isOpen, onClose, data }: Attenda
                       <p className="text-sm text-gray-400 mb-2">{data.location_in}</p>
                     )}
                     <p className="text-xs text-gray-500 mb-2">
-                      {data.latitude_in?.toFixed(6)}, {data.longitude_in?.toFixed(6)}
+                      {Number(data.latitude_in)?.toFixed(6)}, {Number(data.longitude_in)?.toFixed(6)}
                     </p>
                     <button
                       onClick={() => openInGoogleMaps(data.latitude_in!, data.longitude_in!)}
@@ -392,7 +392,7 @@ export default function AttendanceLocationMap({ isOpen, onClose, data }: Attenda
                       <p className="text-sm text-gray-400 mb-2">{data.location_out}</p>
                     )}
                     <p className="text-xs text-gray-500 mb-2">
-                      {data.latitude_out?.toFixed(6)}, {data.longitude_out?.toFixed(6)}
+                      {Number(data.latitude_out)?.toFixed(6)}, {Number(data.longitude_out)?.toFixed(6)}
                     </p>
                     <button
                       onClick={() => openInGoogleMaps(data.latitude_out!, data.longitude_out!)}
