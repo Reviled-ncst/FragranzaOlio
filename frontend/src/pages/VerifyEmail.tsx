@@ -13,6 +13,8 @@ const VerifyEmail = () => {
   const mode = searchParams.get('mode');
   const legacyToken = searchParams.get('token');
   const actionCode = oobCode || legacyToken;
+  // Email param is passed in continueUrl when Firebase handles verification
+  const emailParam = searchParams.get('email');
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'no-token'>('loading');
   const [message, setMessage] = useState('');
@@ -31,6 +33,14 @@ const VerifyEmail = () => {
         return;
       }
 
+      // If we have an email param but no action code, this means Firebase already
+      // verified the email (handleCodeInApp: false) and redirected here via continueUrl
+      if (emailParam && !actionCode) {
+        setStatus('success');
+        setMessage(`Your email (${decodeURIComponent(emailParam)}) has been verified successfully! You can now log in.`);
+        return;
+      }
+
       if (!actionCode) {
         setStatus('no-token');
         setMessage('No verification code provided');
@@ -38,7 +48,7 @@ const VerifyEmail = () => {
       }
 
       try {
-        // Apply the action code to verify the email
+        // Apply the action code to verify the email (for handleCodeInApp: true flow)
         await applyActionCode(auth, actionCode);
         setStatus('success');
         setMessage('Your email has been verified successfully! You can now log in.');
@@ -55,7 +65,7 @@ const VerifyEmail = () => {
     };
 
     verifyEmail();
-  }, [actionCode, mode]);
+  }, [actionCode, mode, emailParam]);
 
   const handleResendVerification = async () => {
     if (!resendEmail) {
