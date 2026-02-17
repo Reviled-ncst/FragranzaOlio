@@ -30,7 +30,7 @@ const Button = ({
     primary: 'bg-gold-500 text-white hover:bg-gold-600 hover:shadow-gold active:scale-[0.98]',
     secondary: 'bg-transparent border-2 border-gold-500 text-gold-500 hover:bg-gold-500 hover:text-white',
     dark: 'bg-charcoal text-white hover:bg-gray-800',
-    outline: 'bg-transparent border border-charcoal text-charcoal hover:bg-charcoal hover:text-white',
+    outline: 'bg-transparent border-2 border-gold-500 text-gold-500 hover:bg-gold-500/10 hover:text-gold-400',
     ghost: 'bg-transparent text-charcoal hover:bg-gray-100',
   };
 
