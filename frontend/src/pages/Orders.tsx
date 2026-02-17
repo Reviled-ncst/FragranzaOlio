@@ -36,16 +36,21 @@ import { useAuth } from '../context/AuthContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
 
 const statusConfig: Record<OrderStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
-  pending: { label: 'Pending', icon: Clock, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
-  confirmed: { label: 'Confirmed', icon: CheckCircle, color: 'text-blue-400', bgColor: 'bg-blue-400/10' },
-  processing: { label: 'Processing', icon: Package, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
-  in_transit: { label: 'In Transit', icon: Truck, color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+  ordered: { label: 'Ordered', icon: Clock, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+  paid_waiting_approval: { label: 'Payment Verification', icon: Clock, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
+  cod_waiting_approval: { label: 'Awaiting Confirmation', icon: Clock, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10' },
+  paid_ready_pickup: { label: 'Ready for Pickup', icon: Store, color: 'text-green-500', bgColor: 'bg-green-500/10' },
+  processing: { label: 'Processing', icon: Package, color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+  in_transit: { label: 'In Transit', icon: Truck, color: 'text-blue-500', bgColor: 'bg-blue-500/10' },
+  waiting_client: { label: 'Awaiting Client', icon: MapPin, color: 'text-orange-500', bgColor: 'bg-orange-500/10' },
   delivered: { label: 'Delivered', icon: PackageCheck, color: 'text-green-500', bgColor: 'bg-green-500/10' },
+  picked_up: { label: 'Picked Up', icon: CheckCircle, color: 'text-green-500', bgColor: 'bg-green-500/10' },
   completed: { label: 'Completed', icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-600/10' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-red-500', bgColor: 'bg-red-500/10' },
   return_requested: { label: 'Return Requested', icon: RotateCcw, color: 'text-orange-500', bgColor: 'bg-orange-500/10' },
   return_approved: { label: 'Return Approved', icon: CircleDot, color: 'text-orange-400', bgColor: 'bg-orange-400/10' },
   returned: { label: 'Returned', icon: Undo2, color: 'text-gray-500', bgColor: 'bg-gray-500/10' },
+  refund_requested: { label: 'Refund Requested', icon: RotateCcw, color: 'text-orange-500', bgColor: 'bg-orange-500/10' },
   refunded: { label: 'Refunded', icon: RotateCcw, color: 'text-gray-400', bgColor: 'bg-gray-400/10' },
 };
 
@@ -438,16 +443,21 @@ const Orders = () => {
               className="appearance-none bg-black-900 border border-gold-500/20 rounded-lg pl-10 pr-10 py-2.5 text-white focus:border-gold-500/50 focus:outline-none cursor-pointer"
             >
               <option value="all">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
+              <option value="ordered">Ordered</option>
+              <option value="paid_waiting_approval">Payment Verification</option>
+              <option value="cod_waiting_approval">Awaiting Confirmation</option>
+              <option value="paid_ready_pickup">Ready for Pickup</option>
               <option value="processing">Processing</option>
               <option value="in_transit">In Transit</option>
+              <option value="waiting_client">Awaiting Client</option>
               <option value="delivered">Delivered</option>
+              <option value="picked_up">Picked Up</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
               <option value="return_requested">Return Requested</option>
               <option value="return_approved">Return Approved</option>
               <option value="returned">Returned</option>
+              <option value="refund_requested">Refund Requested</option>
               <option value="refunded">Refunded</option>
             </select>
           </div>
@@ -518,7 +528,7 @@ const Orders = () => {
           <div className="space-y-3 sm:space-y-4">
             {filteredOrders.map((order, index) => {
               const StatusIcon = statusConfig[order.status]?.icon || Clock;
-              const statusStyle = statusConfig[order.status] || statusConfig.pending;
+              const statusStyle = statusConfig[order.status] || statusConfig.ordered;
               const ShippingIcon = getShippingIcon(order.shipping_method, order.vehicle_type);
               
               return (
@@ -823,7 +833,8 @@ const Orders = () => {
 
                 {/* Actions */}
                 <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                  {selectedOrder.status === 'pending' && (
+  {/* Cancel button for orders that haven't shipped yet */}
+                  {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(selectedOrder.status) && (
                     <button
                       onClick={async () => {
                         if (window.confirm('Are you sure you want to cancel this order?')) {
