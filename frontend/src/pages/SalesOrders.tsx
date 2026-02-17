@@ -1415,49 +1415,210 @@ const SalesOrders = () => {
                     </div>
                   </div>
 
-                  {/* Quick Actions */}
-                  {getQuickAction(selectedOrder.status) && (
-                    <div className="bg-gradient-to-r from-gold-500/10 to-amber-500/5 border border-gold-500/30 rounded-lg p-4">
-                      <p className="text-gray-400 text-sm mb-3">Quick Action</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => updateOrderStatus(selectedOrder.id, getQuickAction(selectedOrder.status)!.nextStatus)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium ${getQuickAction(selectedOrder.status)!.color}`}
-                        >
-                          <CheckCircle size={16} />
-                          {getQuickAction(selectedOrder.status)!.label}
-                        </button>
-                        {['ordered', 'paid_waiting_approval', 'cod_waiting_approval'].includes(selectedOrder.status) && (
+                  {/* Order Actions - Contextual buttons based on status */}
+                  <div className="bg-gradient-to-r from-gold-500/10 to-amber-500/5 border border-gold-500/30 rounded-lg p-4">
+                    <p className="text-gray-400 text-sm mb-3">Order Actions</p>
+                    <div className="flex flex-wrap gap-2">
+                      {/* Pending orders - Approve or Cancel */}
+                      {selectedOrder.status === 'ordered' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Process Order
+                          </button>
                           <button
                             onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
-                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
                           >
                             <XCircle size={16} />
-                            Cancel
+                            Cancel Order
                           </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        </>
+                      )}
 
-                  {/* Update Status */}
-                  <div>
-                    <p className="text-gray-400 text-sm mb-2">All Statuses</p>
-                    <div className="flex flex-wrap gap-2">
-                      {['ordered', 'paid_waiting_approval', 'cod_waiting_approval', 'paid_ready_pickup', 'processing', 'in_transit', 'waiting_client', 'delivered', 'picked_up', 'completed', 'cancelled', 'return_requested', 'return_approved', 'returned', 'refund_requested', 'refunded'].map((status) => (
+                      {/* Payment approval - Approve or Reject */}
+                      {(selectedOrder.status === 'paid_waiting_approval' || selectedOrder.status === 'cod_waiting_approval') && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Approve Payment
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
+                          >
+                            <XCircle size={16} />
+                            Reject
+                          </button>
+                        </>
+                      )}
+
+                      {/* Ready for pickup */}
+                      {selectedOrder.status === 'paid_ready_pickup' && (
                         <button
-                          key={status}
-                          onClick={() => updateOrderStatus(selectedOrder.id, status)}
-                          disabled={selectedOrder.status === status}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            selectedOrder.status === status 
-                              ? 'bg-gold-500 text-black' 
-                              : 'bg-black-800 text-gray-400 hover:text-white border border-gold-500/30'
-                          }`}
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'picked_up')}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
                         >
-                          {formatStatus(status)}
+                          <CheckCircle size={16} />
+                          Mark as Picked Up
                         </button>
-                      ))}
+                      )}
+
+                      {/* Processing - Ship the order */}
+                      {selectedOrder.status === 'processing' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'in_transit')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-medium"
+                          >
+                            <Truck size={16} />
+                            Ship Order
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'paid_ready_pickup')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium"
+                          >
+                            <Package size={16} />
+                            Ready for Pickup
+                          </button>
+                        </>
+                      )}
+
+                      {/* In Transit - Mark delivered or waiting */}
+                      {selectedOrder.status === 'in_transit' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Mark Delivered
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'waiting_client')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                          >
+                            <Clock size={16} />
+                            Waiting for Client
+                          </button>
+                        </>
+                      )}
+
+                      {/* Waiting for client */}
+                      {selectedOrder.status === 'waiting_client' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Mark Delivered
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
+                          >
+                            <XCircle size={16} />
+                            Failed Delivery
+                          </button>
+                        </>
+                      )}
+
+                      {/* Delivered/Picked up - Complete */}
+                      {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up') && (
+                        <button
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
+                        >
+                          <CheckCircle size={16} />
+                          Mark Completed
+                        </button>
+                      )}
+
+                      {/* Return/Refund requests */}
+                      {selectedOrder.status === 'return_requested' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'return_approved')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Approve Return
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 font-medium"
+                          >
+                            <XCircle size={16} />
+                            Reject Return
+                          </button>
+                        </>
+                      )}
+
+                      {selectedOrder.status === 'return_approved' && (
+                        <button
+                          onClick={() => updateOrderStatus(selectedOrder.id, 'returned')}
+                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                        >
+                          <RefreshCw size={16} />
+                          Mark as Returned
+                        </button>
+                      )}
+
+                      {selectedOrder.status === 'refund_requested' && (
+                        <>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'refunded')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
+                          >
+                            <CheckCircle size={16} />
+                            Process Refund
+                          </button>
+                          <button
+                            onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 font-medium"
+                          >
+                            <XCircle size={16} />
+                            Reject Refund
+                          </button>
+                        </>
+                      )}
+
+                      {/* Completed - no primary actions, show status */}
+                      {selectedOrder.status === 'completed' && (
+                        <span className="text-emerald-400 font-medium flex items-center gap-2">
+                          <CheckCircle size={16} />
+                          Order Completed
+                        </span>
+                      )}
+
+                      {/* Cancelled/Returned/Refunded - final states */}
+                      {selectedOrder.status === 'cancelled' && (
+                        <span className="text-red-400 font-medium flex items-center gap-2">
+                          <XCircle size={16} />
+                          Order Cancelled
+                        </span>
+                      )}
+
+                      {selectedOrder.status === 'returned' && (
+                        <span className="text-gray-400 font-medium flex items-center gap-2">
+                          <RefreshCw size={16} />
+                          Item Returned
+                        </span>
+                      )}
+
+                      {selectedOrder.status === 'refunded' && (
+                        <span className="text-gray-400 font-medium flex items-center gap-2">
+                          <RefreshCw size={16} />
+                          Refund Completed
+                        </span>
+                      )}
                     </div>
                   </div>
 
