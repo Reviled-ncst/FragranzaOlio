@@ -443,16 +443,21 @@ const orderService = {
    */
   async completeOrder(orderId: number): Promise<{ success: boolean; message?: string }> {
     try {
+      console.log('📦 Completing order:', orderId, 'with status: completed');
+      
       const response: any = await api.put('/sales.php?action=order-status', {
         id: orderId,
         status: 'completed'
       });
+      
+      console.log('📦 Complete order response:', response);
       
       return {
         success: true,
         message: response.message || 'Order marked as completed'
       };
     } catch (error: any) {
+      console.error('📦 Complete order error:', error);
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to complete order'
