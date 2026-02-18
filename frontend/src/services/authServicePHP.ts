@@ -479,6 +479,44 @@ export const authService = {
       };
     }
   },
+
+  /**
+   * Request password reset
+   */
+  async resetPassword(email: string): Promise<AuthResponse> {
+    try {
+      const response = await apiFetch(`${API_BASE_URL}/auth.php`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'forgot-password',
+          email: email,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        return {
+          success: false,
+          message: result.message || 'Failed to send reset email',
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || 'Password reset email sent!',
+      };
+    } catch (error: any) {
+      console.error('❌ Reset password error:', error);
+      return {
+        success: false,
+        message: error.message || 'Network error',
+      };
+    }
+  },
 };
 
 export default authService;
