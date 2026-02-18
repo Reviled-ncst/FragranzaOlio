@@ -695,6 +695,102 @@ const SalesOrders = () => {
     }
   };
 
+  // Get all action buttons for a status
+  type ActionButton = { label: string; status: string; color: string; icon: 'check' | 'cancel' | 'truck' | 'package' | 'clock' | 'refresh' };
+  const getStatusActions = (status: string): ActionButton[] => {
+    switch (status) {
+      case 'ordered':
+      case 'pending':
+        return [
+          { label: 'Process', status: 'processing', color: 'bg-purple-500 hover:bg-purple-600', icon: 'check' },
+          { label: 'Cancel', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
+        ];
+      case 'paid_waiting_approval':
+      case 'cod_waiting_approval':
+      case 'confirmed':
+        return [
+          { label: 'Approve', status: 'processing', color: 'bg-green-500 hover:bg-green-600', icon: 'check' },
+          { label: 'Reject', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
+        ];
+      case 'paid_ready_pickup':
+        return [
+          { label: 'Picked Up', status: 'picked_up', color: 'bg-green-500 hover:bg-green-600', icon: 'check' }
+        ];
+      case 'processing':
+        return [
+          { label: 'Ship', status: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600', icon: 'truck' },
+          { label: 'Ready Pickup', status: 'paid_ready_pickup', color: 'bg-cyan-500 hover:bg-cyan-600', icon: 'package' }
+        ];
+      case 'in_transit':
+      case 'shipped':
+        return [
+          { label: 'Delivered', status: 'delivered', color: 'bg-green-500 hover:bg-green-600', icon: 'check' },
+          { label: 'Waiting', status: 'waiting_client', color: 'bg-orange-500 hover:bg-orange-600', icon: 'clock' }
+        ];
+      case 'waiting_client':
+        return [
+          { label: 'Delivered', status: 'delivered', color: 'bg-green-500 hover:bg-green-600', icon: 'check' },
+          { label: 'Failed', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
+        ];
+      case 'delivered':
+      case 'picked_up':
+        return [
+          { label: 'Complete', status: 'completed', color: 'bg-emerald-500 hover:bg-emerald-600', icon: 'check' }
+        ];
+      case 'return_requested':
+        return [
+          { label: 'Approve', status: 'return_approved', color: 'bg-orange-500 hover:bg-orange-600', icon: 'check' },
+          { label: 'Reject', status: 'completed', color: 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30', icon: 'cancel' }
+        ];
+      case 'return_approved':
+        return [
+          { label: 'Returned', status: 'returned', color: 'bg-orange-500 hover:bg-orange-600', icon: 'refresh' }
+        ];
+      case 'refund_requested':
+        return [
+          { label: 'Refund', status: 'refunded', color: 'bg-orange-500 hover:bg-orange-600', icon: 'refresh' },
+          { label: 'Reject', status: 'completed', color: 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30', icon: 'cancel' }
+        ];
+      default:
+        return [];
+    }
+  };
+
+  // Get final status message
+  const getFinalStatusMessage = (status: string): { text: string; color: string; icon: 'check' | 'cancel' | 'refresh' } | null => {
+    switch (status) {
+      case 'completed': return { text: 'Order Completed', color: 'text-emerald-400', icon: 'check' };
+      case 'cancelled': return { text: 'Order Cancelled', color: 'text-red-400', icon: 'cancel' };
+      case 'returned': return { text: 'Item Returned', color: 'text-gray-400', icon: 'refresh' };
+      case 'refunded': return { text: 'Refund Completed', color: 'text-gray-400', icon: 'refresh' };
+      default: return null;
+    }
+  };
+
+  // Render action icon
+  const renderActionIcon = (icon: ActionButton['icon']) => {
+    switch (icon) {
+      case 'check': return <CheckCircle size={14} />;
+      case 'cancel': return <XCircle size={14} />;
+      case 'truck': return <Truck size={14} />;
+      case 'package': return <Package size={14} />;
+      case 'clock': return <Clock size={14} />;
+      case 'refresh': return <RefreshCw size={14} />;
+    }
+  };
+
+  // Render large action icon for modal
+  const renderLargeActionIcon = (icon: ActionButton['icon']) => {
+    switch (icon) {
+      case 'check': return <CheckCircle size={16} />;
+      case 'cancel': return <XCircle size={16} />;
+      case 'truck': return <Truck size={16} />;
+      case 'package': return <Package size={16} />;
+      case 'clock': return <Clock size={16} />;
+      case 'refresh': return <RefreshCw size={16} />;
+    }
+  };
+
   // Format status for display
   const formatStatus = (status: string) => {
     return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -1139,7 +1235,7 @@ const SalesOrders = () => {
                       </span>
                       
                       {/* Actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button 
                           onClick={() => fetchOrderDetail(order.id)}
                           disabled={isLoadingDetail}
@@ -1148,26 +1244,17 @@ const SalesOrders = () => {
                           <Eye size={14} />
                           View
                         </button>
-                        {/* Quick action button based on status */}
-                        {getQuickAction(order.status) && (
+                        {/* Status-specific action buttons */}
+                        {getStatusActions(order.status).map((action, idx) => (
                           <button 
-                            onClick={() => updateOrderStatus(order.id, getQuickAction(order.status)!.nextStatus)}
-                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs ${getQuickAction(order.status)!.color}`}
+                            key={idx}
+                            onClick={() => updateOrderStatus(order.id, action.status)}
+                            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
                           >
-                            <CheckCircle size={14} />
-                            {getQuickAction(order.status)!.label}
+                            {renderActionIcon(action.icon)}
+                            {action.label}
                           </button>
-                        )}
-                        {/* Cancel button for pending orders */}
-                        {['ordered', 'pending', 'paid_waiting_approval', 'cod_waiting_approval', 'confirmed'].includes(order.status) && (
-                          <button 
-                            onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/20 text-red-400 text-xs"
-                          >
-                            <XCircle size={14} />
-                            Cancel
-                          </button>
-                        )}
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1237,26 +1324,17 @@ const SalesOrders = () => {
                               >
                                 <Eye size={18} />
                               </button>
-                              {/* Quick action button based on status */}
-                              {getQuickAction(order.status) && (
+                              {/* Status-specific action buttons */}
+                              {getStatusActions(order.status).map((action, idx) => (
                                 <button 
-                                  onClick={() => updateOrderStatus(order.id, getQuickAction(order.status)!.nextStatus)}
-                                  className={`px-3 py-1.5 rounded-lg text-white text-xs font-medium ${getQuickAction(order.status)!.color}`}
-                                  title={getQuickAction(order.status)!.label}
+                                  key={idx}
+                                  onClick={() => updateOrderStatus(order.id, action.status)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
+                                  title={action.label}
                                 >
-                                  {getQuickAction(order.status)!.label}
+                                  {action.label}
                                 </button>
-                              )}
-                              {/* Cancel button for pending orders */}
-                              {['ordered', 'pending', 'paid_waiting_approval', 'cod_waiting_approval', 'confirmed'].includes(order.status) && (
-                                <button 
-                                  onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                                  className="p-2 hover:bg-red-500/20 rounded-lg text-gray-400 hover:text-red-400"
-                                  title="Cancel Order"
-                                >
-                                  <XCircle size={18} />
-                                </button>
-                              )}
+                              ))}
                             </div>
                           </td>
                         </tr>
@@ -1432,204 +1510,23 @@ const SalesOrders = () => {
                   <div className="bg-gradient-to-r from-gold-500/10 to-amber-500/5 border border-gold-500/30 rounded-lg p-4">
                     <p className="text-gray-400 text-sm mb-3">Order Actions</p>
                     <div className="flex flex-wrap gap-2">
-                      {/* Pending orders - Approve or Cancel */}
-                      {(selectedOrder.status === 'ordered' || selectedOrder.status === 'pending') && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Process Order
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
-                          >
-                            <XCircle size={16} />
-                            Cancel Order
-                          </button>
-                        </>
-                      )}
-
-                      {/* Payment approval - Approve or Reject */}
-                      {(selectedOrder.status === 'paid_waiting_approval' || selectedOrder.status === 'cod_waiting_approval' || selectedOrder.status === 'confirmed') && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'processing')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Approve Payment
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
-                          >
-                            <XCircle size={16} />
-                            Reject
-                          </button>
-                        </>
-                      )}
-
-                      {/* Ready for pickup */}
-                      {selectedOrder.status === 'paid_ready_pickup' && (
+                      {/* Dynamic action buttons based on status */}
+                      {getStatusActions(selectedOrder.status).map((action, idx) => (
                         <button
-                          onClick={() => updateOrderStatus(selectedOrder.id, 'picked_up')}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
+                          key={idx}
+                          onClick={() => updateOrderStatus(selectedOrder.id, action.status)}
+                          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
                         >
-                          <CheckCircle size={16} />
-                          Mark as Picked Up
+                          {renderLargeActionIcon(action.icon)}
+                          {action.label}
                         </button>
-                      )}
+                      ))}
 
-                      {/* Processing - Ship the order */}
-                      {selectedOrder.status === 'processing' && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'in_transit')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-medium"
-                          >
-                            <Truck size={16} />
-                            Ship Order
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'paid_ready_pickup')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white font-medium"
-                          >
-                            <Package size={16} />
-                            Ready for Pickup
-                          </button>
-                        </>
-                      )}
-
-                      {/* In Transit - Mark delivered or waiting */}
-                      {(selectedOrder.status === 'in_transit' || selectedOrder.status === 'shipped') && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Mark Delivered
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'waiting_client')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                          >
-                            <Clock size={16} />
-                            Waiting for Client
-                          </button>
-                        </>
-                      )}
-
-                      {/* Waiting for client */}
-                      {selectedOrder.status === 'waiting_client' && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'delivered')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Mark Delivered
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'cancelled')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 font-medium"
-                          >
-                            <XCircle size={16} />
-                            Failed Delivery
-                          </button>
-                        </>
-                      )}
-
-                      {/* Delivered/Picked up - Complete */}
-                      {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up') && (
-                        <button
-                          onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium"
-                        >
-                          <CheckCircle size={16} />
-                          Mark Completed
-                        </button>
-                      )}
-
-                      {/* Return/Refund requests */}
-                      {selectedOrder.status === 'return_requested' && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'return_approved')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Approve Return
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 font-medium"
-                          >
-                            <XCircle size={16} />
-                            Reject Return
-                          </button>
-                        </>
-                      )}
-
-                      {selectedOrder.status === 'return_approved' && (
-                        <button
-                          onClick={() => updateOrderStatus(selectedOrder.id, 'returned')}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                        >
-                          <RefreshCw size={16} />
-                          Mark as Returned
-                        </button>
-                      )}
-
-                      {selectedOrder.status === 'refund_requested' && (
-                        <>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'refunded')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium"
-                          >
-                            <CheckCircle size={16} />
-                            Process Refund
-                          </button>
-                          <button
-                            onClick={() => updateOrderStatus(selectedOrder.id, 'completed')}
-                            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-500/20 text-gray-400 hover:bg-gray-500/30 font-medium"
-                          >
-                            <XCircle size={16} />
-                            Reject Refund
-                          </button>
-                        </>
-                      )}
-
-                      {/* Completed - no primary actions, show status */}
-                      {selectedOrder.status === 'completed' && (
-                        <span className="text-emerald-400 font-medium flex items-center gap-2">
-                          <CheckCircle size={16} />
-                          Order Completed
-                        </span>
-                      )}
-
-                      {/* Cancelled/Returned/Refunded - final states */}
-                      {selectedOrder.status === 'cancelled' && (
-                        <span className="text-red-400 font-medium flex items-center gap-2">
-                          <XCircle size={16} />
-                          Order Cancelled
-                        </span>
-                      )}
-
-                      {selectedOrder.status === 'returned' && (
-                        <span className="text-gray-400 font-medium flex items-center gap-2">
-                          <RefreshCw size={16} />
-                          Item Returned
-                        </span>
-                      )}
-
-                      {selectedOrder.status === 'refunded' && (
-                        <span className="text-gray-400 font-medium flex items-center gap-2">
-                          <RefreshCw size={16} />
-                          Refund Completed
+                      {/* Final status indicators (no actions) */}
+                      {getFinalStatusMessage(selectedOrder.status) && (
+                        <span className={`${getFinalStatusMessage(selectedOrder.status)!.color} font-medium flex items-center gap-2`}>
+                          {renderLargeActionIcon(getFinalStatusMessage(selectedOrder.status)!.icon)}
+                          {getFinalStatusMessage(selectedOrder.status)!.text}
                         </span>
                       )}
                     </div>
