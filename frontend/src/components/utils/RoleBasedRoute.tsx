@@ -10,6 +10,7 @@ import { ReactNode } from 'react';
 // Dashboard routes for each role
 export const ROLE_DASHBOARDS: Record<string, string> = {
   admin: '/admin',
+  hr: '/hr',
   ojt_supervisor: '/supervisor',
   ojt: '/ojt',
   sales: '/sales',
@@ -18,7 +19,8 @@ export const ROLE_DASHBOARDS: Record<string, string> = {
 
 // Allowed routes for each role
 export const ROLE_ALLOWED_ROUTES: Record<string, string[]> = {
-  admin: ['/admin', '/sales', '/supervisor', '/ojt', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
+  admin: ['/admin', '/hr', '/sales', '/supervisor', '/ojt', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
+  hr: ['/hr', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
   ojt_supervisor: ['/supervisor', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
   ojt: ['/ojt', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
   sales: ['/sales', '/dashboard', '/profile', '/products', '/cart', '/wishlist', '/orders', '/checkout', '/addresses'],
@@ -160,6 +162,15 @@ export const SalesRoute = ({ children }: { children: ReactNode }) => (
   </ProtectedRoute>
 );
 
+/**
+ * HR Only Route
+ */
+export const HRRoute = ({ children }: { children: ReactNode }) => (
+  <ProtectedRoute allowedRoles={['admin', 'hr']}>
+    {children}
+  </ProtectedRoute>
+);
+
 export default {
   ProtectedRoute,
   RoleRedirect,
@@ -167,6 +178,7 @@ export default {
   SupervisorRoute,
   OJTRoute,
   SalesRoute,
+  HRRoute,
   getDashboardForRole,
   canAccessRoute,
 };

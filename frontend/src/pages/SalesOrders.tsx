@@ -671,12 +671,13 @@ const SalesOrders = () => {
   // Get quick action for a status
   const getQuickAction = (status: string): { label: string; nextStatus: string; color: string } | null => {
     switch (status) {
+      case 'pending': // Pending needs confirmation first
+        return { label: 'Confirm', nextStatus: 'confirmed', color: 'bg-green-500 hover:bg-green-600' };
       case 'ordered':
-      case 'pending': // Legacy
+      case 'confirmed': // Confirmed can be processed
         return { label: 'Process', nextStatus: 'processing', color: 'bg-purple-500 hover:bg-purple-600' };
       case 'paid_waiting_approval':
       case 'cod_waiting_approval':
-      case 'confirmed': // Legacy
         return { label: 'Approve', nextStatus: 'processing', color: 'bg-green-500 hover:bg-green-600' };
       case 'processing':
         return { label: 'Ship', nextStatus: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600' };
@@ -699,15 +700,23 @@ const SalesOrders = () => {
   type ActionButton = { label: string; status: string; color: string; icon: 'check' | 'cancel' | 'truck' | 'package' | 'clock' | 'refresh' };
   const getStatusActions = (status: string): ActionButton[] => {
     switch (status) {
-      case 'ordered':
       case 'pending':
+        return [
+          { label: 'Confirm', status: 'confirmed', color: 'bg-green-500 hover:bg-green-600', icon: 'check' },
+          { label: 'Cancel', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
+        ];
+      case 'ordered':
+        return [
+          { label: 'Process', status: 'processing', color: 'bg-purple-500 hover:bg-purple-600', icon: 'check' },
+          { label: 'Cancel', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
+        ];
+      case 'confirmed':
         return [
           { label: 'Process', status: 'processing', color: 'bg-purple-500 hover:bg-purple-600', icon: 'check' },
           { label: 'Cancel', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
         ];
       case 'paid_waiting_approval':
       case 'cod_waiting_approval':
-      case 'confirmed':
         return [
           { label: 'Approve', status: 'processing', color: 'bg-green-500 hover:bg-green-600', icon: 'check' },
           { label: 'Reject', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }

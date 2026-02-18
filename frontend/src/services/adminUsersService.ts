@@ -6,7 +6,7 @@
 import { getToken, getStoredUser } from './authServicePHP';
 import { API_BASE_URL, apiFetch } from './api';
 
-export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'admin';
+export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'hr' | 'admin';
 export type UserStatus = 'active' | 'inactive' | 'suspended' | 'pending_verification';
 
 export interface AdminUser {

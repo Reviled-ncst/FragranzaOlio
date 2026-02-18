@@ -41,6 +41,7 @@ import adminUsersService, {
 // Role configuration
 const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: typeof Users }> = {
   admin: { label: 'Administrator', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: Shield },
+  hr: { label: 'HR Department', color: 'bg-pink-500/20 text-pink-400 border-pink-500/30', icon: Briefcase },
   sales: { label: 'Sales Staff', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: Briefcase },
   ojt: { label: 'OJT Trainee', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: GraduationCap },
   ojt_supervisor: { label: 'OJT Supervisor', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: UserCheck },
