@@ -8,8 +8,10 @@
       "maxDuration": 30
     }
   },
-  "rewrites": [
-    { "source": "/assets/:path*", "destination": "/assets/:path*" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  "routes": [
+    { "src": "/api/proxy", "dest": "/api/proxy.ts" },
+    { "src": "/api/image", "dest": "/api/image.ts" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
