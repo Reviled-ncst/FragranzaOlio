@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff, Calendar, Phone, MapPin, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle, Building2, Briefcase, GraduationCap, UserCheck } from 'lucide-react';
 import authService from '../../services/authServicePHP';
-import { firebaseEmailService } from '../../services/firebaseEmailService';
 import { useAuth } from '../../context/AuthContext';
 import { useAuthModal } from '../../context/AuthModalContext';
 import { getDashboardForRole } from '../utils/RoleBasedRoute';
@@ -99,8 +98,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [showResendVerification, setShowResendVerification] = useState(false);
-  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const totalSteps = 4; // Now 4 steps: Role, Basic Info, Contact, Account
 
   // Fetch supervisors when modal opens
@@ -276,16 +273,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
       // Handle Login
       setIsLoading(true);
       try {
-        // Check if email is verified via Firebase
-        const isVerified = await firebaseEmailService.checkEmailVerified(formData.email, formData.password);
-        
-        if (!isVerified) {
-          setError('Please verify your email before logging in.');
-          setShowResendVerification(true);
-          setIsLoading(false);
-          return;
-        }
-
         const result = await authService.login({
           email: formData.email,
           password: formData.password,
@@ -362,10 +349,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
           });
           
           if (result.success) {
-            // Send verification email via Firebase
-            await firebaseEmailService.sendVerificationEmail(formData.email, formData.password);
-            
-            setSuccessMessage('Registration successful! Please check your email to verify your account.');
+            setSuccessMessage('Registration successful! You can now log in.');
             setTimeout(() => {
               // Switch to login after successful registration
               setIsLogin(true);
@@ -397,7 +381,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     
     setIsLoading(true);
     try {
-      const result = await firebaseEmailService.sendPasswordResetEmail(forgotEmail);
+      const result = await authService.forgotPassword(forgotEmail);
       
       if (result.success) {
         setSuccessMessage('If an account exists with this email, you will receive a password reset link. Please check your email.');
@@ -416,40 +400,11 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     }
   };
 
-  const handleResendVerification = async () => {
-    if (!formData.email) {
-      setError('Please enter your email above');
-      return;
-    }
-    
-    setIsResendingVerification(true);
-    setError(null);
-    
-    try {
-      const result = await firebaseEmailService.resendVerification(formData.email);
-      
-      if (result.success) {
-        setSuccessMessage(result.message || 'Verification email sent! Check your inbox.');
-        setShowResendVerification(false);
-        setTimeout(() => {
-          setSuccessMessage(null);
-        }, 5000);
-      } else {
-        setError(result.message || 'Failed to send verification email.');
-      }
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsResendingVerification(false);
-    }
-  };
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const checked = (e.target as HTMLInputElement).checked;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     setError(null); // Clear general error on input change
-    setShowResendVerification(false); // Clear resend verification state
     
     // Real-time validation for touched fields
     if (touchedFields[name]) {
@@ -470,7 +425,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     setSuccessMessage(null);
     setFieldErrors({});
     setTouchedFields({});
-    setShowResendVerification(false);
     setFormData({
       email: '',
       password: '',
@@ -1164,27 +1118,6 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
               {error && (
                 <div className="mx-8 mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <p className="text-red-400 text-sm text-center">{error}</p>
-                  {/* Resend Verification Button */}
-                  {showResendVerification && isLogin && (
-                    <button
-                      type="button"
-                      onClick={handleResendVerification}
-                      disabled={isResendingVerification}
-                      className="mt-3 w-full py-2 bg-gold-500/20 hover:bg-gold-500/30 border border-gold-500/40 text-gold-400 text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isResendingVerification ? (
-                        <>
-                          <Loader2 size={14} className="animate-spin" />
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Mail size={14} />
-                          Resend Verification Email
-                        </>
-                      )}
-                    </button>
-                  )}
                 </div>
               )}
 

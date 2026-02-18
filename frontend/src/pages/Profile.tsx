@@ -1,12 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, LogOut, Edit2, Save, X, CheckCircle, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Calendar, Shield, Bell, Camera, LogOut, Edit2, Save, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
 import AdminLayout from '../components/layout/AdminLayout';
-import { firebaseEmailService } from '../services/firebaseEmailService';
 
 // Helper component for role-based layout wrapper
 const RoleBasedWrapper = ({ role, children }: { role: string | undefined, children: React.ReactNode }) => {
@@ -32,31 +31,6 @@ const Profile = () => {
   const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'preferences'>('profile');
-  const [isResendingVerification, setIsResendingVerification] = useState(false);
-  const [verificationMessage, setVerificationMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isCheckingVerification, setIsCheckingVerification] = useState(false);
-  
-  // Check and sync verification status with Firebase on load
-  useEffect(() => {
-    const syncVerification = async () => {
-      if (!user?.email || user.emailVerified) return;
-      
-      setIsCheckingVerification(true);
-      try {
-        const result = await firebaseEmailService.syncVerificationStatus(user.email);
-        if (result.verified && result.synced) {
-          // Update local user state
-          updateUser({ ...user, emailVerified: true });
-        }
-      } catch (error) {
-        console.error('Failed to sync verification status:', error);
-      } finally {
-        setIsCheckingVerification(false);
-      }
-    };
-    
-    syncVerification();
-  }, [user?.email]); // Only run when email changes
   
   const [formData, setFormData] = useState({
     firstName: user?.firstName || '',
@@ -124,25 +98,6 @@ const Profile = () => {
       zipCode: user?.zipCode || '',
     });
     setIsEditing(false);
-  };
-
-  const handleResendVerification = async () => {
-    setIsResendingVerification(true);
-    setVerificationMessage(null);
-    
-    try {
-      const result = await firebaseEmailService.resendVerification(user.email);
-      
-      if (result.success) {
-        setVerificationMessage({ type: 'success', text: result.message || 'Verification email sent!' });
-      } else {
-        setVerificationMessage({ type: 'error', text: result.message || 'Failed to send verification email' });
-      }
-    } catch {
-      setVerificationMessage({ type: 'error', text: 'An error occurred. Please try again.' });
-    } finally {
-      setIsResendingVerification(false);
-    }
   };
 
   const getInitials = () => {
@@ -316,47 +271,6 @@ const Profile = () => {
                     <div className="flex-1">
                       <p className="text-white py-2.5">{user.email}</p>
                       <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-                    </div>
-                    
-                    {/* Verification Status */}
-                    <div className="flex flex-col gap-2">
-                      {user.emailVerified ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-                          <CheckCircle size={14} />
-                          Email Verified
-                        </span>
-                      ) : (
-                        <>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                            <AlertCircle size={14} />
-                            Not Verified
-                          </span>
-                          <button
-                            onClick={handleResendVerification}
-                            disabled={isResendingVerification}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-gold-500/20 text-gold-400 border border-gold-500/30 hover:bg-gold-500/30 transition-colors disabled:opacity-50"
-                          >
-                            {isResendingVerification ? (
-                              <>
-                                <Loader2 size={14} className="animate-spin" />
-                                Sending...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw size={14} />
-                                Resend Verification
-                              </>
-                            )}
-                          </button>
-                        </>
-                      )}
-                      
-                      {/* Verification Message */}
-                      {verificationMessage && (
-                        <p className={`text-xs ${verificationMessage.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
-                          {verificationMessage.text}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
