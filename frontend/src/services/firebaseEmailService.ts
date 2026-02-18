@@ -96,7 +96,7 @@ export const firebaseEmailService = {
   /**
    * Check if email is verified in Firebase
    * Returns true if: user doesn't exist in Firebase (legacy user), or user is verified
-   * Returns false only if: user exists in Firebase but is not verified
+   * Returns false only if: user exists in Firebase AND is not verified
    */
   async checkEmailVerified(email: string, _password?: string): Promise<boolean> {
     const servicePassword = getServicePassword(email);
@@ -111,11 +111,25 @@ export const firebaseEmailService = {
       return isVerified;
     } catch (error: any) {
       console.log('🔐 Firebase checkEmailVerified error:', error.code, error.message);
-      // If user doesn't exist in Firebase, treat as verified (legacy user)
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      // These errors mean user doesn't exist in Firebase or password mismatch
+      // In both cases, treat as legacy user (not registered via Firebase) - allow login
+      const allowLoginErrors = [
+        'auth/user-not-found',
+        'auth/invalid-credential', 
+        'auth/wrong-password',
+        'auth/invalid-email',
+        'auth/user-disabled',
+        'auth/too-many-requests'
+      ];
+      
+      if (allowLoginErrors.includes(error.code)) {
+        console.log('🔐 User not in Firebase or Firebase error - allowing login via PHP auth');
         return true;
       }
-      // For other errors (network, etc.), allow login to proceed
+      
+      // For any other errors (network, etc.), also allow login to proceed
+      // Firebase is only for email verification, not authentication
+      console.log('🔐 Firebase error - allowing login to proceed via PHP auth');
       return true;
     }
   },
