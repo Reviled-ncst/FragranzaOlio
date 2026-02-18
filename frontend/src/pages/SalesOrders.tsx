@@ -169,7 +169,8 @@ const SalesOrders = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // Check if search query looks like a QR code scan (contains pipe separators)
-    if (searchQuery.includes('|')) {
+    // or a barcode scan (starts with ORD- or INV-)
+    if (searchQuery.includes('|') || searchQuery.startsWith('ORD-') || searchQuery.startsWith('INV-')) {
       parseQRCode(searchQuery);
     } else {
       fetchOrders();
@@ -177,109 +178,118 @@ const SalesOrders = () => {
   };
 
   // Parse QR code data: FRAGRANZA|order_number|invoice_number|total|customer_name
+  // Or barcode data: order_number (e.g., ORD-20250115-001)
   // Auto-completes the transaction when scanned
-  const parseQRCode = useCallback((qrData: string) => {
-    const parts = qrData.split('|');
-    if (parts.length >= 2 && parts[0] === 'FRAGRANZA') {
-      const orderNumber = parts[1];
-      setSearchQuery(orderNumber);
-      setShowScanner(false);
-      
-      // Stop scanner
-      if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
-      }
-      
-      // Search for the order and auto-complete
-      setTimeout(async () => {
-        try {
-          const params = new URLSearchParams({ action: 'orders', search: orderNumber });
-          const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
-          const data = await response.json();
-          
-          if (data.success && data.data?.length > 0) {
-            const foundOrder = data.data[0];
-            setOrders(data.data);
-            
-            const customerName = `${foundOrder.customer_first_name || ''} ${foundOrder.customer_last_name || ''}`.trim() || 'Customer';
-            const total = parseFloat(foundOrder.total_amount) || 0;
-            
-            // Check if order is already completed
-            if (foundOrder.status === 'delivered' || foundOrder.status === 'completed') {
-              setConfirmationData({
-                orderNumber,
-                customerName,
-                total,
-                status: 'already_completed'
-              });
-              setShowConfirmation(true);
-              fetchOrderDetail(foundOrder.id);
-              return;
-            }
-            
-            // Auto-complete the transaction
-            const completeResponse = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                id: foundOrder.id, 
-                status: 'completed', 
-                payment_status: 'paid' 
-              })
-            });
-            const completeData = await completeResponse.json();
-            
-            if (completeData.success) {
-              setConfirmationData({
-                orderNumber,
-                customerName,
-                total,
-                status: 'success'
-              });
-              setShowConfirmation(true);
-              fetchOrders();
-              fetchOrderDetail(foundOrder.id);
-            } else {
-              setConfirmationData({
-                orderNumber,
-                customerName,
-                total,
-                status: 'error',
-                message: completeData.message || 'Failed to complete transaction'
-              });
-              setShowConfirmation(true);
-            }
-          } else {
-            setConfirmationData({
-              orderNumber,
-              customerName: '',
-              total: 0,
-              status: 'error',
-              message: `Order ${orderNumber} not found`
-            });
-            setShowConfirmation(true);
-          }
-        } catch (err) {
-          console.error('Error processing order:', err);
-          setConfirmationData({
-            orderNumber: orderNumber,
-            customerName: '',
-            total: 0,
-            status: 'error',
-            message: 'Failed to process order. Please try again.'
-          });
-          setShowConfirmation(true);
-        }
-      }, 100);
+  const parseQRCode = useCallback((scanData: string) => {
+    let orderNumber: string;
+    
+    // Check if it's a QR code format (FRAGRANZA|...)
+    if (scanData.includes('|') && scanData.startsWith('FRAGRANZA')) {
+      const parts = scanData.split('|');
+      orderNumber = parts[1];
+    } else if (scanData.startsWith('ORD-') || scanData.startsWith('INV-') || /^[A-Z]{2,4}-\d/.test(scanData)) {
+      // It's a barcode with just the order/invoice number
+      orderNumber = scanData;
     } else {
-      // Try treating it as an order number directly
-      setSearchQuery(qrData);
+      // Unknown format, treat as search query
+      setSearchQuery(scanData);
       setShowScanner(false);
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
       }
       fetchOrders();
+      return;
     }
+    
+    setSearchQuery(orderNumber);
+    setShowScanner(false);
+    
+    // Stop scanner
+    if (scannerRef.current) {
+      scannerRef.current.stop().catch(() => {});
+    }
+      
+    // Search for the order and auto-complete
+    setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ action: 'orders', search: orderNumber });
+        const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
+        const data = await response.json();
+        
+        if (data.success && data.data?.length > 0) {
+          const foundOrder = data.data[0];
+          setOrders(data.data);
+          
+          const customerName = `${foundOrder.customer_first_name || ''} ${foundOrder.customer_last_name || ''}`.trim() || 'Customer';
+          const total = parseFloat(foundOrder.total_amount) || 0;
+          
+          // Check if order is already completed
+          if (foundOrder.status === 'delivered' || foundOrder.status === 'completed') {
+            setConfirmationData({
+              orderNumber,
+              customerName,
+              total,
+              status: 'already_completed'
+            });
+            setShowConfirmation(true);
+            fetchOrderDetail(foundOrder.id);
+            return;
+          }
+          
+          // Auto-complete the transaction
+          const completeResponse = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              id: foundOrder.id, 
+              status: 'completed', 
+              payment_status: 'paid' 
+            })
+          });
+          const completeData = await completeResponse.json();
+          
+          if (completeData.success) {
+            setConfirmationData({
+              orderNumber,
+              customerName,
+              total,
+              status: 'success'
+            });
+            setShowConfirmation(true);
+            fetchOrders();
+            fetchOrderDetail(foundOrder.id);
+          } else {
+            setConfirmationData({
+              orderNumber,
+              customerName,
+              total,
+              status: 'error',
+              message: completeData.message || 'Failed to complete transaction'
+            });
+            setShowConfirmation(true);
+          }
+        } else {
+          setConfirmationData({
+            orderNumber,
+            customerName: '',
+            total: 0,
+            status: 'error',
+            message: `Order ${orderNumber} not found`
+          });
+          setShowConfirmation(true);
+        }
+      } catch (err) {
+        console.error('Error processing order:', err);
+        setConfirmationData({
+          orderNumber: orderNumber,
+          customerName: '',
+          total: 0,
+          status: 'error',
+          message: 'Failed to process order. Please try again.'
+        });
+        setShowConfirmation(true);
+      }
+    }, 100);
   }, []);
 
   // Start QR code scanner
@@ -1031,6 +1041,14 @@ const SalesOrders = () => {
                         <p className="text-white font-medium">{confirmationData.orderNumber}</p>
                         <p className="text-gray-400 text-sm">{confirmationData.customerName}</p>
                         <p className="text-gold-400 font-bold text-lg mt-1">₱{confirmationData.total.toLocaleString()}</p>
+                        {/* Barcode Display */}
+                        <div className="mt-3 pt-3 border-t border-gold-500/20">
+                          <img 
+                            src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=d4af5f&textcolor=d4af5f`}
+                            alt="Order Barcode"
+                            className="mx-auto h-10"
+                          />
+                        </div>
                       </motion.div>
                     </div>
                     <div className="p-4 flex gap-3">
@@ -1087,6 +1105,20 @@ const SalesOrders = () => {
                       >
                         {confirmationData.customerName} • <span className="text-green-400 font-semibold">₱{confirmationData.total.toLocaleString()}</span>
                       </motion.p>
+                      {/* Barcode Display */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="bg-black-700/50 rounded-lg p-3 mt-4"
+                      >
+                        <p className="text-gray-500 text-xs mb-2">Order #{confirmationData.orderNumber}</p>
+                        <img 
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=22c55e&textcolor=22c55e`}
+                          alt="Order Barcode"
+                          className="mx-auto h-10"
+                        />
+                      </motion.div>
                     </div>
                     <div className="p-4">
                       <button
@@ -1127,6 +1159,20 @@ const SalesOrders = () => {
                       >
                         This item has already been picked up
                       </motion.p>
+                      {/* Barcode Display */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 }}
+                        className="bg-black-700/50 rounded-lg p-3 mt-4"
+                      >
+                        <p className="text-gray-500 text-xs mb-2">Order #{confirmationData.orderNumber}</p>
+                        <img 
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=f59e0b&textcolor=f59e0b`}
+                          alt="Order Barcode"
+                          className="mx-auto h-10"
+                        />
+                      </motion.div>
                     </div>
                     <div className="p-4">
                       <button

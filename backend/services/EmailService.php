@@ -392,6 +392,24 @@ class EmailService {
                                 </tr>
                             </table>
                             
+                            <!-- QR Code & Barcode Section -->
+                            <div style="margin: 30px 0; padding: 20px; background-color: rgba(212, 175, 95, 0.1); border-radius: 12px; border: 1px dashed rgba(212, 175, 95, 0.3);">
+                                <p style="color: #d4af5f; font-size: 14px; font-weight: bold; text-align: center; margin: 0 0 15px;">Pickup Verification Codes</p>
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td align="center" style="padding: 10px;">
+                                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&bgcolor=1a1a1a&color=d4af5f&data=' . urlencode('FRAGRANZA|' . $orderData['order_number'] . '|' . ($orderData['invoice_number'] ?? '') . '|' . ($orderData['total_amount'] ?? 0) . '|' . $customerName) . '" alt="QR Code" style="width: 100px; height: 100px;" />
+                                            <p style="color: #888; font-size: 11px; margin: 8px 0 0;">QR Code</p>
+                                        </td>
+                                        <td align="center" style="padding: 10px;">
+                                            <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=' . urlencode($orderData['order_number']) . '&scale=2&height=12&includetext&backgroundcolor=1a1a1a&barcolor=d4af5f&textcolor=d4af5f" alt="Barcode" style="height: 50px; width: auto;" />
+                                            <p style="color: #888; font-size: 11px; margin: 8px 0 0;">Barcode</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <p style="color: #888; font-size: 12px; text-align: center; margin: 15px 0 0;">Present either code to the cashier for quick pickup verification</p>
+                            </div>
+                            
                             <div style="text-align: center; margin: 30px 0;">
                                 <a href="https://fragranza-web.vercel.app/orders" style="display: inline-block; background: linear-gradient(135deg, #d4af5f 0%, #b8963f 100%); color: #000000; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: bold; font-size: 13px; letter-spacing: 1px;">
                                     Track Order

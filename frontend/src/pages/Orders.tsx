@@ -348,7 +348,11 @@ const Orders = () => {
     .totals-row.discount { color: #16a34a; }
     .totals-row.total { border-top: 2px solid #9ca3af; font-weight: bold; font-size: 18px; color: #000; }
     .qr-section { display: flex; align-items: center; gap: 20px; margin-top: 32px; padding: 20px; background: #f9fafb; border-radius: 8px; border: 1px dashed #d1d5db; }
-    .qr-code img { width: 120px; height: 120px; }
+    .codes-container { display: flex; gap: 16px; align-items: center; }
+    .qr-code img { width: 100px; height: 100px; }
+    .barcode-code { display: flex; flex-direction: column; align-items: center; }
+    .barcode-code img { height: 50px; width: auto; }
+    .barcode-label { font-size: 10px; color: #6b7280; margin-top: 2px; }
     .qr-info { flex: 1; }
     .qr-title { font-weight: 600; font-size: 16px; color: #000; margin-bottom: 4px; }
     .qr-order { color: #4b5563; font-size: 14px; margin-bottom: 8px; }
@@ -437,22 +441,28 @@ const Orders = () => {
     </div>
   </div>
   
-  <!-- QR Code Section -->
+  <!-- QR Code & Barcode Section -->
   <div class="qr-section">
-    <div class="qr-code">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`FRAGRANZA|${selectedOrder.order_number}|${selectedOrder.invoice_number}|${selectedOrder.total_amount}|${selectedOrder.customer_name}`)}" alt="Order QR Code" />
+    <div class="codes-container">
+      <div class="qr-code">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`FRAGRANZA|${selectedOrder.order_number}|${selectedOrder.invoice_number}|${selectedOrder.total_amount}|${selectedOrder.customer_name}`)}" alt="Order QR Code" />
+      </div>
+      <div class="barcode-code">
+        <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=2&height=12&includetext" alt="Order Barcode" />
+        <span class="barcode-label">Barcode</span>
+      </div>
     </div>
     <div class="qr-info">
       <p class="qr-title">Scan to Verify</p>
       <p class="qr-order">Order: ${selectedOrder.order_number}</p>
-      <p class="qr-hint">Present this QR code to the cashier for pickup verification</p>
+      <p class="qr-hint">Present the QR code or barcode to the cashier for pickup verification</p>
     </div>
   </div>
   
   <!-- Important Reminder -->
   <div class="reminder">
     <p class="reminder-icon">📱</p>
-    <p class="reminder-text"><strong>Important:</strong> Please save or screenshot this invoice. Show the QR code to our cashier when picking up your order for quick transaction completion.</p>
+    <p class="reminder-text"><strong>Important:</strong> Please save or screenshot this invoice. Show the QR code or barcode to our cashier when picking up your order for quick transaction completion.</p>
   </div>
   
   <div class="footer">
@@ -1303,19 +1313,29 @@ const Orders = () => {
                     </div>
                   </div>
 
-                  {/* QR Code Section */}
+                  {/* QR Code & Barcode Section */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginTop: '32px', padding: '20px', background: '#f9fafb', borderRadius: '8px', border: '1px dashed #d1d5db' }}>
-                    <div>
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`FRAGRANZA|${selectedOrder.order_number}|${selectedOrder.invoice_number}|${selectedOrder.total_amount}|${selectedOrder.customer_name}`)}`} 
-                        alt="Order QR Code" 
-                        style={{ width: '120px', height: '120px' }}
-                      />
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                      <div>
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`FRAGRANZA|${selectedOrder.order_number}|${selectedOrder.invoice_number}|${selectedOrder.total_amount}|${selectedOrder.customer_name}`)}`} 
+                          alt="Order QR Code" 
+                          style={{ width: '100px', height: '100px' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <img 
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=2&height=12&includetext`} 
+                          alt="Order Barcode" 
+                          style={{ height: '50px', width: 'auto' }}
+                        />
+                        <span style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>Barcode</span>
+                      </div>
                     </div>
                     <div style={{ flex: 1 }}>
                       <p style={{ fontWeight: 600, fontSize: '16px', color: '#000', marginBottom: '4px' }}>Scan to Verify</p>
                       <p style={{ color: '#4b5563', fontSize: '14px', marginBottom: '8px' }}>Order: {selectedOrder.order_number}</p>
-                      <p style={{ color: '#6b7280', fontSize: '12px' }}>Present this QR code to the cashier for pickup verification</p>
+                      <p style={{ color: '#6b7280', fontSize: '12px' }}>Present the QR code or barcode to the cashier for pickup verification</p>
                     </div>
                   </div>
 
@@ -1323,7 +1343,7 @@ const Orders = () => {
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginTop: '20px', padding: '16px', background: '#fef3c7', borderRadius: '8px', border: '1px solid #f59e0b' }}>
                     <span style={{ fontSize: '24px' }}>📱</span>
                     <p style={{ color: '#92400e', fontSize: '13px', lineHeight: 1.5 }}>
-                      <strong>Important:</strong> Please save or screenshot this invoice. Show the QR code to our cashier when picking up your order for quick transaction completion.
+                      <strong>Important:</strong> Please save or screenshot this invoice. Show the QR code or barcode to our cashier when picking up your order for quick transaction completion.
                     </p>
                   </div>
 
