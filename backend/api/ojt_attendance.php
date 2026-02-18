@@ -345,9 +345,9 @@ function getHRAttendanceSummary($conn) {
             MIN(a.attendance_date) as week_start,
             MAX(a.attendance_date) as week_end,
             COUNT(DISTINCT a.attendance_date) as days_worked,
-            SUM(a.total_hours) as total_hours,
-            SUM(a.overtime_hours) as overtime_hours,
-            SUM(CASE WHEN a.is_late = 1 THEN 1 ELSE 0 END) as late_days
+            COALESCE(SUM(a.total_hours), 0) as total_hours,
+            COALESCE(SUM(a.overtime_hours), 0) as overtime_hours,
+            SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) as late_days
         FROM ojt_attendance a
         JOIN users u ON a.trainee_id = u.id AND u.role = 'ojt'
         LEFT JOIN ojt_assignments oa ON a.trainee_id = oa.trainee_id AND oa.status = 'active'
@@ -380,7 +380,8 @@ function getHRAttendanceSummary($conn) {
             a.*,
             CONCAT(u.first_name, ' ', u.last_name) as trainee_name,
             u.email as trainee_email,
-            u.university as trainee_university
+            u.university as trainee_university,
+            CASE WHEN a.status = 'late' THEN 1 ELSE 0 END as is_late
         FROM ojt_attendance a
         JOIN users u ON a.trainee_id = u.id AND u.role = 'ojt'
         ORDER BY a.attendance_date DESC, a.time_in DESC
