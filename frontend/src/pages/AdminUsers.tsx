@@ -200,6 +200,18 @@ const PREFILL_TEMPLATES: Record<string, Partial<UserFormData>> = {
     notes: 'System administrator',
     status: 'active',
   },
+  hr: {
+    role: 'hr',
+    firstName: 'HR',
+    lastName: 'Staff',
+    email: 'hr@fragranza.com',
+    password: 'HR@12345',
+    phone: '09211234567',
+    department: 'Human Resources',
+    position: 'HR Officer',
+    notes: 'HR department staff - manages employees and interns',
+    status: 'active',
+  },
 };
 
 const AdminUsers = () => {
@@ -1118,6 +1130,18 @@ const AdminUsers = () => {
                           >
                             <Shield className="inline-block w-3 h-3 mr-1" />
                             Administrator
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData(prev => ({ 
+                              ...prev, 
+                              ...PREFILL_TEMPLATES.hr,
+                              hireDate: new Date().toISOString().split('T')[0]
+                            }))}
+                            className="px-3 py-1.5 text-xs bg-pink-500/20 text-pink-400 border border-pink-500/30 rounded-md hover:bg-pink-500/30 transition-all"
+                          >
+                            <Briefcase className="inline-block w-3 h-3 mr-1" />
+                            HR Department
                           </button>
                           <button
                             type="button"
