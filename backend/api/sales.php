@@ -853,7 +853,7 @@ function getCustomers($db) {
     $search = $_GET['search'] ?? null;
     $type = $_GET['type'] ?? null;
     
-    // Get customers from users table (verified users) with order statistics
+    // Get all users with customer role OR any user with orders as customers
     $sql = "SELECT 
             u.id,
             u.first_name,
@@ -865,10 +865,11 @@ function getCustomers($db) {
             u.province,
             u.zip_code,
             u.email_verified,
+            u.status as user_status,
             u.created_at,
             CASE 
                 WHEN COALESCE(order_stats.total_spent, 0) > 10000 THEN 'vip'
-                WHEN u.status = 'active' AND u.email_verified = 1 THEN 'active'
+                WHEN u.email_verified = 1 THEN 'active'
                 ELSE 'inactive'
             END as status,
             CASE 
@@ -889,15 +890,15 @@ function getCustomers($db) {
             WHERE o.status NOT IN ('cancelled', 'refunded')
             GROUP BY o.user_id
         ) order_stats ON u.id = order_stats.user_id
-        WHERE u.role = 'customer' AND u.email_verified = 1";
+        WHERE (u.role = 'customer' OR u.role IS NULL OR order_stats.total_orders > 0)";
     $params = [];
     
     // Filter by status
     if ($status && $status !== 'all') {
         if ($status === 'active') {
-            $sql .= " AND u.status = 'active'";
+            $sql .= " AND u.email_verified = 1";
         } else if ($status === 'inactive') {
-            $sql .= " AND u.status != 'active'";
+            $sql .= " AND u.email_verified = 0";
         } else if ($status === 'vip') {
             $sql .= " AND COALESCE(order_stats.total_spent, 0) > 10000";
         }
@@ -917,12 +918,12 @@ function getCustomers($db) {
     $stmt->execute($params);
     $customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get stats from verified users
+    // Get stats
     $stats = [
-        'total' => $db->query("SELECT COUNT(*) FROM users WHERE role = 'customer' AND email_verified = 1")->fetchColumn(),
-        'active' => $db->query("SELECT COUNT(*) FROM users WHERE role = 'customer' AND email_verified = 1 AND status = 'active'")->fetchColumn(),
-        'vip' => $db->query("SELECT COUNT(*) FROM users u LEFT JOIN (SELECT user_id, SUM(total_amount) as total FROM orders WHERE status NOT IN ('cancelled', 'refunded') GROUP BY user_id) o ON u.id = o.user_id WHERE u.role = 'customer' AND COALESCE(o.total, 0) > 10000")->fetchColumn(),
-        'inactive' => $db->query("SELECT COUNT(*) FROM users WHERE role = 'customer' AND email_verified = 1 AND status != 'active'")->fetchColumn(),
+        'total' => $db->query("SELECT COUNT(*) FROM users WHERE role = 'customer' OR role IS NULL")->fetchColumn(),
+        'active' => $db->query("SELECT COUNT(*) FROM users WHERE (role = 'customer' OR role IS NULL) AND email_verified = 1")->fetchColumn(),
+        'vip' => $db->query("SELECT COUNT(*) FROM users u LEFT JOIN (SELECT user_id, SUM(total_amount) as total FROM orders WHERE status NOT IN ('cancelled', 'refunded') GROUP BY user_id) o ON u.id = o.user_id WHERE (u.role = 'customer' OR u.role IS NULL) AND COALESCE(o.total, 0) > 10000")->fetchColumn(),
+        'inactive' => $db->query("SELECT COUNT(*) FROM users WHERE (role = 'customer' OR role IS NULL) AND email_verified = 0")->fetchColumn(),
     ];
     
     echo json_encode(['success' => true, 'data' => $customers, 'stats' => $stats]);
