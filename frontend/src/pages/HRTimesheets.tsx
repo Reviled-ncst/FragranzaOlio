@@ -12,13 +12,13 @@ import {
   ChevronRight,
   Eye,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Users
 } from 'lucide-react';
 import HRLayout from '../components/layout/HRLayout';
 import { API_BASE_URL, apiFetch } from '../services/api';
 
-interface TimesheetEntry {
-  id: number;
+interface AttendanceSummary {
   trainee_id: number;
   trainee_name: string;
   trainee_email: string;
@@ -26,22 +26,35 @@ interface TimesheetEntry {
   supervisor_name?: string;
   week_start: string;
   week_end: string;
+  days_worked: number;
   total_hours: number;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
-  submitted_at?: string;
-  reviewed_at?: string;
-  reviewer_name?: string;
-  notes?: string;
+  overtime_hours: number;
+  late_days: number;
+}
+
+interface AttendanceRecord {
+  id: number;
+  trainee_id: number;
+  trainee_name: string;
+  trainee_email: string;
+  trainee_university?: string;
+  attendance_date: string;
+  time_in: string;
+  time_out: string;
+  total_hours: number;
+  overtime_hours: number;
+  is_late: boolean;
+  status: string;
 }
 
 const HRTimesheets = () => {
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [timesheets, setTimesheets] = useState<TimesheetEntry[]>([]);
+  const [viewMode, setViewMode] = useState<'summary' | 'recent'>('summary');
+  const [summaries, setSummaries] = useState<AttendanceSummary[]>([]);
+  const [recentRecords, setRecentRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<number | null>(null);
 
   // Calculate week dates based on offset
   const getWeekDates = (offset: number) => {
@@ -61,122 +74,67 @@ const HRTimesheets = () => {
 
   const weekDates = getWeekDates(weekOffset);
 
-  const fetchTimesheets = async () => {
+  const fetchAttendanceData = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Fetch attendance summary from HR endpoint
       const params = new URLSearchParams();
       params.append('week_start', weekDates.start);
+      params.append('week_end', weekDates.end);
       
-      const res = await apiFetch(`${API_BASE_URL}/ojt_timesheets.php?${params}`);
+      const res = await apiFetch(`${API_BASE_URL}/ojt_attendance.php/hr-summary?${params}`);
       const response = await res.json();
       
+      console.log('HR Attendance API response:', response);
+      
       if (response.success && response.data) {
-        setTimesheets(response.data);
-      } else if (Array.isArray(response)) {
-        setTimesheets(response);
+        setSummaries(response.data.summaries || []);
+        setRecentRecords(response.data.recent || []);
       } else {
-        setTimesheets([]);
+        setSummaries([]);
+        setRecentRecords([]);
       }
     } catch (err) {
-      console.error('Error fetching timesheets:', err);
-      setError('Failed to load timesheets');
-      setTimesheets([]);
+      console.error('Error fetching attendance data:', err);
+      setError('Failed to load attendance data');
+      setSummaries([]);
+      setRecentRecords([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchTimesheets();
+    fetchAttendanceData();
   }, [weekOffset]);
 
-  const handleApprove = async (timesheetId: number) => {
-    setActionLoading(timesheetId);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/ojt_timesheets.php/${timesheetId}/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewer_notes: 'Approved by HR' })
-      });
-      const response = await res.json();
-      
-      if (response.success || response.message) {
-        await fetchTimesheets();
-      } else {
-        alert(response.error || 'Failed to approve timesheet');
-      }
-    } catch (err) {
-      console.error('Error approving timesheet:', err);
-      alert('Failed to approve timesheet');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleReject = async (timesheetId: number) => {
-    const reason = prompt('Reason for rejection:');
-    if (!reason) return;
-    
-    setActionLoading(timesheetId);
-    try {
-      const res = await apiFetch(`${API_BASE_URL}/ojt_timesheets.php/${timesheetId}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewer_notes: reason })
-      });
-      const response = await res.json();
-      
-      if (response.success || response.message) {
-        await fetchTimesheets();
-      } else {
-        alert(response.error || 'Failed to reject timesheet');
-      }
-    } catch (err) {
-      console.error('Error rejecting timesheet:', err);
-      alert('Failed to reject timesheet');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
   const stats = {
-    totalSubmitted: timesheets.filter(t => t.status !== 'draft').length,
-    pending: timesheets.filter(t => t.status === 'submitted').length,
-    approved: timesheets.filter(t => t.status === 'approved').length,
-    totalHours: timesheets.reduce((sum, t) => sum + (t.total_hours || 0), 0)
+    totalInterns: summaries.length,
+    totalHours: summaries.reduce((sum, s) => sum + parseFloat(String(s.total_hours || 0)), 0),
+    totalOvertime: summaries.reduce((sum, s) => sum + parseFloat(String(s.overtime_hours || 0)), 0),
+    lateDays: summaries.reduce((sum, s) => sum + (s.late_days || 0), 0)
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full flex items-center gap-1"><CheckCircle size={12} /> Approved</span>;
-      case 'submitted':
-        return <span className="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded-full flex items-center gap-1"><AlertCircle size={12} /> Pending</span>;
-      case 'rejected':
-        return <span className="px-2 py-1 text-xs font-medium bg-red-500/20 text-red-400 rounded-full flex items-center gap-1"><XCircle size={12} /> Rejected</span>;
-      case 'draft':
-        return <span className="px-2 py-1 text-xs font-medium bg-gray-500/20 text-gray-400 rounded-full flex items-center gap-1"><Clock size={12} /> Draft</span>;
-      default:
-        return null;
-    }
-  };
+  const filteredSummaries = summaries.filter(s => {
+    const name = s.trainee_name || '';
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
-  const filteredTimesheets = timesheets
-    .filter(t => {
-      const name = t.trainee_name || '';
-      return name.toLowerCase().includes(searchQuery.toLowerCase());
-    })
-    .filter(t => {
-      if (!statusFilter) return true;
-      if (statusFilter === 'pending') return t.status === 'submitted';
-      return t.status === statusFilter;
-    });
+  const filteredRecent = recentRecords.filter(r => {
+    const name = r.trainee_name || '';
+    return name.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return '-';
+    return timeStr.substring(0, 5);
   };
 
   return (
@@ -185,8 +143,8 @@ const HRTimesheets = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white">Intern Timesheet Management</h1>
-            <p className="text-gray-400">Review and approve OJT intern timesheets</p>
+            <h1 className="text-2xl font-bold text-white">Intern Attendance & Timesheets</h1>
+            <p className="text-gray-400">View OJT intern attendance records and hours</p>
           </div>
           <div className="flex items-center gap-3">
             {/* Week Navigation */}
@@ -207,7 +165,7 @@ const HRTimesheets = () => {
               </button>
             </div>
             <button 
-              onClick={fetchTimesheets}
+              onClick={fetchAttendanceData}
               className="p-2 bg-black-800 border border-pink-500/20 rounded-lg hover:bg-pink-500/20 transition-all"
             >
               <RefreshCw size={18} className="text-gray-400" />
@@ -228,8 +186,8 @@ const HRTimesheets = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Total Submitted</p>
-                <p className="text-2xl font-bold text-white">{stats.totalSubmitted}</p>
+                <p className="text-gray-400 text-sm">Active Interns</p>
+                <p className="text-2xl font-bold text-white">{stats.totalInterns}</p>
               </div>
               <div className="w-12 h-12 bg-pink-500/20 rounded-lg flex items-center justify-center">
                 <Calendar className="text-pink-400" size={24} />
@@ -245,11 +203,11 @@ const HRTimesheets = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Pending Review</p>
-                <p className="text-2xl font-bold text-yellow-400">{stats.pending}</p>
+                <p className="text-gray-400 text-sm">Total Hours</p>
+                <p className="text-2xl font-bold text-pink-400">{stats.totalHours.toFixed(1)}</p>
               </div>
-              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                <AlertCircle className="text-yellow-400" size={24} />
+              <div className="w-12 h-12 bg-pink-500/20 rounded-lg flex items-center justify-center">
+                <Clock className="text-pink-400" size={24} />
               </div>
             </div>
           </motion.div>
@@ -262,11 +220,11 @@ const HRTimesheets = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Approved</p>
-                <p className="text-2xl font-bold text-green-400">{stats.approved}</p>
+                <p className="text-gray-400 text-sm">Overtime Hours</p>
+                <p className="text-2xl font-bold text-yellow-400">{stats.totalOvertime.toFixed(1)}</p>
               </div>
-              <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
-                <CheckCircle className="text-green-400" size={24} />
+              <div className="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                <AlertCircle className="text-yellow-400" size={24} />
               </div>
             </div>
           </motion.div>
@@ -279,11 +237,11 @@ const HRTimesheets = () => {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-400 text-sm">Total Hours</p>
-                <p className="text-2xl font-bold text-pink-400">{stats.totalHours.toFixed(1)}</p>
+                <p className="text-gray-400 text-sm">Late Days</p>
+                <p className="text-2xl font-bold text-red-400">{stats.lateDays}</p>
               </div>
-              <div className="w-12 h-12 bg-pink-500/20 rounded-lg flex items-center justify-center">
-                <Clock className="text-pink-400" size={24} />
+              <div className="w-12 h-12 bg-red-500/20 rounded-lg flex items-center justify-center">
+                <XCircle className="text-red-400" size={24} />
               </div>
             </div>
           </motion.div>
@@ -302,17 +260,30 @@ const HRTimesheets = () => {
                 className="w-full pl-10 pr-4 py-2.5 bg-black-800 border border-pink-500/20 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pink-500"
               />
             </div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2.5 bg-black-800 border border-pink-500/20 rounded-lg text-white focus:outline-none focus:border-pink-500"
-            >
-              <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="draft">Draft</option>
-            </select>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setViewMode('summary')}
+                className={`px-4 py-2.5 rounded-lg transition-all ${
+                  viewMode === 'summary'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-black-800 border border-pink-500/20 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Users size={18} className="inline mr-2" />
+                Summary
+              </button>
+              <button
+                onClick={() => setViewMode('recent')}
+                className={`px-4 py-2.5 rounded-lg transition-all ${
+                  viewMode === 'recent'
+                    ? 'bg-pink-500 text-white'
+                    : 'bg-black-800 border border-pink-500/20 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Clock size={18} className="inline mr-2" />
+                Recent
+              </button>
+            </div>
           </div>
         </div>
 
@@ -330,8 +301,8 @@ const HRTimesheets = () => {
           </div>
         )}
 
-        {/* Timesheets Table */}
-        {!loading && !error && (
+        {/* Summary View */}
+        {!loading && !error && viewMode === 'summary' && (
         <div className="bg-black-900 border border-pink-500/20 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -340,22 +311,22 @@ const HRTimesheets = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Intern</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">University</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Period</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Days</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Hours</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Overtime</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Supervisor</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-pink-500/10">
-                {filteredTimesheets.length === 0 ? (
+                {filteredSummaries.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                      No timesheets found for this week
+                      No attendance records found for this week
                     </td>
                   </tr>
                 ) : (
-                filteredTimesheets.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-black-800/50 transition-colors">
+                filteredSummaries.map((entry) => (
+                  <tr key={entry.trainee_id} className="hover:bg-black-800/50 transition-colors">
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 font-medium">
@@ -369,33 +340,62 @@ const HRTimesheets = () => {
                     </td>
                     <td className="px-4 py-4 text-gray-400 text-sm">{entry.trainee_university || '-'}</td>
                     <td className="px-4 py-4 text-gray-400">{formatDate(entry.week_start)} - {formatDate(entry.week_end)}</td>
-                    <td className="px-4 py-4 text-pink-400 font-medium">{(entry.total_hours || 0).toFixed(1)}h</td>
+                    <td className="px-4 py-4 text-white">{entry.days_worked}</td>
+                    <td className="px-4 py-4 text-pink-400 font-medium">{parseFloat(String(entry.total_hours || 0)).toFixed(1)}h</td>
+                    <td className="px-4 py-4 text-yellow-400">{parseFloat(String(entry.overtime_hours || 0)).toFixed(1)}h</td>
                     <td className="px-4 py-4 text-gray-400 text-sm">{entry.supervisor_name || '-'}</td>
-                    <td className="px-4 py-4">{getStatusBadge(entry.status)}</td>
-                    <td className="px-4 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button className="p-2 text-gray-400 hover:text-pink-400 transition-colors">
-                          <Eye size={18} />
-                        </button>
-                        {entry.status === 'submitted' && (
-                          <>
-                            <button 
-                              onClick={() => handleApprove(entry.id)}
-                              disabled={actionLoading === entry.id}
-                              className="px-3 py-1 text-xs bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all disabled:opacity-50"
-                            >
-                              {actionLoading === entry.id ? 'Loading...' : 'Approve'}
-                            </button>
-                            <button 
-                              onClick={() => handleReject(entry.id)}
-                              disabled={actionLoading === entry.id}
-                              className="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-all disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </>
-                        )}
+                  </tr>
+                ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        )}
+
+        {/* Recent Records View */}
+        {!loading && !error && viewMode === 'recent' && (
+        <div className="bg-black-900 border border-pink-500/20 rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-black-800 border-b border-pink-500/20">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Intern</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time In</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time Out</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Hours</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-pink-500/10">
+                {filteredRecent.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      No recent attendance records
+                    </td>
+                  </tr>
+                ) : (
+                filteredRecent.map((record) => (
+                  <tr key={record.id} className="hover:bg-black-800/50 transition-colors">
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 font-medium">
+                          {(record.trainee_name || 'N/A').split(' ').map(n => n[0]).join('').slice(0, 2)}
+                        </div>
+                        <span className="text-white font-medium">{record.trainee_name || 'Unknown'}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-4 text-gray-400">{formatDate(record.attendance_date)}</td>
+                    <td className="px-4 py-4 text-green-400">{formatTime(record.time_in)}</td>
+                    <td className="px-4 py-4 text-red-400">{formatTime(record.time_out)}</td>
+                    <td className="px-4 py-4 text-pink-400 font-medium">{parseFloat(String(record.total_hours || 0)).toFixed(1)}h</td>
+                    <td className="px-4 py-4">
+                      {record.is_late ? (
+                        <span className="px-2 py-1 text-xs font-medium bg-yellow-500/20 text-yellow-400 rounded-full">Late</span>
+                      ) : (
+                        <span className="px-2 py-1 text-xs font-medium bg-green-500/20 text-green-400 rounded-full">On Time</span>
+                      )}
                     </td>
                   </tr>
                 ))

@@ -88,6 +88,9 @@ function handleGet($conn, $path) {
         case 'check-late-permission':
             checkLatePermission($conn);
             break;
+        case 'hr-summary':
+            getHRAttendanceSummary($conn);
+            break;
         default:
             getAttendance($conn);
     }
@@ -319,6 +322,81 @@ function getAttendance($conn) {
     ");
     $stmt->execute([$traineeId]);
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+/**
+ * Get HR attendance summary - all OJT trainee attendance records
+ * Used by HR department to view all intern timesheets
+ */
+function getHRAttendanceSummary($conn) {
+    $weekStart = $_GET['week_start'] ?? null;
+    $weekEnd = $_GET['week_end'] ?? null;
+    
+    // Build query to get attendance grouped by trainee with weekly totals
+    $query = "
+        SELECT 
+            a.trainee_id,
+            u.first_name,
+            u.last_name,
+            CONCAT(u.first_name, ' ', u.last_name) as trainee_name,
+            u.email as trainee_email,
+            u.university as trainee_university,
+            COALESCE(CONCAT(s.first_name, ' ', s.last_name), 'Unassigned') as supervisor_name,
+            MIN(a.attendance_date) as week_start,
+            MAX(a.attendance_date) as week_end,
+            COUNT(DISTINCT a.attendance_date) as days_worked,
+            SUM(a.total_hours) as total_hours,
+            SUM(a.overtime_hours) as overtime_hours,
+            SUM(CASE WHEN a.is_late = 1 THEN 1 ELSE 0 END) as late_days
+        FROM ojt_attendance a
+        JOIN users u ON a.trainee_id = u.id AND u.role = 'ojt'
+        LEFT JOIN ojt_assignments oa ON a.trainee_id = oa.trainee_id AND oa.status = 'active'
+        LEFT JOIN users s ON oa.supervisor_id = s.id
+        WHERE 1=1
+    ";
+    
+    $params = [];
+    
+    if ($weekStart) {
+        $query .= " AND a.attendance_date >= ?";
+        $params[] = $weekStart;
+    }
+    
+    if ($weekEnd) {
+        $query .= " AND a.attendance_date <= ?";
+        $params[] = $weekEnd;
+    }
+    
+    $query .= " GROUP BY a.trainee_id, u.first_name, u.last_name, u.email, u.university, supervisor_name
+                ORDER BY trainee_name ASC";
+    
+    $stmt = $conn->prepare($query);
+    $stmt->execute($params);
+    $summaries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Also get recent individual records for detail view
+    $recentQuery = "
+        SELECT 
+            a.*,
+            CONCAT(u.first_name, ' ', u.last_name) as trainee_name,
+            u.email as trainee_email,
+            u.university as trainee_university
+        FROM ojt_attendance a
+        JOIN users u ON a.trainee_id = u.id AND u.role = 'ojt'
+        ORDER BY a.attendance_date DESC, a.time_in DESC
+        LIMIT 50
+    ";
+    $recentStmt = $conn->prepare($recentQuery);
+    $recentStmt->execute();
+    $recentRecords = $recentStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'summaries' => $summaries,
+            'recent' => $recentRecords
+        ]
+    ]);
 }
 
 function getPendingOvertime($conn) {
