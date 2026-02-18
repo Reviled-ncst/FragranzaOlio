@@ -320,7 +320,7 @@ class AdminUsersController {
             }
             
             // Validate role
-            $allowedRoles = ['customer', 'sales', 'ojt', 'ojt_supervisor', 'admin'];
+            $allowedRoles = ['customer', 'sales', 'ojt', 'ojt_supervisor', 'hr', 'admin'];
             if (!in_array($data['role'], $allowedRoles)) {
                 return $this->response(false, 'Invalid role specified', null, 400);
             }
@@ -350,6 +350,7 @@ class AdminUsersController {
             if ($data['role'] !== 'customer') {
                 $prefix = match($data['role']) {
                     'admin' => 'ADM',
+                    'hr' => 'HRD',
                     'sales' => 'SAL',
                     'ojt' => 'OJT',
                     'ojt_supervisor' => 'SUP',
