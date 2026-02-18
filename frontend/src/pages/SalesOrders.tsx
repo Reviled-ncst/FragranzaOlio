@@ -121,6 +121,56 @@ const SalesOrders = () => {
   const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  
+  // Physical barcode scanner support
+  const barcodeBufferRef = useRef<string>('');
+  const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Listen for physical barcode scanner input (keyboard emulation)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is typing in an input field (except search which we handle)
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' && target !== searchInputRef.current) return;
+      if (target.tagName === 'TEXTAREA') return;
+      
+      // Clear timeout on each keypress
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+      
+      // If Enter is pressed and we have buffer content, process it
+      if (e.key === 'Enter' && barcodeBufferRef.current.length > 3) {
+        e.preventDefault();
+        const scannedData = barcodeBufferRef.current.trim();
+        barcodeBufferRef.current = '';
+        
+        // Process the barcode - check for order format
+        if (scannedData.includes('|') || scannedData.startsWith('FO-') || scannedData.startsWith('ORD-') || /^[A-Z]{2,4}-\d/.test(scannedData)) {
+          parseQRCode(scannedData);
+        }
+        return;
+      }
+      
+      // Add printable characters to buffer
+      if (e.key.length === 1) {
+        barcodeBufferRef.current += e.key;
+        
+        // Clear buffer after 100ms of no input (barcode scanners type very fast)
+        barcodeTimeoutRef.current = setTimeout(() => {
+          barcodeBufferRef.current = '';
+        }, 100);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (barcodeTimeoutRef.current) {
+        clearTimeout(barcodeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Cleanup scanner on unmount
   useEffect(() => {
@@ -236,7 +286,21 @@ const SalesOrders = () => {
             return;
           }
           
-          // Auto-complete the transaction
+          // For pickup orders or any pending order, show confirmation dialog first
+          if (foundOrder.shipping_method === 'store_pickup' || foundOrder.status === 'pending' || foundOrder.status === 'processing' || foundOrder.status === 'ready') {
+            setConfirmationData({
+              orderNumber,
+              customerName,
+              total,
+              status: 'pending',
+              orderId: foundOrder.id
+            });
+            setShowConfirmation(true);
+            fetchOrderDetail(foundOrder.id);
+            return;
+          }
+          
+          // Auto-complete the transaction for other orders
           const completeResponse = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
