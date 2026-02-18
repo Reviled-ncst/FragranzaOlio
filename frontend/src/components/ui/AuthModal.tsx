@@ -381,7 +381,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
     
     setIsLoading(true);
     try {
-      const result = await authService.forgotPassword(forgotEmail);
+      const result = await authService.resetPassword(forgotEmail);
       
       if (result.success) {
         setSuccessMessage('If an account exists with this email, you will receive a password reset link. Please check your email.');
