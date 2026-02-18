@@ -1,18 +1,4 @@
-// Types for Vercel serverless functions
-interface VercelRequest {
-  method?: string;
-  query: { [key: string]: string | string[] };
-  body?: any;
-  headers: { [key: string]: string | string[] | undefined };
-}
-
-interface VercelResponse {
-  status: (code: number) => VercelResponse;
-  json: (data: any) => void;
-  send: (data: any) => void;
-  end: () => void;
-  setHeader: (name: string, value: string) => void;
-}
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Backend URL for images - Cloudflare tunnel to local XAMPP
 const BACKEND_URL = process.env.BACKEND_URL || 'https://roses-feels-cgi-port.trycloudflare.com/FragranzaWeb';
