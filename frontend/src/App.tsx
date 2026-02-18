@@ -66,6 +66,12 @@ import AdminOJT from './pages/AdminOJT';
 import HRDashboard from './pages/HRDashboard';
 import HREmployees from './pages/HREmployees';
 import HRInterns from './pages/HRInterns';
+import HRAttendance from './pages/HRAttendance';
+import HRTimesheets from './pages/HRTimesheets';
+import HRPayroll from './pages/HRPayroll';
+import HRReports from './pages/HRReports';
+import HRDocuments from './pages/HRDocuments';
+import HRSettings from './pages/HRSettings';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 
@@ -159,6 +165,12 @@ const AppContent = () => {
             <Route path="/hr" element={<HRRoute><HRDashboard /></HRRoute>} />
             <Route path="/hr/employees" element={<HRRoute><HREmployees /></HRRoute>} />
             <Route path="/hr/interns" element={<HRRoute><HRInterns /></HRRoute>} />
+            <Route path="/hr/attendance" element={<HRRoute><HRAttendance /></HRRoute>} />
+            <Route path="/hr/timesheets" element={<HRRoute><HRTimesheets /></HRRoute>} />
+            <Route path="/hr/payroll" element={<HRRoute><HRPayroll /></HRRoute>} />
+            <Route path="/hr/reports" element={<HRRoute><HRReports /></HRRoute>} />
+            <Route path="/hr/documents" element={<HRRoute><HRDocuments /></HRRoute>} />
+            <Route path="/hr/settings" element={<HRRoute><HRSettings /></HRRoute>} />
             
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
