@@ -103,10 +103,14 @@ export const firebaseEmailService = {
     
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, servicePassword);
+      // Force reload user to get fresh emailVerified status from server
+      await userCredential.user.reload();
       const isVerified = userCredential.user.emailVerified;
+      console.log(`🔐 Firebase email verified status for ${email}: ${isVerified}`);
       await signOut(auth);
       return isVerified;
     } catch (error: any) {
+      console.log('🔐 Firebase checkEmailVerified error:', error.code, error.message);
       // If user doesn't exist in Firebase, treat as verified (legacy user)
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         return true;
