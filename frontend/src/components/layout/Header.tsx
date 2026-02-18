@@ -97,6 +97,17 @@ const getRoleConfig = (role: UserRole) => {
         { path: '/dashboard?tab=profile', label: 'My Profile', icon: User },
       ],
     },
+    hr: {
+      label: 'HR Department',
+      color: 'bg-pink-500',
+      dashboardPath: '/hr',
+      menuItems: [
+        { path: '/hr', label: 'HR Dashboard', icon: LayoutDashboard },
+        { path: '/hr/employees', label: 'Employees', icon: Users },
+        { path: '/hr/interns', label: 'Interns', icon: Users },
+        { path: '/dashboard?tab=profile', label: 'My Profile', icon: User },
+      ],
+    },
   };
 
   return configs[role] || configs.customer;
@@ -241,6 +252,7 @@ const Header = () => {
       sales: 'bg-green-500/20 text-green-400',
       ojt: 'bg-blue-400/20 text-blue-300',
       ojt_supervisor: 'bg-purple-500/20 text-purple-400',
+      hr: 'bg-pink-500/20 text-pink-400',
     };
     return colors[role] || colors.customer;
   };
