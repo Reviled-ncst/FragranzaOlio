@@ -34,7 +34,8 @@ interface Customer {
   province: string;
   zip_code: string;
   status: 'active' | 'inactive' | 'vip';
-  customer_type: 'retail' | 'wholesale' | 'distributor';
+  customer_type: string;
+  is_active: number;
   total_orders: number;
   total_spent: number;
   last_order_date: string;
@@ -301,14 +302,14 @@ const SalesCustomers = () => {
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gold-500/20 rounded-full flex items-center justify-center">
                         <span className="text-gold-400 font-bold text-lg">
-                          {customer.first_name[0]}{customer.last_name[0]}
+                          {(customer.first_name || 'C')[0]}{(customer.last_name || '')[0] || ''}
                         </span>
                       </div>
                       <div>
-                        <h3 className="text-white font-medium">{customer.first_name} {customer.last_name}</h3>
+                        <h3 className="text-white font-medium">{customer.first_name || ''} {customer.last_name || customer.email?.split('@')[0] || 'Customer'}</h3>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(customer.status)}`}>
                           {getStatusIcon(customer.status)}
-                          {customer.status.toUpperCase()}
+                          {(customer.status || 'active').toUpperCase()}
                         </span>
                       </div>
                     </div>
@@ -386,14 +387,14 @@ const SalesCustomers = () => {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 bg-gold-500/20 rounded-full flex items-center justify-center">
                     <span className="text-gold-400 font-bold text-2xl">
-                      {selectedCustomer.first_name[0]}{selectedCustomer.last_name[0]}
+                      {(selectedCustomer.first_name || 'C')[0]}{(selectedCustomer.last_name || '')[0] || ''}
                     </span>
                   </div>
                   <div>
-                    <h4 className="text-xl font-bold text-white">{selectedCustomer.first_name} {selectedCustomer.last_name}</h4>
+                    <h4 className="text-xl font-bold text-white">{selectedCustomer.first_name || ''} {selectedCustomer.last_name || selectedCustomer.email?.split('@')[0] || 'Customer'}</h4>
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedCustomer.status)}`}>
                       {getStatusIcon(selectedCustomer.status)}
-                      {selectedCustomer.status.toUpperCase()} • {selectedCustomer.customer_type.toUpperCase()}
+                      {(selectedCustomer.status || 'active').toUpperCase()} • {(selectedCustomer.customer_type || 'retail').toUpperCase()}
                     </span>
                   </div>
                 </div>

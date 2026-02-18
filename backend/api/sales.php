@@ -853,31 +853,54 @@ function getCustomers($db) {
     $search = $_GET['search'] ?? null;
     $type = $_GET['type'] ?? null;
     
-    $sql = "SELECT * FROM customers WHERE 1=1";
+    // Get customers with order statistics
+    $sql = "SELECT c.*, 
+            CASE 
+                WHEN c.customer_type = 'vip' THEN 'vip'
+                WHEN c.is_active = 1 THEN 'active'
+                ELSE 'inactive'
+            END as status,
+            COALESCE(order_stats.total_orders, 0) as total_orders,
+            COALESCE(order_stats.total_spent, 0) as total_spent,
+            order_stats.last_order_date
+        FROM customers c
+        LEFT JOIN (
+            SELECT customer_id, 
+                   COUNT(*) as total_orders, 
+                   SUM(total_amount) as total_spent,
+                   MAX(created_at) as last_order_date
+            FROM orders 
+            WHERE status NOT IN ('cancelled', 'refunded')
+            GROUP BY customer_id
+        ) order_stats ON c.id = order_stats.customer_id
+        WHERE 1=1";
     $params = [];
     
     // Use is_active instead of status
     if ($status && $status !== 'all') {
         if ($status === 'active') {
-            $sql .= " AND is_active = 1";
+            $sql .= " AND c.is_active = 1 AND c.customer_type != 'vip'";
         } else if ($status === 'inactive') {
-            $sql .= " AND is_active = 0";
+            $sql .= " AND c.is_active = 0";
+        } else if ($status === 'vip') {
+            $sql .= " AND c.customer_type = 'vip'";
         }
     }
     
     if ($type && $type !== 'all') {
-        $sql .= " AND customer_type = :type";
+        $sql .= " AND c.customer_type = :type";
         $params[':type'] = $type;
     }
     
     if ($search) {
-        $sql .= " AND (first_name LIKE :search OR last_name LIKE :search2 OR email LIKE :search3)";
+        $sql .= " AND (c.first_name LIKE :search OR c.last_name LIKE :search2 OR c.email LIKE :search3 OR c.phone LIKE :search4)";
         $params[':search'] = "%$search%";
         $params[':search2'] = "%$search%";
         $params[':search3'] = "%$search%";
+        $params[':search4'] = "%$search%";
     }
     
-    $sql .= " ORDER BY created_at DESC";
+    $sql .= " ORDER BY order_stats.total_spent DESC, c.created_at DESC";
     
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
@@ -886,7 +909,7 @@ function getCustomers($db) {
     // Get stats - use is_active and customer_type
     $stats = [
         'total' => $db->query("SELECT COUNT(*) FROM customers")->fetchColumn(),
-        'active' => $db->query("SELECT COUNT(*) FROM customers WHERE is_active = 1")->fetchColumn(),
+        'active' => $db->query("SELECT COUNT(*) FROM customers WHERE is_active = 1 AND customer_type != 'vip'")->fetchColumn(),
         'vip' => $db->query("SELECT COUNT(*) FROM customers WHERE customer_type = 'vip'")->fetchColumn(),
         'inactive' => $db->query("SELECT COUNT(*) FROM customers WHERE is_active = 0")->fetchColumn(),
     ];
