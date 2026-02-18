@@ -2,8 +2,6 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode } fro
 import type { User } from '../services/authServicePHP';
 import { getStoredUser, removeStoredUser, setStoredUser } from '../services/authServicePHP';
 import authService from '../services/authServicePHP';
-import { signOut } from 'firebase/auth';
-import { auth } from '../config/firebase';
 
 // Session verification cache to prevent rapid re-verification
 const SESSION_VERIFIED_KEY = 'fragranza_session_verified';
@@ -105,8 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     removeStoredUser();
     localStorage.removeItem(SESSION_VERIFIED_KEY);
     try {
-      // Logout from Firebase (used for email verification) and PHP backend
-      await signOut(auth);
       await authService.logout();
     } catch (error) {
       console.error('Logout error:', error);
