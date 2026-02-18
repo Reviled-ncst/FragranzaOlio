@@ -402,7 +402,7 @@ class EmailService {
                                             <p style="color: #888; font-size: 11px; margin: 8px 0 0;">QR Code</p>
                                         </td>
                                         <td align="center" style="padding: 10px;">
-                                            <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=' . urlencode($orderData['order_number']) . '&scale=2&height=12&includetext&backgroundcolor=1a1a1a&barcolor=d4af5f&textcolor=d4af5f" alt="Barcode" style="height: 50px; width: auto;" />
+                                            <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=' . urlencode($orderData['order_number']) . '&scale=3&height=18&includetext&backgroundcolor=1a1a1a&barcolor=d4af5f&textcolor=d4af5f" alt="Barcode" style="height: 70px; width: auto;" />
                                             <p style="color: #888; font-size: 11px; margin: 8px 0 0;">Barcode</p>
                                         </td>
                                     </tr>

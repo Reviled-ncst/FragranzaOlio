@@ -1044,9 +1044,9 @@ const SalesOrders = () => {
                         {/* Barcode Display */}
                         <div className="mt-3 pt-3 border-t border-gold-500/20">
                           <img 
-                            src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=d4af5f&textcolor=d4af5f`}
+                            src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=3&height=18&includetext&backgroundcolor=1f1f1f&barcolor=d4af5f&textcolor=d4af5f`}
                             alt="Order Barcode"
-                            className="mx-auto h-10"
+                            className="mx-auto h-14"
                           />
                         </div>
                       </motion.div>
@@ -1114,9 +1114,9 @@ const SalesOrders = () => {
                       >
                         <p className="text-gray-500 text-xs mb-2">Order #{confirmationData.orderNumber}</p>
                         <img 
-                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=22c55e&textcolor=22c55e`}
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=3&height=18&includetext&backgroundcolor=1f1f1f&barcolor=22c55e&textcolor=22c55e`}
                           alt="Order Barcode"
-                          className="mx-auto h-10"
+                          className="mx-auto h-14"
                         />
                       </motion.div>
                     </div>
@@ -1168,9 +1168,9 @@ const SalesOrders = () => {
                       >
                         <p className="text-gray-500 text-xs mb-2">Order #{confirmationData.orderNumber}</p>
                         <img 
-                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=2&height=10&includetext&backgroundcolor=1f1f1f&barcolor=f59e0b&textcolor=f59e0b`}
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(confirmationData.orderNumber)}&scale=3&height=18&includetext&backgroundcolor=1f1f1f&barcolor=f59e0b&textcolor=f59e0b`}
                           alt="Order Barcode"
-                          className="mx-auto h-10"
+                          className="mx-auto h-14"
                         />
                       </motion.div>
                     </div>

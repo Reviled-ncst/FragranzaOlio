@@ -351,7 +351,7 @@ const Orders = () => {
     .codes-container { display: flex; gap: 16px; align-items: center; }
     .qr-code img { width: 100px; height: 100px; }
     .barcode-code { display: flex; flex-direction: column; align-items: center; }
-    .barcode-code img { height: 50px; width: auto; }
+    .barcode-code img { height: 70px; width: auto; }
     .barcode-label { font-size: 10px; color: #6b7280; margin-top: 2px; }
     .qr-info { flex: 1; }
     .qr-title { font-weight: 600; font-size: 16px; color: #000; margin-bottom: 4px; }
@@ -448,7 +448,7 @@ const Orders = () => {
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`FRAGRANZA|${selectedOrder.order_number}|${selectedOrder.invoice_number}|${selectedOrder.total_amount}|${selectedOrder.customer_name}`)}" alt="Order QR Code" />
       </div>
       <div class="barcode-code">
-        <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=2&height=12&includetext" alt="Order Barcode" />
+        <img src="https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=3&height=20&includetext" alt="Order Barcode" />
         <span class="barcode-label">Barcode</span>
       </div>
     </div>
@@ -1325,9 +1325,9 @@ const Orders = () => {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <img 
-                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=2&height=12&includetext`} 
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedOrder.order_number)}&scale=3&height=20&includetext`} 
                           alt="Order Barcode" 
-                          style={{ height: '50px', width: 'auto' }}
+                          style={{ height: '70px', width: 'auto' }}
                         />
                         <span style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>Barcode</span>
                       </div>
