@@ -13,6 +13,7 @@ import {
   SupervisorRoute, 
   OJTRoute, 
   SalesRoute,
+  HRRoute,
   getDashboardForRole 
 } from './components/utils/RoleBasedRoute';
 
@@ -62,6 +63,9 @@ import Addresses from './pages/Addresses';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminOJT from './pages/AdminOJT';
+import HRDashboard from './pages/HRDashboard';
+import HREmployees from './pages/HREmployees';
+import HRInterns from './pages/HRInterns';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 
@@ -91,13 +95,14 @@ const AppContent = () => {
   const isSupervisorRoute = location.pathname.startsWith('/supervisor');
   const isSalesRoute = location.pathname.startsWith('/sales');
   const isOjtRoute = location.pathname.startsWith('/ojt');
+  const isHrRoute = location.pathname.startsWith('/hr');
 
   return (
     <>
       <ScrollToTop />
       <div className="flex flex-col min-h-screen">
-        {!isAdminRoute && !isSupervisorRoute && !isSalesRoute && !isOjtRoute && <Header />}
-        <main className={`flex-grow ${isAdminRoute || isSupervisorRoute || isSalesRoute || isOjtRoute ? '' : ''}`}>
+        {!isAdminRoute && !isSupervisorRoute && !isSalesRoute && !isOjtRoute && !isHrRoute && <Header />}
+        <main className={`flex-grow ${isAdminRoute || isSupervisorRoute || isSalesRoute || isOjtRoute || isHrRoute ? '' : ''}`}>
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
@@ -150,6 +155,11 @@ const AppContent = () => {
             <Route path="/supervisor/documents" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />
             <Route path="/supervisor/settings" element={<SupervisorRoute><SupervisorDashboard /></SupervisorRoute>} />
             
+            {/* HR Routes - Protected */}
+            <Route path="/hr" element={<HRRoute><HRDashboard /></HRRoute>} />
+            <Route path="/hr/employees" element={<HRRoute><HREmployees /></HRRoute>} />
+            <Route path="/hr/interns" element={<HRRoute><HRInterns /></HRRoute>} />
+            
             {/* Admin Routes - Protected */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
@@ -163,7 +173,7 @@ const AppContent = () => {
             <Route path="/admin/settings" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           </Routes>
         </main>
-        {!isAdminRoute && !isSupervisorRoute && !isSalesRoute && !isOjtRoute && <Footer />}
+        {!isAdminRoute && !isSupervisorRoute && !isSalesRoute && !isOjtRoute && !isHrRoute && <Footer />}
       </div>
       <GlobalAuthModal />
     </>
