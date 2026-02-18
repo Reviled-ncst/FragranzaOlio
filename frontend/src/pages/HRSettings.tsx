@@ -5,10 +5,7 @@ import {
   Bell,
   Shield,
   Clock,
-  Calendar,
-  Users,
-  Save,
-  Toggle
+  Save
 } from 'lucide-react';
 import HRLayout from '../components/layout/HRLayout';
 
