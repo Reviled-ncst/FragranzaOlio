@@ -80,6 +80,7 @@ try {
     http_response_code(500);
     error_log('OJT Tasks error: ' . $e->getMessage());
     echo json_encode(['error' => 'An internal error occurred']);
+}
 
 /**
  * Expand file_path JSON arrays into individual submission entries

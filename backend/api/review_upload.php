@@ -91,6 +91,8 @@ if (!empty($_FILES)) {
             $extension = $imgMimeToExt[$mimeType] ?? 'jpg';
             $filename = 'review_' . uniqid('', true) . '.' . $extension;
             $destination = $imageDir . $filename;
+            
+            if (move_uploaded_file($tmpName, $destination)) {
                 $uploadedFiles['images'][] = [
                     'filename' => $filename,
                     'path' => '/uploads/reviews/images/' . $filename,

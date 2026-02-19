@@ -19,7 +19,6 @@ define('OJT_LUNCH_END', 13);      // 1:00 PM
 define('OJT_LUNCH_DURATION', 1);  // 1 hour lunch (auto-deducted)
 define('OJT_DAILY_HOURS', 8);     // Target hours per day
 
-require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
 
 header('Content-Type: application/json');
@@ -57,6 +56,7 @@ try {
     http_response_code(500);
     error_log('OJT Attendance error: ' . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'An internal error occurred']);
+}
 
 function handleGet($conn, $path) {
     switch ($path) {

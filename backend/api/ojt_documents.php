@@ -62,6 +62,7 @@ try {
     http_response_code(500);
     error_log('OJT Documents error: ' . $e->getMessage());
     echo json_encode(['error' => 'An internal error occurred']);
+}
 
 /**
  * Get all documents (with filters)

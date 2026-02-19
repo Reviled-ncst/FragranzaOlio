@@ -67,6 +67,7 @@ try {
     http_response_code(500);
     error_log('OJT Notifications error: ' . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'An internal error occurred']);
+}
 
 function getUnreadCount($conn) {
     $userId = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;

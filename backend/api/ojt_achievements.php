@@ -59,6 +59,7 @@ try {
     http_response_code(500);
     error_log('OJT Achievements error: ' . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'An internal error occurred']);
+}
 
 function getAchievementDefinitions($conn) {
     $category = $_GET['category'] ?? null;

@@ -86,6 +86,7 @@ try {
     http_response_code(500);
     error_log('OJT Timesheets error: ' . $e->getMessage());
     echo json_encode(['error' => 'An internal error occurred']);
+}
 
 /**
  * Get all timesheets (with filters)
