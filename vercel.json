@@ -8,8 +8,6 @@
     }
   },
   "rewrites": [
-    { "source": "/api/proxy", "destination": "/api/proxy" },
-    { "source": "/api/image", "destination": "/api/image" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
