@@ -1,566 +1,433 @@
-# FragranzaWeb Development Session Notes
-**Date:** February 7, 2026
-
-## Project Overview
-- **Frontend:** React 18 + TypeScript + Vite (localhost:3000)
-- **Backend:** PHP 8 + MySQL via XAMPP (localhost/FragranzaWeb/backend/api)
-- **Database:** MySQL `fragranza_db`
-- **Two Project Locations:**
-  - Editing: `C:\Users\User\Documents\Projects\FragranzaWeb`
-  - Serving: `C:\xampp\htdocs\FragranzaWeb` (need manual sync)
-
-## Test Credentials
-- **Email:** vendor0qw@gmail.com
-- **Password:** Test@1234
-- **Role:** sales
+# FragranzaWeb Development Documentation
+**Last Updated:** February 19, 2026
 
 ---
 
-## Completed Features This Session
-
-### 1. Fixed Image Display in Sales Products Table
-- **File:** `frontend/src/pages/SalesProducts.tsx`
-- **Issue:** Images weren't displaying because they needed full URL prefix
-- **Fix:** Added `http://localhost/FragranzaWeb/backend` prefix to image paths
-
-### 2. View Product Details Modal
-- **File:** `frontend/src/pages/SalesProducts.tsx`
-- **Features:**
-  - Image gallery with thumbnails
-  - Variation selector (shows different sizes/volumes)
-  - Displays all product info: category, status badges, SKU, price, stock
-  - Each variation can have its own image
-
-### 3. Product Variations System
-- **Files:** 
-  - `frontend/src/pages/SalesProducts.tsx`
-  - `frontend/src/services/productServicePHP.ts`
-  - `backend/api/products.php`
-
-- **ProductVariation Interface:**
-```typescript
-interface ProductVariation {
-  id: string;
-  volume: string;
-  price: number;
-  comparePrice: number;
-  stock: number;
-  sku: string;
-  image?: string;        // URL of uploaded image
-  imageFile?: File;      // File object for upload
-  description?: string;
-  isDefault?: boolean;
-}
-```
-
-- **Features:**
-  - Add/edit/delete variations in "Product Details" tab
-  - Each variation has: volume, price, compare price, stock, SKU, image
-  - Mark variation as default
-  - Upload individual images per variation
-  - Preview variation thumbnails in "Basic Info" tab
-  - Variations stored as JSON in `variations` column in products table
-
-### 4. Step Validation for Add Product Modal
-- **File:** `frontend/src/pages/SalesProducts.tsx`
-- **Validation Rules:**
-  - **Step 1 (Basic Info):** Name, category, and price required
-  - **Step 2 (Details):** Volume required
-  - Shows error message if validation fails
-  - "Next" button disabled until requirements met
-
-### 5. Fixed Variations Not Saving Bug
-- **File:** `backend/api/products.php`
-- **Issue:** PHP was referencing `featured` column instead of `is_featured`
-- **Fix:** Changed `featured` to `is_featured` in INSERT and UPDATE queries (lines ~218, 224)
-
-### 6. Simplified Header Navigation
-- **File:** `frontend/src/components/layout/Header.tsx`
-- **Change:** Sales role navigation simplified to:
-  - Dashboard
-  - Products
-  - Inventory
-- Removed Orders/Customers from header (they're tabs in Dashboard)
-
-### 7. Created Dedicated Inventory Page
-- **New File:** `frontend/src/pages/SalesInventory.tsx`
-- **Route:** `/sales/inventory`
-- **Features:**
-  - Stats grid: Total units, inventory value, in-stock/low-stock/out-of-stock counts
-  - Stock levels table with search and filter
-  - Stock movement indicators (trending up/down)
-  - Restock alerts sidebar
-  - Stock health visualization with progress bars
-  - Recent activity feed
-  - Add/remove stock buttons
-
-### 8. Updated Dashboard Tabs
-- **File:** `frontend/src/pages/SalesDashboard.tsx`
-- **Tabs:** Overview, Orders, Customers, Reports
-- Removed Inventory tab (now separate page)
+## 📋 Table of Contents
+1. [Project Overview](#project-overview)
+2. [Development Phases](#development-phases)
+3. [Quick Start Guide](#quick-start-guide)
+4. [Deployment Procedures](#deployment-procedures)
+5. [Session Logs](#session-logs)
+6. [API Reference](#api-reference)
+7. [Database Schema](#database-schema)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
-## File Changes Summary
+## 🏗️ Project Overview
 
-### Modified Files:
-1. `frontend/src/pages/SalesProducts.tsx` - Product management, variations, view modal
-2. `frontend/src/pages/SalesDashboard.tsx` - Removed inventory tab
-3. `frontend/src/components/layout/Header.tsx` - Added Inventory link
-4. `frontend/src/App.tsx` - Added `/sales/inventory` route
-5. `frontend/src/services/productServicePHP.ts` - ProductVariation interface
-6. `backend/api/products.php` - Fixed `is_featured` column, variations JSON handling
+### Tech Stack
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 + TypeScript + Vite + TailwindCSS |
+| **Backend** | PHP 8 + MySQL via XAMPP |
+| **Database** | MySQL `fragranza_db` |
+| **Auth** | Firebase Authentication + Supabase |
+| **Hosting** | Vercel (frontend) + Cloudflare Tunnel (backend) |
 
-### New Files:
-1. `frontend/src/pages/SalesInventory.tsx` - Dedicated inventory management page
+### Project Locations
+- **Development:** `C:\Users\User\Documents\Projects\FragranzaWeb`
+- **Symlinked Backend:** `C:\xampp\htdocs\backend` → development folder (auto-synced)
 
----
-
-## Database Schema Notes
-
-### Products Table Key Columns:
-- `id`, `name`, `description`, `short_description`
-- `price`, `compare_price`
-- `category_id`
-- `image_main`, `image_gallery` (JSON)
-- `stock_quantity`, `stock_status`
-- `sku`, `volume`
-- `is_featured`, `is_new`, `is_on_sale`
-- `variations` (JSON) - Stores array of ProductVariation objects
-- `status` ('active', 'draft', 'archived')
+### Test Credentials
+| Role | Email | Password |
+|------|-------|----------|
+| Sales | vendor0qw@gmail.com | Test@1234 |
+| Admin | renzrusselbauto@gmail.com | (Firebase) |
 
 ---
 
-## Pending/Future Work
+## 🚀 Development Phases
 
-### Inventory System - COMPLETED ✅
-Created a comprehensive inventory management system with:
-- Multi-branch/location support
-- Stock-in, stock-out, transfer operations
-- Transaction history with audit trail
-- Stock alerts (low stock, out of stock)
-- Branch management
+### Phase 1: Core E-commerce ✅
+- Product catalog with categories
+- Shopping cart functionality
+- User authentication (Firebase)
+- Basic order placement
 
----
+### Phase 2: Sales Module ✅
+- Sales dashboard with analytics
+- Product management (CRUD + variations)
+- Order management with status workflow
+- Customer management
 
-## Inventory Management System
+### Phase 3: Inventory System ✅
+- Multi-branch inventory tracking
+- Stock-in/stock-out operations
+- Transfer between branches
+- Stock alerts and notifications
+- Inventory transactions audit trail
 
-### Database Schema
-Run `database/inventory_schema.sql` in phpMyAdmin to create:
+### Phase 4: Order Flow Enhancement ✅
+- Payment verification workflow
+- Store pickup with QR/barcode scanning
+- COD via Lalamove integration info
+- Order status history tracking
 
-1. **branches** - Store locations (warehouses and retail branches)
-   - Main Warehouse, SM MOA, Greenbelt, Trinoma (default branches)
-   
-2. **branch_inventory** - Stock levels per branch/product
-   - Tracks quantity, min/max levels, last restocked date
-   
-3. **inventory_transactions** - All stock movements
-   - Types: stock_in, stock_out, transfer, adjustment, return, damaged
-   - Tracks source/destination for transfers
-   - Reference numbers, suppliers, costs, remarks
-   
-4. **stock_alerts** - Low stock and out-of-stock alerts
+### Phase 5: Sales POS & Verification 🔄 IN PROGRESS
+- **Barcode/QR scanning for orders** ✅
+- **Auto stock deduction on order confirmation** ✅
+- **Inventory transaction logging** ✅
+- **Sales representative tracking** ✅
+- **Customer order verification** ✅
+- Pickup flow requires barcode scan ✅
+- Customer verifies receipt to complete order ✅
 
-### API Endpoints (`/api/inventory.php`)
-
-| Action | Method | Description |
-|--------|--------|-------------|
-| `?action=branches` | GET | Get all active branches |
-| `?action=stock-levels` | GET | Get stock levels (filter by branch/product) |
-| `?action=transactions` | GET | Get transaction history |
-| `?action=alerts` | GET | Get unresolved stock alerts |
-| `?action=dashboard` | GET | Get inventory dashboard stats |
-| `?action=stock-in` | POST | Receive stock at a branch |
-| `?action=stock-out` | POST | Remove stock from a branch |
-| `?action=transfer` | POST | Transfer between branches |
-| `?action=adjustment` | POST | Adjust stock count |
-| `?action=complete-transfer` | PUT | Complete a pending transfer |
-| `?action=branch` | POST | Create a new branch |
-
-### Frontend Components
-
-**SalesInventory.tsx** - Main inventory page with tabs:
-- **Overview**: Dashboard stats, alerts, pending transfers
-- **Stock Levels**: View/filter stock by branch with actions
-- **Transactions**: Full transaction history with filtering
-- **Branches**: View all branches and their details
-
-**inventoryService.ts** - TypeScript API service with types
-
-### Stock Operations
-
-1. **Stock In** (Receiving):
-   - Select branch, product, quantity
-   - Optional: supplier, unit cost, reference number
-   - Reasons: Purchase order, return, transfer received, etc.
-
-2. **Stock Out** (Removing):
-   - Select branch, product, quantity
-   - Required: reason (Sold, Damaged, Expired, Lost, etc.)
-   - Optional: reference number, remarks
-
-3. **Transfer**:
-   - Select source and destination branches
-   - Immediate or in-transit mode
-   - Deducts from source, adds to destination
-   - Reasons: Branch request, stock balancing, promotional event
-
-4. **Adjustment**:
-   - Set new quantity for a product at a branch
-   - Required: reason (Physical count, system correction, audit)
-   - Logs the difference (+/-) in transactions
+### Phase 6: Planned Features 📋
+- Real-time Lalamove tracking integration
+- Push/SMS notifications
+- Customer ratings & reviews (partially done)
+- Analytics dashboard enhancements
+- Multi-language support
 
 ---
 
-## Quick Commands
+## ⚡ Quick Start Guide
 
-### Start Development Server:
+### 1. Start Development Environment
 ```powershell
-cd C:\xampp\htdocs\FragranzaWeb\frontend
+# Start XAMPP (Apache + MySQL)
+# Then start frontend dev server:
+cd C:\Users\User\Documents\Projects\FragranzaWeb\frontend
 npm run dev
 ```
 
-### Type Check:
+### 2. Start Cloudflare Tunnel (for Vercel testing)
 ```powershell
-cd C:\Users\User\Documents\Projects\FragranzaWeb\frontend
-npx tsc --noEmit
+cd C:\Users\User\Documents\Projects\FragranzaWeb
+.\start-tunnel.ps1
 ```
 
-### Test API:
+### 3. Update Tunnel URL & Deploy to Vercel
 ```powershell
-Invoke-RestMethod -Uri "http://localhost/FragranzaWeb/backend/api/products.php" -Method GET | ConvertTo-Json -Depth 5
+# Get new tunnel URL from tunnel-url.txt, then:
+.\update-tunnel-url.ps1 -NewUrl "https://your-tunnel-url.trycloudflare.com" -Push
 ```
 
-### Sync All Frontend Files:
+### 4. Common Commands
 ```powershell
-Copy-Item -Path "C:\Users\User\Documents\Projects\FragranzaWeb\frontend\src\*" -Destination "C:\xampp\htdocs\FragranzaWeb\frontend\src\" -Recurse -Force
+# Type check
+cd frontend; npx tsc --noEmit
+
+# Test API locally
+Invoke-RestMethod -Uri "http://localhost/backend/api/products.php" -Method GET
+
+# View tunnel URL
+Get-Content tunnel-url.txt
+
+# Check git status
+git status; git log --oneline -5
 ```
 
 ---
 
-## Architecture Notes
+## 📦 Deployment Procedures
 
-### Sales Module Routes:
-- `/sales` - Dashboard (Overview, Orders, Customers, Reports tabs)
-- `/sales/products` - Product management (CRUD, variations)
-- `/sales/inventory` - Stock management
+### Why This Architecture?
+- **Vercel** hosts the React frontend (free, fast CDN, auto-deploy from GitHub)
+- **XAMPP** runs PHP/MySQL backend locally (development flexibility)
+- **Cloudflare Tunnel** exposes local XAMPP to the internet (free, no port forwarding needed)
 
-### API Endpoints:
-- `GET /api/products.php` - List all products
-- `GET /api/products.php?id=X` - Get single product
-- `POST /api/products.php` - Create product
-- `PUT /api/products.php?id=X` - Update product
-- `DELETE /api/products.php?id=X` - Delete product
-- `POST /api/upload.php` - Upload images
+### Local Development (XAMPP)
+1. Backend is symlinked: `C:\xampp\htdocs\backend` → project's `backend` folder
+2. Changes to PHP files are immediately live (no copy needed)
+3. Frontend runs on `localhost:3000` via Vite
+4. Update `.env` for local: `VITE_API_URL=http://localhost/backend/api`
 
----
+### Vercel Production Deployment
 
-*Last updated: February 10, 2026*
-
----
-
-# Session Notes - February 12, 2026
-
-## Current Status
-- **Frontend**: Deployed on Vercel at `https://fragranza-olio.vercel.app`
-- **Backend**: PHP/MySQL - needs hosting (currently local XAMPP)
-- **Database**: MySQL - `fragranza_db`
-
----
-
-## NEXT STEPS: Ubuntu Server Setup
-
-### 1. After Ubuntu is installed, run these commands:
-
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install LAMP stack
-sudo apt install apache2 mysql-server php php-mysql php-curl php-json php-mbstring libapache2-mod-php -y
-
-# Enable Apache modules
-sudo a2enmod rewrite headers
-sudo systemctl restart apache2
-
-# Secure MySQL
-sudo mysql_secure_installation
+#### Architecture Diagram
+```
+┌─────────────┐    ┌──────────────────┐    ┌─────────────────────┐    ┌─────────────┐
+│   Browser   │───▶│  Vercel (React)  │───▶│  Cloudflare Tunnel  │───▶│  XAMPP PHP  │
+│             │    │  /api/proxy.ts   │    │  *.trycloudflare.com│    │  localhost  │
+└─────────────┘    └──────────────────┘    └─────────────────────┘    └─────────────┘
 ```
 
-### 2. Create database and user:
-```bash
-sudo mysql
-```
-```sql
-CREATE DATABASE fragranza_db;
-CREATE USER 'fragranza'@'localhost' IDENTIFIED BY 'your_secure_password';
-GRANT ALL PRIVILEGES ON fragranza_db.* TO 'fragranza'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
+#### How It Works
+1. User visits `fragranza-olio.vercel.app`
+2. React app makes API calls to `/api/proxy`
+3. Vercel serverless function (`api/proxy.ts`) forwards request to Cloudflare tunnel URL
+4. Cloudflare tunnel routes request to `localhost:80` (XAMPP Apache)
+5. PHP processes request, returns JSON
+6. Response flows back through the chain
 
-### 3. Clone the project:
-```bash
-cd /var/www
-sudo git clone https://github.com/Reviled-ncst/FragranzaOlio.git fragranza
-sudo chown -R www-data:www-data /var/www/fragranza
-```
+#### Starting Cloudflare Tunnel
+```powershell
+# Basic start (manual URL update)
+.\start-tunnel.ps1
 
-### 4. Import database:
-```bash
-cd /var/www/fragranza/database
-sudo mysql fragranza_db < COMPLETE_SETUP.sql
+# Auto-detect URL and push to deploy (recommended)
+.\start-tunnel.ps1 -AutoPush
+
+# Watch mode for URL changes
+.\start-tunnel.ps1 -Watch
 ```
 
-### 5. Configure Apache Virtual Host:
-```bash
-sudo nano /etc/apache2/sites-available/fragranza.conf
-```
-```apache
-<VirtualHost *:80>
-    ServerName your-server-ip-or-domain
-    DocumentRoot /var/www/fragranza/backend
-    
-    <Directory /var/www/fragranza/backend>
-        AllowOverride All
-        Require all granted
-    </Directory>
-    
-    # CORS headers
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
-</VirtualHost>
-```
-```bash
-sudo a2ensite fragranza.conf
-sudo a2dissite 000-default.conf
-sudo systemctl restart apache2
+The `start-tunnel.ps1` script:
+1. Starts `cloudflared tunnel --url http://localhost:80`
+2. **Auto-detects** the tunnel URL from cloudflared output
+3. **Auto-updates** `api/proxy.ts` and `api/image.ts`
+4. With `-AutoPush`: commits and pushes to GitHub automatically
+5. Vercel auto-deploys on push
+
+The tunnel URL looks like: `https://random-words.trycloudflare.com`
+- **Changes every time** you restart the tunnel
+- Saved automatically to `tunnel-url.txt`
+
+#### Manual Update (if script fails)
+```powershell
+# 1. Edit api/proxy.ts - change BACKEND_URL
+# 2. Edit api/image.ts - change BACKEND_URL
+# 3. Commit and push
+git add api/proxy.ts api/image.ts tunnel-url.txt
+git commit -m "Update tunnel URL"
+git push origin main
 ```
 
-### 6. Update backend config:
-Edit `/var/www/fragranza/backend/config/database.php`:
-- Set `$host = 'localhost'`
-- Set `$db = 'fragranza_db'`
-- Set `$user = 'fragranza'`
-- Set `$pass = 'your_secure_password'`
-
-### 7. SSL with Let's Encrypt (after domain setup):
-```bash
-sudo apt install certbot python3-certbot-apache -y
-sudo certbot --apache -d your-domain.com
-```
-
----
-
-## Files to Update After Backend is Live
-
-### Update Vercel proxy.ts:
-File: `api/proxy.ts`
-Change `BACKEND_URL` to your server's URL:
-```typescript
-const BACKEND_URL = 'https://your-domain.com';
-```
-
-### Update image proxy (api/image.ts):
-Same change for `BACKEND_URL`
-
-### Commit and push to redeploy Vercel frontend
-
----
-
-## Important URLs & Credentials
-
-- **GitHub Repo**: https://github.com/Reviled-ncst/FragranzaOlio
-- **Vercel Frontend**: https://fragranza-olio.vercel.app
-- **Cloudflare Tunnel ID**: 486637d4-67da-490a-ba20-0bf7e8fcea19 (created but not configured)
-
----
-
-## Vercel Environment Variables
-**DELETE these if still present:**
-- `VITE_API_URL` 
-- `VITE_IMAGE_URL`
-
-These were pointing to old InfinityFree hosting which is broken.
-
----
-
-## Database Schema
-Use `/database/COMPLETE_SETUP.sql` for full schema import.
-
----
-
-## Previous Session Notes - February 10, 2026
-
-## Overview
-This session focused on enhancing the checkout experience for Fragranza customers, improving notification visibility, and ensuring mobile responsiveness across all pages.
-
----
-
-## Completed Features
-
-### 1. Store Pickup - Location Map
-**File:** `frontend/src/pages/Checkout.tsx`
-
-When customers select "Store Pickup" as their payment method, they now see:
-- **Interactive Google Maps embed** showing the exact store location
-- **Store details card** with:
-  - Store name: Fragranza Store
-  - Address: Blk 16 Lot1-A Brgy San Dionisio, Dasmariñas, Cavite
-  - Phone: +63 912 345 6789
-  - Hours: Mon-Sat: 9AM-7PM, Sun: 10AM-5PM
-- **"Get Directions" button** that opens Google Maps navigation
-
-**Store Coordinates:**
-- Latitude: 14.3294
-- Longitude: 120.9367
-
----
-
-### 2. Cash on Delivery - Lalamove Integration Info
-**File:** `frontend/src/pages/Checkout.tsx`
-
-When customers select "Cash on Delivery via Lalamove":
-
-#### During Checkout:
-- **Info banner** explaining Lalamove delivery partnership
-- **Estimated delivery time: Within 24 hours**
-- Explanation: "We need time to prepare your order and find an available rider"
-- Notification reminder about tracking link
-
-#### Order Summary Section:
-- Changed "Est. delivery" from showing Lalamove's rider ETA (e.g., "16 mins") to **"Within 24 hours"**
-- This reflects the actual business process: order preparation + finding rider
-
-#### After Order Placed (Success Screen):
-- Clear indication of COD via Lalamove
-- Blue info box with 24-hour delivery estimate
-- Gold notification box about upcoming tracking link
-- Confirmation email display
-
----
-
-### 3. Notification Bell in Header
-**File:** `frontend/src/components/layout/Header.tsx`
-
-**Changes:**
-- Added `NotificationDropdown` component beside the profile dropdown button
-- Visible on both desktop and mobile views
-- **Removed** the redundant "Notifications & Help" option from inside the user dropdown menu
-
-**Desktop:** Notification bell appears next to shopping cart icon
-**Mobile:** Notification bell appears with slightly scaled down size (scale-90)
-
----
-
-### 4. Mobile Responsiveness - SalesOrders Page
-**File:** `frontend/src/pages/SalesOrders.tsx`
-
-**Improvements Made:**
-
-#### Stats Cards:
-- Changed grid from `grid-cols-2 lg:grid-cols-5` to `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`
-- Reduced padding on mobile: `p-3 sm:p-4`
-- Smaller text on mobile with `text-base sm:text-xl`
-
-#### Filter Form:
-- Split into two responsive rows:
-  - Row 1: Search input + Barcode scan button
-  - Row 2: Filter dropdowns + Clear/Refresh buttons
-- Better spacing and sizing for mobile
-
-#### Orders Table → Mobile Cards:
-- **Desktop (lg+):** Traditional table view
-- **Mobile (<lg):** Card-based layout showing:
-  - Order number with status badge
-  - Customer name and email
-  - Order summary (items, total, date)
-  - Payment status
-  - Quick action buttons (View, Update Status)
-
----
-
-## Payment Methods Configuration
-
-```typescript
-const paymentMethods = [
-  { 
-    id: 'cod', 
-    name: 'Cash on Delivery via Lalamove', 
-    icon: Truck, 
-    description: 'Delivered within 24 hours. Tracking link sent via notification.' 
-  },
-  { 
-    id: 'store_pickup', 
-    name: 'Store Pickup', 
-    icon: Store, 
-    description: 'Pick up your order at our store and pay in cash or via QR' 
-  },
-];
-```
-
----
-
-## Files Modified (Feb 10, 2026)
-
-| File | Changes |
+#### Important Files
+| File | Purpose |
 |------|---------|
-| `frontend/src/pages/Checkout.tsx` | Store map, Lalamove info, 24hr delivery estimate |
-| `frontend/src/components/layout/Header.tsx` | Notification bell beside profile |
-| `frontend/src/pages/SalesOrders.tsx` | Mobile card view, responsive filters |
+| `api/proxy.ts` | Vercel serverless function - forwards API calls to tunnel |
+| `api/image.ts` | Vercel serverless function - proxies images from backend |
+| `vercel.json` | Build config, rewrites `/api/*` to serverless functions |
+| `tunnel-url.txt` | Current active tunnel URL (reference) |
+| `start-tunnel.ps1` | **Main script** - starts tunnel, auto-detects URL, updates proxy files |
+| `update-tunnel-url.ps1` | Manual URL update (if auto-detect fails) |
 
----
+#### Keeping Tunnel Running
+The tunnel must stay running while testing on Vercel:
+- Use `start-tunnel.ps1` which runs in background
+- Or run cloudflared in a separate terminal
+- If tunnel disconnects, you'll get "Unexpected token '<'" errors (HTML error page)
 
-## Technical Notes
+### Switching Between Local and Vercel Testing
 
-### Google Maps Embed API
-```html
-<iframe
-  src="https://www.google.com/maps/embed/v1/place?key=API_KEY&q=14.3294,120.9367&zoom=16"
-  width="100%"
-  height="200"
-  allowFullScreen
-  loading="lazy"
-/>
+**For Local Development:**
+```powershell
+# frontend/.env
+VITE_API_URL=http://localhost/backend/api
+VITE_IMAGE_URL=http://localhost/backend
 ```
 
-### Responsive Breakpoints Used
-- `sm`: 640px
-- `md`: 768px  
-- `lg`: 1024px
-- `xl`: 1280px
+**For Vercel (tunnel):**
+- Don't set VITE_API_URL (Vercel uses `/api/proxy` route)
+- Frontend code detects production and uses proxy automatically
 
-### Icons Added/Used
-- `Clock` - For delivery time estimates
-- `Bell` - For notification reminders
-- `Truck` - For COD/delivery
-- `Store` - For store pickup
-- `Navigation2` - For directions
-- `Phone` - For store contact
-- `ExternalLink` - For external links
-- `Info` - For info banners
+### Database Updates
+```powershell
+# Run SQL files via MySQL CLI
+C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE path/to/script.sql"
 
----
-
-## Deployment
-All modified files were copied to XAMPP:
-```
-C:\xampp\htdocs\FragranzaWeb\frontend\src\pages\Checkout.tsx
-C:\xampp\htdocs\FragranzaWeb\frontend\src\components\layout\Header.tsx
-C:\xampp\htdocs\FragranzaWeb\frontend\src\pages\SalesOrders.tsx
+# Or use phpMyAdmin at http://localhost/phpmyadmin
 ```
 
 ---
 
-## Future Considerations
+## 📝 Session Logs
 
-1. **Customer Ratings** - Add rating system after order completion
-2. **Real-time Tracking** - Integrate actual Lalamove tracking API
-3. **Push Notifications** - Browser push notifications for order updates
-4. **SMS Notifications** - Send tracking links via SMS as backup
-5. **Order Preparation Time** - Track and display actual preparation time
+### February 19, 2026 - Sales POS & Customer Verification
+**Focus:** Order pickup flow and customer verification
+
+#### Completed:
+1. **Barcode Scan Required for Pickup**
+   - Removed manual "Picked Up" button for `paid_ready_pickup` status
+   - Added "Scan Barcode to Complete" message
+   - Pickup orders must be completed via barcode/QR scan
+
+2. **Customer Verification Endpoint**
+   - New endpoint: `POST /sales.php?action=customer-verify-order`
+   - Accepts `order_number` + `email` to verify ownership
+   - Only allows verification of `delivered` or `picked_up` orders
+   - Updates status to `completed` with `customer_verified_at` timestamp
+
+3. **Frontend Customer Verification**
+   - Added `verifyOrderReceipt()` to `orderService.ts`
+   - Updated Orders.tsx to use verification endpoint
+   - Changed button text: "Mark as Completed" → "Verify Receipt"
+
+4. **Database Updates**
+   - Added `customer_verified_at DATETIME` column to orders table
+   - Added `processed_by INT` and `processed_at DATETIME` columns
+
+#### Files Modified:
+- `backend/api/sales.php` - customerVerifyOrder() function
+- `frontend/src/services/orderService.ts` - verifyOrderReceipt()
+- `frontend/src/pages/Orders.tsx` - customer verification UI
+- `frontend/src/pages/SalesOrders.tsx` - scan-only pickup
 
 ---
 
-*Session End: February 10, 2026*
+### February 18, 2026 - Auto Stock Deduction & Sales Rep Tracking
+**Focus:** Inventory automation
+
+#### Completed:
+1. **Auto Stock Deduction**
+   - Stock deducted when order status changes to: `confirmed`, `processing`, `picked_up`, `delivered`
+   - Handles both product base stock and variation stock
+   - Deduction only happens once (checks if already processed)
+
+2. **Inventory Transaction Logging**
+   - Creates `stock_out` transaction for each order item
+   - Records: quantity, product, reference (order number), sales rep name
+
+3. **Sales Representative Tracking**
+   - `processed_by` column stores user ID of sales rep
+   - `processed_at` column stores timestamp
+   - Sent from frontend via `user_id` in status update request
+
+4. **Physical Barcode Scanner Support**
+   - Detects rapid keystrokes (scanner input)
+   - Shows confirmation dialog before processing
+   - Works with USB/Bluetooth barcode scanners
+
+---
+
+### February 17, 2026 - Customer Data Fix
+**Focus:** Customer list showing "No customers found"
+
+#### Issue:
+- System was querying non-existent `customers` table
+
+#### Fix:
+- Query `users` table where `email_verified = 1`
+- Join with orders for stats: total_orders, total_spent, last_order
+
+---
+
+### February 12-14, 2026 - Vercel Deployment Setup
+**Focus:** Production deployment architecture
+
+#### Completed:
+- Set up Cloudflare Tunnel for XAMPP backend access
+- Created Vercel serverless proxy functions
+- Implemented auto-update scripts for tunnel URL
+- Configured GitHub auto-deploy integration
+
+---
+
+### February 10, 2026 - Checkout & Mobile UX
+**Focus:** Checkout experience improvements
+
+#### Completed:
+1. **Store Pickup Map** - Google Maps embed showing store location
+2. **Lalamove COD Info** - 24-hour delivery estimate, tracking info
+3. **Notification Bell** - Added to header
+4. **Mobile Responsive SalesOrders** - Card layout on mobile
+
+---
+
+### February 7, 2026 - Inventory System
+**Focus:** Multi-branch inventory management
+
+#### Completed:
+1. **Branch Management** - Multiple store locations
+2. **Stock Operations** - In/out/transfer/adjustment
+3. **Transaction History** - Full audit trail
+4. **Stock Alerts** - Low stock notifications
+5. **Dashboard Stats** - Inventory value, stock health
+
+---
+
+## 📡 API Reference
+
+### Products API (`/api/products.php`)
+| Method | Action | Description |
+|--------|--------|-------------|
+| GET | `?action=list` | List all products |
+| GET | `?id=X` | Get single product |
+| POST | - | Create product |
+| PUT | `?id=X` | Update product |
+| DELETE | `?id=X` | Delete product |
+
+### Sales API (`/api/sales.php`)
+| Method | Action | Description |
+|--------|--------|-------------|
+| GET | `?action=orders` | List orders |
+| GET | `?action=customers` | List customers |
+| POST | `?action=customer-verify-order` | Customer verifies receipt |
+| PUT | `?action=order-status` | Update order status |
+
+### Inventory API (`/api/inventory.php`)
+| Method | Action | Description |
+|--------|--------|-------------|
+| GET | `?action=branches` | List branches |
+| GET | `?action=stock-levels` | Get stock levels |
+| GET | `?action=transactions` | Transaction history |
+| POST | `?action=stock-in` | Receive stock |
+| POST | `?action=stock-out` | Remove stock |
+| POST | `?action=transfer` | Transfer stock |
+
+---
+
+## 🗄️ Database Schema
+
+### Key Tables
+| Table | Purpose |
+|-------|---------|
+| `users` | User accounts (Firebase linked) |
+| `products` | Product catalog |
+| `categories` | Product categories |
+| `orders` | Customer orders |
+| `order_items` | Order line items |
+| `order_status_history` | Status change log |
+| `branches` | Store locations |
+| `branch_inventory` | Stock per branch |
+| `inventory_transactions` | Stock movement audit |
+
+### Important Columns in `orders`
+- `status` - Order status enum
+- `processed_by` - Sales rep user ID
+- `processed_at` - When order was processed
+- `customer_verified_at` - When customer confirmed receipt
+
+### Order Status Flow
+```
+ordered → paid_waiting_approval → confirmed → processing → in_transit → delivered → completed
+                                     ↓
+                                paid_ready_pickup → picked_up → completed (via customer verify)
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### "Unexpected token '<'" Error
+**Cause:** API returning HTML instead of JSON (wrong URL or server error)
+
+**Fix:**
+1. Check tunnel is running: `Get-Content tunnel-url.txt`
+2. Verify proxy files have correct URL: `api/proxy.ts`, `api/image.ts`
+3. Update and redeploy: `.\update-tunnel-url.ps1 -NewUrl "..." -Push`
+
+### Orders Not Showing
+**Cause:** Missing customer_id link or wrong email
+
+**Fix:** Check `orders` table has correct `customer_id` and `shipping_email`
+
+### Stock Not Deducting
+**Cause:** Order status not reaching deduction triggers
+
+**Fix:** Verify status is one of: `confirmed`, `processing`, `picked_up`, `delivered`
+
+### Scanner Not Working
+**Cause:** Scanner not in HID keyboard mode
+
+**Fix:** Configure scanner to emulate keyboard input with Enter suffix
+
+---
+
+## 🔗 Important URLs
+
+| Resource | URL |
+|----------|-----|
+| GitHub Repo | https://github.com/Reviled-ncst/FragranzaOlio |
+| Vercel Frontend | https://fragranza-olio.vercel.app |
+| Local Frontend | http://localhost:3000 |
+| Local API | http://localhost/backend/api |
+| phpMyAdmin | http://localhost/phpmyadmin |
+
+---
+
+*Documentation maintained by development team*

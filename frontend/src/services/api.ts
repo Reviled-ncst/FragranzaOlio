@@ -8,7 +8,7 @@ const isProduction = typeof window !== 'undefined' &&
 const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
 // Direct backend URL for file uploads (bypasses Vercel proxy size limits)
-const DIRECT_BACKEND_URL = 'https://wax-harris-anchor-latex.trycloudflare.com/FragranzaWeb/backend/api';
+const DIRECT_BACKEND_URL = 'https://picked-journalists-public-symphony.trycloudflare.com/backend/api';
 
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;

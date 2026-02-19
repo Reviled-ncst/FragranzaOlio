@@ -114,9 +114,9 @@ const Orders = () => {
       variant: 'success' as const,
     },
     complete: {
-      title: 'Complete Order',
-      message: 'Confirm that your order is complete? This will finalize the order and allow you to rate the products.',
-      confirmText: 'Yes, Complete Order',
+      title: 'Verify Order Receipt',
+      message: 'Please confirm that you have received your order in good condition. This will complete your order and allow you to rate the products.',
+      confirmText: 'Verify & Complete',
       variant: 'success' as const,
     },
     cancel: {
@@ -157,8 +157,16 @@ const Orders = () => {
           console.log('📦 confirmDelivery result:', result);
           break;
         case 'complete':
-          console.log('📦 Calling completeOrder for:', confirmDialog.orderId);
-          result = await orderService.completeOrder(confirmDialog.orderId);
+          // Use verifyOrderReceipt for customer verification
+          const orderToVerify = orders.find(o => o.id === confirmDialog.orderId);
+          if (orderToVerify && user?.email) {
+            console.log('📦 Calling verifyOrderReceipt for:', orderToVerify.order_number);
+            result = await orderService.verifyOrderReceipt(orderToVerify.order_number, user.email);
+          } else {
+            // Fallback to old method
+            console.log('📦 Fallback: Calling completeOrder for:', confirmDialog.orderId);
+            result = await orderService.completeOrder(confirmDialog.orderId);
+          }
           console.log('📦 completeOrder result:', result);
           break;
         case 'cancel':
@@ -822,7 +830,7 @@ const Orders = () => {
                               <p className="text-green-400 font-semibold text-sm">
                                 {order.status === 'delivered' ? 'Your order has arrived!' : 'Order picked up successfully!'}
                               </p>
-                              <p className="text-gray-400 text-xs mt-0.5">Confirm receipt to complete your order and unlock ratings</p>
+                              <p className="text-gray-400 text-xs mt-0.5">Verify receipt to complete your order and unlock ratings</p>
                             </div>
                           </div>
                           <button
@@ -833,7 +841,7 @@ const Orders = () => {
                             className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white text-sm font-bold rounded-lg transition-all shadow-lg shadow-green-500/25 hover:shadow-green-500/40 hover:scale-[1.02]"
                           >
                             <CheckCircle size={16} />
-                            Confirm & Complete
+                            Verify Receipt
                           </button>
                         </div>
                       </div>
@@ -1134,14 +1142,14 @@ const Orders = () => {
                     </button>
                   )}
                   
-                  {/* Mark as Completed for delivered/picked_up orders */}
+                  {/* Verify Receipt for delivered/picked_up orders */}
                   {(selectedOrder.status === 'delivered' || selectedOrder.status === 'picked_up') && (
                     <button
                       onClick={() => openConfirmDialog('complete', selectedOrder.id)}
                       className="flex items-center justify-center gap-2 bg-green-500/10 hover:bg-green-500/20 text-green-500 font-medium px-4 py-2.5 rounded-lg transition-colors"
                     >
                       <CheckCircle size={18} />
-                      Mark as Completed
+                      Verify Receipt
                     </button>
                   )}
                   

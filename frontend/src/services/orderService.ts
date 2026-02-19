@@ -589,6 +589,33 @@ const orderService = {
       console.error('Failed to get product reviews:', error);
       return { success: false };
     }
+  },
+
+  /**
+   * Customer verifies order receipt (marks as completed with verification timestamp)
+   */
+  async verifyOrderReceipt(orderNumber: string, email: string): Promise<{ success: boolean; message?: string }> {
+    try {
+      console.log('📦 Verifying order receipt:', orderNumber, 'for email:', email);
+      
+      const response: any = await api.post('/sales.php?action=customer-verify-order', {
+        order_number: orderNumber,
+        email: email
+      });
+      
+      console.log('📦 Verify order response:', response);
+      
+      return {
+        success: response.success !== false,
+        message: response.message || 'Order verified successfully'
+      };
+    } catch (error: any) {
+      console.error('📦 Verify order error:', error);
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to verify order'
+      };
+    }
   }
 };
 

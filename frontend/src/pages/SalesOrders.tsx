@@ -82,6 +82,7 @@ interface Order {
   status: string;
   payment_status: string;
   payment_method: string;
+  shipping_method?: string;
   created_at: string;
   shipping_city: string;
 }
@@ -117,6 +118,7 @@ const SalesOrders = () => {
     status: 'pending' | 'success' | 'error' | 'already_completed';
     message?: string;
     orderId?: number;
+    isPickup?: boolean;
   } | null>(null);
   const [isProcessingTransaction, setIsProcessingTransaction] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -274,7 +276,7 @@ const SalesOrders = () => {
           const total = parseFloat(foundOrder.total_amount) || 0;
           
           // Check if order is already completed
-          if (foundOrder.status === 'delivered' || foundOrder.status === 'completed') {
+          if (foundOrder.status === 'delivered' || foundOrder.status === 'completed' || foundOrder.status === 'picked_up') {
             setConfirmationData({
               orderNumber,
               customerName,
@@ -286,14 +288,22 @@ const SalesOrders = () => {
             return;
           }
           
-          // For pickup orders or any pending order, show confirmation dialog first
-          if (foundOrder.shipping_method === 'store_pickup' || foundOrder.status === 'pending' || foundOrder.status === 'processing' || foundOrder.status === 'ready') {
+          // For pickup orders (ready for pickup), show confirmation dialog to complete
+          const isPickupOrder = foundOrder.shipping_method === 'store_pickup' || 
+                                foundOrder.payment_method === 'store_pickup' ||
+                                foundOrder.payment_method === 'cop' ||
+                                foundOrder.status === 'paid_ready_pickup' ||
+                                foundOrder.status === 'ready';
+          
+          // Show confirmation dialog for pickup orders or orders that need processing
+          if (isPickupOrder || foundOrder.status === 'pending' || foundOrder.status === 'processing') {
             setConfirmationData({
               orderNumber,
               customerName,
               total,
-              status: 'pending',
-              orderId: foundOrder.id
+              status: 'pending',  // This is the dialog state, not the order status
+              orderId: foundOrder.id,
+              isPickup: isPickupOrder
             });
             setShowConfirmation(true);
             fetchOrderDetail(foundOrder.id);
@@ -608,12 +618,19 @@ const SalesOrders = () => {
       customerName = order.customer_email || 'Customer';
     }
     
+    // Check if this is a pickup order
+    const isPickup = order.shipping_method === 'store_pickup' || 
+                     order.payment_method === 'store_pickup' ||
+                     order.payment_method === 'cop' ||
+                     order.status === 'paid_ready_pickup';
+    
     setConfirmationData({
       orderNumber: order.order_number,
       customerName: customerName,
       total: order.total_amount,
       status: 'pending',
-      orderId: order.id
+      orderId: order.id,
+      isPickup
     });
     setShowConfirmation(true);
   };
@@ -625,11 +642,17 @@ const SalesOrders = () => {
     setIsProcessingTransaction(true);
     
     try {
-      // Update order status to delivered
+      // Update order status - use 'picked_up' for pickup orders, 'delivered' for delivery
+      const newStatus = confirmationData.isPickup ? 'picked_up' : 'delivered';
       await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: confirmationData.orderId, status: 'delivered', payment_status: 'paid' })
+        body: JSON.stringify({ 
+          id: confirmationData.orderId, 
+          status: newStatus, 
+          payment_status: 'paid',
+          user_id: user?.id // Track which sales rep completed the pickup
+        })
       });
       
       // Show success state
@@ -796,9 +819,8 @@ const SalesOrders = () => {
           { label: 'Reject', status: 'cancelled', color: 'bg-red-500/20 text-red-400 hover:bg-red-500/30', icon: 'cancel' }
         ];
       case 'paid_ready_pickup':
-        return [
-          { label: 'Picked Up', status: 'picked_up', color: 'bg-green-500 hover:bg-green-600', icon: 'check' }
-        ];
+        // No manual button - must scan barcode to complete pickup
+        return [];
       case 'processing':
         return [
           { label: 'Ship', status: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600', icon: 'truck' },
@@ -1086,7 +1108,7 @@ const SalesOrders = () => {
                         transition={{ delay: 0.2 }}
                         className="text-xl font-bold text-white mb-2"
                       >
-                        Complete Transaction?
+                        {confirmationData.isPickup ? 'Complete Pickup?' : 'Complete Transaction?'}
                       </motion.h3>
                       <motion.p
                         initial={{ opacity: 0, y: 10 }}
@@ -1094,7 +1116,10 @@ const SalesOrders = () => {
                         transition={{ delay: 0.3 }}
                         className="text-gray-400 text-sm mb-2"
                       >
-                        This will mark the order as delivered and payment as received.
+                        {confirmationData.isPickup 
+                          ? 'This will mark the order as picked up and payment as received.'
+                          : 'This will mark the order as delivered and payment as received.'
+                        }
                       </motion.p>
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
@@ -1134,7 +1159,7 @@ const SalesOrders = () => {
                             Processing...
                           </>
                         ) : (
-                          'Confirm'
+                          confirmationData.isPickup ? 'Confirm Pickup' : 'Confirm'
                         )}
                       </button>
                     </div>
@@ -1159,7 +1184,7 @@ const SalesOrders = () => {
                         transition={{ delay: 0.3 }}
                         className="text-2xl font-bold text-white mb-1"
                       >
-                        Complete!
+                        {confirmationData.isPickup ? 'Pickup Complete!' : 'Complete!'}
                       </motion.h3>
                       <motion.p
                         initial={{ opacity: 0, y: 10 }}
@@ -1363,6 +1388,13 @@ const SalesOrders = () => {
                           <Eye size={14} />
                           View
                         </button>
+                        {/* Show scan prompt for pickup orders */}
+                        {(order.status === 'paid_ready_pickup' || order.status === 'ready') && (
+                          <span className="flex items-center gap-1 px-3 py-1.5 bg-cyan-500/20 rounded-lg text-cyan-400 text-xs font-medium">
+                            <QrCode size={14} />
+                            Scan Barcode to Complete
+                          </span>
+                        )}
                         {/* Status-specific action buttons */}
                         {getStatusActions(order.status).map((action, idx) => (
                           <button 

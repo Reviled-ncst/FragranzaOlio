@@ -126,6 +126,9 @@ function handlePostRequests($db, $action) {
         case 'change_password':
             changePassword($db, $data);
             break;
+        case 'customer-verify-order':
+            customerVerifyOrder($db, $data);
+            break;
         default:
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid action']);
@@ -671,9 +674,10 @@ function updateOrderStatus($db, $data) {
     
     $orderId = intval($data['id']); // Ensure it's an integer
     $newStatus = trim($data['status']);
+    $salesRepId = $data['processed_by'] ?? $data['sales_rep_id'] ?? $data['user_id'] ?? null;
     
     // Validate status is a valid value
-    $validStatuses = ['ordered', 'paid_waiting_approval', 'cod_waiting_approval', 'paid_ready_pickup', 
+    $validStatuses = ['pending', 'ordered', 'confirmed', 'ready', 'paid_waiting_approval', 'cod_waiting_approval', 'paid_ready_pickup', 
                       'processing', 'in_transit', 'waiting_client', 'delivered', 'picked_up', 
                       'completed', 'cancelled', 'return_requested', 'return_approved', 'returned', 
                       'refund_requested', 'refunded'];
@@ -684,7 +688,7 @@ function updateOrderStatus($db, $data) {
         return;
     }
     
-    error_log("Updating order $orderId to status: $newStatus");
+    error_log("Updating order $orderId to status: $newStatus by sales rep: $salesRepId");
     
     $sql = "UPDATE orders SET status = :status";
     $params = [':id' => $orderId, ':status' => $newStatus];
@@ -734,8 +738,95 @@ function updateOrderStatus($db, $data) {
     // Set delivered_at timestamp
     if ($newStatus === 'delivered' || $newStatus === 'picked_up') {
         $sql .= ", delivered_at = NOW()";
+        // Track sales rep who completed the pickup/delivery
+        if ($salesRepId) {
+            $sql .= ", processed_by = :processed_by, processed_at = NOW()";
+            $params[':processed_by'] = $salesRepId;
+        }
     }
     
+    // When order is confirmed/processing/picked_up, deduct stock and log inventory transaction
+    if (in_array($newStatus, ['confirmed', 'processing', 'picked_up', 'delivered'])) {
+        // Track sales rep who processed the order
+        if ($salesRepId && !isset($params[':processed_by'])) {
+            $sql .= ", processed_by = :processed_by, processed_at = NOW()";
+            $params[':processed_by'] = $salesRepId;
+        }
+        
+        // Deduct stock for each order item
+        try {
+            // First check if stock was already deducted (to prevent double deduction)
+            $checkDeductedStmt = $db->prepare("SELECT processed_by FROM orders WHERE id = :id AND processed_by IS NOT NULL");
+            $checkDeductedStmt->execute([':id' => $orderId]);
+            $alreadyProcessed = $checkDeductedStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$alreadyProcessed) {
+                // Get order items
+                $itemsStmt = $db->prepare("SELECT oi.product_id, oi.variation_id, oi.quantity, oi.product_name, p.stock_quantity as current_stock 
+                    FROM order_items oi 
+                    LEFT JOIN products p ON oi.product_id = p.id 
+                    WHERE oi.order_id = :order_id");
+                $itemsStmt->execute([':order_id' => $orderId]);
+                $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get order number for reference
+                $orderStmt = $db->prepare("SELECT order_number FROM orders WHERE id = :id");
+                $orderStmt->execute([':id' => $orderId]);
+                $orderInfo = $orderStmt->fetch(PDO::FETCH_ASSOC);
+                $orderNumber = $orderInfo['order_number'] ?? "ORD-$orderId";
+                
+                // Get sales rep name
+                $salesRepName = 'System';
+                if ($salesRepId) {
+                    $repStmt = $db->prepare("SELECT CONCAT(first_name, ' ', last_name) as name FROM users WHERE id = :id");
+                    $repStmt->execute([':id' => $salesRepId]);
+                    $rep = $repStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($rep) $salesRepName = $rep['name'];
+                }
+                
+                foreach ($items as $item) {
+                    $productId = $item['product_id'];
+                    $quantity = $item['quantity'];
+                    $currentStock = $item['current_stock'] ?? 0;
+                    
+                    // Deduct from product stock
+                    if ($productId) {
+                        $deductStmt = $db->prepare("UPDATE products SET stock_quantity = GREATEST(stock_quantity - :qty, 0) WHERE id = :product_id");
+                        $deductStmt->execute([':qty' => $quantity, ':product_id' => $productId]);
+                        error_log("Deducted $quantity units from product $productId for order $orderId");
+                        
+                        // Also deduct from variation if specified
+                        if (!empty($item['variation_id'])) {
+                            $deductVarStmt = $db->prepare("UPDATE product_variations SET stock_quantity = GREATEST(stock_quantity - :qty, 0) WHERE id = :variation_id");
+                            $deductVarStmt->execute([':qty' => $quantity, ':variation_id' => $item['variation_id']]);
+                        }
+                        
+                        // Log inventory transaction
+                        $transactionStmt = $db->prepare("INSERT INTO inventory_transactions 
+                            (product_id, variation_id, transaction_type, quantity, quantity_before, quantity_after, 
+                             reference_number, reason, remarks, status, created_by, created_at)
+                            VALUES (:product_id, :variation_id, 'stock_out', :quantity, :qty_before, :qty_after,
+                                    :reference, :reason, :remarks, 'completed', :created_by, NOW())");
+                        $transactionStmt->execute([
+                            ':product_id' => $productId,
+                            ':variation_id' => $item['variation_id'] ?? null,
+                            ':quantity' => $quantity,
+                            ':qty_before' => $currentStock,
+                            ':qty_after' => max($currentStock - $quantity, 0),
+                            ':reference' => $orderNumber,
+                            ':reason' => 'Sales Order',
+                            ':remarks' => "Sold by: $salesRepName | Order: $orderNumber | Product: " . ($item['product_name'] ?? 'Unknown'),
+                            ':created_by' => $salesRepId
+                        ]);
+                        error_log("Logged inventory transaction for product $productId, order $orderNumber, sales rep: $salesRepName");
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Failed to deduct inventory for order $orderId: " . $e->getMessage());
+        }
+    }
+
     // Handle return/refund processing - restore inventory
     if ($newStatus === 'returned' || $newStatus === 'refunded') {
         // Mark payment as refunded
@@ -751,14 +842,14 @@ function updateOrderStatus($db, $data) {
             foreach ($items as $item) {
                 // Restore stock to variation if variation_id exists
                 if (!empty($item['variation_id'])) {
-                    $restoreStmt = $db->prepare("UPDATE product_variations SET stock = stock + :qty WHERE id = :variation_id");
+                    $restoreStmt = $db->prepare("UPDATE product_variations SET stock_quantity = stock_quantity + :qty WHERE id = :variation_id");
                     $restoreStmt->execute([':qty' => $item['quantity'], ':variation_id' => $item['variation_id']]);
                     error_log("Restored {$item['quantity']} units to variation {$item['variation_id']}");
                 }
                 
                 // Also update main product stock if tracking at product level
                 if (!empty($item['product_id'])) {
-                    $restoreProductStmt = $db->prepare("UPDATE products SET stock = stock + :qty WHERE id = :product_id");
+                    $restoreProductStmt = $db->prepare("UPDATE products SET stock_quantity = stock_quantity + :qty WHERE id = :product_id");
                     $restoreProductStmt->execute([':qty' => $item['quantity'], ':product_id' => $item['product_id']]);
                     error_log("Restored {$item['quantity']} units to product {$item['product_id']}");
                 }
@@ -800,6 +891,96 @@ function updateOrderStatus($db, $data) {
     }
     
     echo json_encode(['success' => true, 'message' => 'Order status updated to ' . $newStatus, 'rows_affected' => $rowsAffected]);
+}
+
+/**
+ * Customer verification of order receipt
+ * Allows customer to confirm they received their order (picked_up or delivered -> completed)
+ */
+function customerVerifyOrder($db, $data) {
+    $orderNumber = $data['order_number'] ?? null;
+    $email = $data['email'] ?? null;
+    $verificationCode = $data['verification_code'] ?? null; // Optional: QR code data
+    
+    if (!$orderNumber && !$verificationCode) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Order number or verification code required']);
+        return;
+    }
+    
+    // If verification code provided (from QR scan), parse it
+    if ($verificationCode && strpos($verificationCode, 'FRAGRANZA|') === 0) {
+        $parts = explode('|', $verificationCode);
+        $orderNumber = $parts[1] ?? null;
+    }
+    
+    // Find the order
+    $findSql = "SELECT o.id, o.order_number, o.status, o.shipping_email, o.customer_id, c.email as customer_email
+                FROM orders o 
+                LEFT JOIN customers c ON o.customer_id = c.id
+                WHERE o.order_number = :order_number";
+    $params = [':order_number' => $orderNumber];
+    
+    // If email provided, verify it matches
+    if ($email) {
+        $findSql .= " AND (o.shipping_email = :email OR c.email = :email2)";
+        $params[':email'] = $email;
+        $params[':email2'] = $email;
+    }
+    
+    $findStmt = $db->prepare($findSql);
+    $findStmt->execute($params);
+    $order = $findStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$order) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'Order not found or email does not match']);
+        return;
+    }
+    
+    // Check if order is in a state that can be verified
+    $verifiableStatuses = ['delivered', 'picked_up'];
+    if (!in_array($order['status'], $verifiableStatuses)) {
+        // If already completed, return success message
+        if ($order['status'] === 'completed') {
+            echo json_encode(['success' => true, 'message' => 'Order already verified', 'already_verified' => true]);
+            return;
+        }
+        
+        http_response_code(400);
+        echo json_encode([
+            'success' => false, 
+            'message' => 'Order cannot be verified yet. Current status: ' . $order['status'],
+            'current_status' => $order['status']
+        ]);
+        return;
+    }
+    
+    // Update order to completed
+    $updateStmt = $db->prepare("
+        UPDATE orders 
+        SET status = 'completed', 
+            customer_verified_at = NOW()
+        WHERE id = :id
+    ");
+    $updateStmt->execute([':id' => $order['id']]);
+    
+    // Log status change
+    try {
+        $historyStmt = $db->prepare("
+            INSERT INTO order_status_history (order_id, status, note, changed_by)
+            VALUES (:order_id, 'completed', 'Verified by customer', 'customer')
+        ");
+        $historyStmt->execute([':order_id' => $order['id']]);
+    } catch (Exception $e) {
+        error_log("History logging failed: " . $e->getMessage());
+    }
+    
+    echo json_encode([
+        'success' => true, 
+        'message' => 'Order verified successfully! Thank you for shopping with Fragranza Olio.',
+        'order_number' => $orderNumber
+    ]);
 }
 
 function updateOrder($db, $data) {
