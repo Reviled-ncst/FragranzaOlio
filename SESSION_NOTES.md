@@ -77,7 +77,21 @@
 - Pickup flow requires barcode scan ✅
 - Customer verifies receipt to complete order ✅
 
-### Phase 6: Planned Features 📋
+### Phase 6: Security Hardening ✅
+- **Auth middleware** - Centralized Bearer token verification (`requireAuth`, `requireRole`, `optionalAuth`)
+- **Rate limiting** - IP-based: login (5/min), register (10/hr), password reset (3/hr)
+- **Input sanitization** - Centralized trim, htmlspecialchars, length limits across all endpoints
+- **CORS rewrite** - Origin whitelist replacing wildcard `*`, plus security headers
+- **SQL injection fix** - Parameterized count query in sales.php
+- **Auth bypass fix** - Removed X-Admin-Email header bypass in admin_users.php
+- **Privilege escalation fix** - Registration restricted to customer/ojt roles
+- **File upload hardening** - finfo MIME verification, getimagesize validation
+- **Error leak prevention** - Removed `$e->getMessage()` from 50+ client responses
+- **Credential management** - Moved DB credentials from hardcoded to `.env` file
+- **Password complexity** - Uppercase + lowercase + number + special char required
+- **Debug lockdown** - debug.php restricted to localhost only
+
+### Phase 7: Planned Features 📋
 - Real-time Lalamove tracking integration
 - Push/SMS notifications
 - Customer ratings & reviews (partially done)
@@ -419,8 +433,13 @@ ordered → paid_waiting_approval → confirmed → processing → in_transit �
 | `backend/api/inventory.php` | Stock management | Stock in/out, transfers, alerts |
 | `backend/api/auth.php` | Authentication | Login, register, verify email |
 | `backend/api/upload.php` | File uploads | Product images, documents |
-| `backend/config/database.php` | DB connection | MySQL PDO configuration |
-| `backend/middleware/cors.php` | CORS handling | Cross-origin request headers |
+| `backend/config/database.php` | DB connection | MySQL PDO config, loads `.env` credentials |
+| `backend/middleware/cors.php` | CORS & security headers | Origin whitelist, X-Frame-Options, HSTS, CSP |
+| `backend/middleware/auth.php` | Auth middleware | `requireAuth()`, `requireRole()`, `optionalAuth()` |
+| `backend/middleware/rate_limit.php` | Rate limiting | IP-based throttling for login/register/reset |
+| `backend/middleware/sanitize.php` | Input sanitization | `sanitizeInput()`, `sanitizeEmail()`, `sanitizePhone()` |
+| `backend/.env` | Environment secrets | DB credentials (gitignored, never committed) |
+| `backend/.env.example` | Env template | Safe template to copy for new setups |
 
 ### Deployment Files
 
@@ -517,10 +536,17 @@ C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE database/your_migra
 - **Push after completing** each feature
 - **Update SESSION_NOTES.md** to document changes
 
-### Security
-- **Never commit .env** files with real credentials
-- **Use environment variables** in Vercel for production secrets
-- **Validate all user input** in PHP endpoints
+### Security ✅ (Hardened)
+- **Credentials in `.env`** - DB passwords loaded from `backend/.env` (gitignored), not hardcoded ✅
+- **Auth middleware on all write endpoints** - `requireAuth()`/`requireRole()` on POST/PUT/DELETE ✅
+- **Rate limiting active** - Login (5/min), registration (10/hr), password reset (3/hr) ✅
+- **Input sanitization** - All user-facing endpoints use `sanitizeInput()` with length limits ✅
+- **CORS origin whitelist** - Only fragranza-web.vercel.app and localhost allowed ✅
+- **Security headers** - X-Content-Type-Options, X-Frame-Options, HSTS, Referrer-Policy ✅
+- **Error messages genericized** - Server errors logged, clients see "An internal error occurred" ✅
+- **File uploads validated** - MIME type verified with finfo, extensions derived from content ✅
+- **Password complexity enforced** - Uppercase + lowercase + number + special character ✅
+- **No admin bypass** - All admin actions require valid Bearer token session ✅
 
 ### Performance
 - **Lazy load images** using loading="lazy"
