@@ -15,7 +15,11 @@ import {
   ThumbsDown,
   Truck,
   Gift,
-  HeadphonesIcon
+  HeadphonesIcon,
+  ArrowRight,
+  ArrowLeft,
+  ShoppingBag,
+  Heart
 } from 'lucide-react';
 import { Order, OrderItem } from '../services/orderService';
 
@@ -24,7 +28,17 @@ interface RatingModalProps {
   onClose: () => void;
   order: Order | null;
   onSubmit: (reviews: ReviewData[], shopRating?: ShopRatingData) => Promise<boolean>;
+  recommendations?: Array<{
+    id: number;
+    name: string;
+    price: number;
+    image?: string;
+    category?: string;
+  }>;
+  onAddToCart?: (productId: number) => void;
 }
+
+type ModalPhase = 'products' | 'shop' | 'recommendations' | 'success';
 
 export interface ReviewData {
   product_id: number;
@@ -229,12 +243,11 @@ const ProductReviewCard = ({
 };
 
 // Main Rating Modal
-const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => {
+const RatingModal = ({ isOpen, onClose, order, onSubmit, recommendations = [], onAddToCart }: RatingModalProps) => {
   const [reviews, setReviews] = useState<ReviewData[]>([]);
   const [shopRating, setShopRating] = useState<ShopRatingData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [showShopRating, setShowShopRating] = useState(false);
+  const [phase, setPhase] = useState<ModalPhase>('products');
 
   // Initialize reviews when order changes
   useEffect(() => {
@@ -258,8 +271,7 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
         feedback: '',
         would_recommend: true
       });
-      setSubmitSuccess(false);
-      setShowShopRating(false);
+      setPhase('products');
     }
   }, [order]);
 
@@ -271,9 +283,10 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
     });
   };
 
-  const hasAnyRating = reviews.some(r => r.rating > 0) || (shopRating?.rating || 0) > 0;
+  const hasAnyProductRating = reviews.some(r => r.rating > 0);
   const allRated = reviews.every(r => r.rating > 0);
   const ratedCount = reviews.filter(r => r.rating > 0).length;
+  const hasShopRating = (shopRating?.rating || 0) > 0;
 
   const handleSubmit = async () => {
     const validReviews = reviews.filter(r => r.rating > 0);
@@ -285,11 +298,13 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
     try {
       const success = await onSubmit(validReviews, validShopRating);
       if (success) {
-        setSubmitSuccess(true);
-        // Auto-close after success animation
-        setTimeout(() => {
-          onClose();
-        }, 2000);
+        // Show recommendations if available, otherwise success
+        if (recommendations.length > 0) {
+          setPhase('recommendations');
+        } else {
+          setPhase('success');
+          setTimeout(() => onClose(), 2000);
+        }
       }
     } catch (error) {
       console.error('Failed to submit reviews:', error);
@@ -297,6 +312,22 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
       setIsSubmitting(false);
     }
   };
+
+  const handleNextPhase = () => {
+    if (phase === 'products') {
+      setPhase('shop');
+    } else if (phase === 'shop') {
+      handleSubmit();
+    }
+  };
+
+  const handlePrevPhase = () => {
+    if (phase === 'shop') {
+      setPhase('products');
+    }
+  };
+
+  const canProceed = phase === 'products' ? hasAnyProductRating : hasShopRating;
 
   if (!order) return null;
 
@@ -315,13 +346,14 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
             className="bg-gradient-to-b from-black-900 to-black-950 border border-gold-500/20 rounded-2xl max-w-xl w-full max-h-[90vh] overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* Success State */}
             <AnimatePresence mode="wait">
-              {submitSuccess ? (
+              {/* SUCCESS PHASE */}
+              {phase === 'success' && (
                 <motion.div
                   key="success"
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
                   className="p-8 text-center"
                 >
                   <motion.div
@@ -347,8 +379,100 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                     ))}
                   </div>
                 </motion.div>
-              ) : (
-                <motion.div key="form">
+              )}
+
+              {/* RECOMMENDATIONS PHASE */}
+              {phase === 'recommendations' && (
+                <motion.div
+                  key="recommendations"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                >
+                  {/* Header */}
+                  <div className="sticky top-0 bg-black-900/95 backdrop-blur-sm border-b border-gold-500/10 px-6 py-4 flex items-center justify-between z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-pink-500/20 rounded-full flex items-center justify-center">
+                        <Heart className="w-5 h-5 text-pink-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-display font-bold text-white">You Might Also Like</h2>
+                        <p className="text-gray-500 text-sm">Based on your purchase</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={onClose}
+                      className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-black-800 rounded-lg"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Recommendations Grid */}
+                  <div className="p-6 space-y-4 overflow-y-auto max-h-[60vh]">
+                    <div className="grid grid-cols-2 gap-4">
+                      {recommendations.slice(0, 4).map((product, index) => (
+                        <motion.div
+                          key={product.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          className="bg-black-800/50 border border-gray-800 rounded-xl overflow-hidden hover:border-gold-500/30 transition-all group"
+                        >
+                          <div className="aspect-square bg-black-900 overflow-hidden">
+                            {product.image ? (
+                              <img 
+                                src={product.image} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Package className="w-12 h-12 text-gray-700" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3">
+                            <p className="text-white text-sm font-medium truncate">{product.name}</p>
+                            {product.category && (
+                              <p className="text-gray-500 text-xs">{product.category}</p>
+                            )}
+                            <p className="text-gold-500 font-semibold mt-1">₱{product.price.toLocaleString()}</p>
+                            {onAddToCart && (
+                              <button
+                                onClick={() => onAddToCart(product.id)}
+                                className="w-full mt-2 px-3 py-2 bg-gold-500/20 border border-gold-500/30 rounded-lg text-gold-400 text-sm font-medium hover:bg-gold-500/30 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <ShoppingBag size={14} />
+                                Add to Cart
+                              </button>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 bg-black-900/95 backdrop-blur-sm border-t border-gold-500/10 px-6 py-4">
+                    <button
+                      onClick={onClose}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-black rounded-lg font-semibold transition-all"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* PRODUCTS PHASE */}
+              {phase === 'products' && (
+                <motion.div
+                  key="products"
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -50 }}
+                >
                   {/* Header */}
                   <div className="sticky top-0 bg-black-900/95 backdrop-blur-sm border-b border-gold-500/10 px-6 py-4 flex items-center justify-between z-10">
                     <div className="flex items-center gap-3">
@@ -356,8 +480,8 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                         <Sparkles className="w-5 h-5 text-gold-400" />
                       </div>
                       <div>
-                        <h2 className="text-lg font-display font-bold text-white">Rate Your Order</h2>
-                        <p className="text-gray-500 text-sm">Order #{order.order_number}</p>
+                        <h2 className="text-lg font-display font-bold text-white">Rate Products</h2>
+                        <p className="text-gray-500 text-sm">Step 1 of 2 • Order #{order.order_number}</p>
                       </div>
                     </div>
                     <button
@@ -406,146 +530,6 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                         onReviewChange={(data) => updateReview(index, data)}
                       />
                     ))}
-
-                    {/* Shop/Service Rating Section */}
-                    <motion.div 
-                      className="mt-6 border-t border-gold-500/20 pt-6"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setShowShopRating(!showShopRating)}
-                        className="w-full flex items-center justify-between p-4 bg-gradient-to-br from-gold-500/10 to-amber-500/5 border border-gold-500/20 rounded-xl hover:border-gold-500/40 transition-all"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
-                            <Store className="w-5 h-5 text-gold-400" />
-                          </div>
-                          <div className="text-left">
-                            <h3 className="text-white font-medium">Rate Our Service</h3>
-                            <p className="text-gray-500 text-sm">How was your overall experience?</p>
-                          </div>
-                        </div>
-                        {shopRating && shopRating.rating > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <span className="text-gold-400 font-semibold">{shopRating.rating}</span>
-                            <Star className="w-5 h-5 fill-gold-500 text-gold-500" />
-                          </div>
-                        ) : (
-                          <span className="text-gray-500 text-sm">Tap to rate →</span>
-                        )}
-                      </button>
-
-                      <AnimatePresence>
-                        {showShopRating && shopRating && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="mt-4 space-y-4 p-4 bg-black-800/50 rounded-xl border border-gray-800">
-                              {/* Overall Shop Rating */}
-                              <div className="text-center">
-                                <p className="text-gray-400 text-sm mb-3">Overall Experience</p>
-                                <StarRating
-                                  rating={shopRating.rating}
-                                  onRatingChange={(rating) => setShopRating({ ...shopRating, rating })}
-                                  size="lg"
-                                />
-                              </div>
-
-                              {/* Detailed Ratings */}
-                              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-800">
-                                {/* Service */}
-                                <div className="text-center">
-                                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <HeadphonesIcon className="w-5 h-5 text-blue-400" />
-                                  </div>
-                                  <p className="text-gray-500 text-xs mb-2">Service</p>
-                                  <StarRating
-                                    rating={shopRating.service_rating || 0}
-                                    onRatingChange={(rating) => setShopRating({ ...shopRating, service_rating: rating })}
-                                    size="sm"
-                                  />
-                                </div>
-                                
-                                {/* Delivery */}
-                                <div className="text-center">
-                                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <Truck className="w-5 h-5 text-green-400" />
-                                  </div>
-                                  <p className="text-gray-500 text-xs mb-2">Delivery</p>
-                                  <StarRating
-                                    rating={shopRating.delivery_rating || 0}
-                                    onRatingChange={(rating) => setShopRating({ ...shopRating, delivery_rating: rating })}
-                                    size="sm"
-                                  />
-                                </div>
-                                
-                                {/* Packaging */}
-                                <div className="text-center">
-                                  <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <Gift className="w-5 h-5 text-purple-400" />
-                                  </div>
-                                  <p className="text-gray-500 text-xs mb-2">Packaging</p>
-                                  <StarRating
-                                    rating={shopRating.packaging_rating || 0}
-                                    onRatingChange={(rating) => setShopRating({ ...shopRating, packaging_rating: rating })}
-                                    size="sm"
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Would Recommend */}
-                              <div className="pt-4 border-t border-gray-800">
-                                <p className="text-gray-400 text-sm text-center mb-3">Would you recommend us?</p>
-                                <div className="flex justify-center gap-4">
-                                  <button
-                                    type="button"
-                                    onClick={() => setShopRating({ ...shopRating, would_recommend: true })}
-                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg border transition-all ${
-                                      shopRating.would_recommend 
-                                        ? 'bg-green-500/20 border-green-500/50 text-green-400' 
-                                        : 'border-gray-700 text-gray-500 hover:border-gray-600'
-                                    }`}
-                                  >
-                                    <ThumbsUp className="w-5 h-5" />
-                                    Yes
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setShopRating({ ...shopRating, would_recommend: false })}
-                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg border transition-all ${
-                                      shopRating.would_recommend === false 
-                                        ? 'bg-red-500/20 border-red-500/50 text-red-400' 
-                                        : 'border-gray-700 text-gray-500 hover:border-gray-600'
-                                    }`}
-                                  >
-                                    <ThumbsDown className="w-5 h-5" />
-                                    No
-                                  </button>
-                                </div>
-                              </div>
-
-                              {/* Feedback */}
-                              <div className="pt-4 border-t border-gray-800">
-                                <label className="text-gray-400 text-sm mb-2 block">Additional Feedback (optional)</label>
-                                <textarea
-                                  value={shopRating.feedback || ''}
-                                  onChange={(e) => setShopRating({ ...shopRating, feedback: e.target.value })}
-                                  placeholder="Tell us how we can improve..."
-                                  className="w-full bg-black-900 border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500/50 focus:outline-none resize-none"
-                                  rows={3}
-                                />
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
                   </div>
 
                   {/* Footer */}
@@ -558,10 +542,162 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                         Maybe Later
                       </button>
                       <button
-                        onClick={handleSubmit}
-                        disabled={!hasAnyRating || isSubmitting}
+                        onClick={handleNextPhase}
+                        disabled={!hasAnyProductRating}
                         className={`flex-1 px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
-                          hasAnyRating
+                          hasAnyProductRating
+                            ? 'bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-black shadow-lg shadow-gold-500/25'
+                            : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        Next
+                        <ArrowRight size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* SHOP RATING PHASE */}
+              {phase === 'shop' && shopRating && (
+                <motion.div
+                  key="shop"
+                  initial={{ opacity: 0, x: 50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 50 }}
+                >
+                  {/* Header */}
+                  <div className="sticky top-0 bg-black-900/95 backdrop-blur-sm border-b border-gold-500/10 px-6 py-4 flex items-center justify-between z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
+                        <Store className="w-5 h-5 text-gold-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-display font-bold text-white">Rate Our Service</h2>
+                        <p className="text-gray-500 text-sm">Step 2 of 2 • Almost done!</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={onClose}
+                      className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-black-800 rounded-lg"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="p-6 space-y-6 overflow-y-auto max-h-[60vh]">
+                    {/* Overall Shop Rating */}
+                    <div className="text-center py-4">
+                      <p className="text-gray-400 text-sm mb-4">How was your overall experience?</p>
+                      <StarRating
+                        rating={shopRating.rating}
+                        onRatingChange={(rating) => setShopRating({ ...shopRating, rating })}
+                        size="lg"
+                      />
+                    </div>
+
+                    {/* Detailed Ratings */}
+                    <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-800">
+                      {/* Service */}
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <HeadphonesIcon className="w-6 h-6 text-blue-400" />
+                        </div>
+                        <p className="text-gray-400 text-sm mb-2">Service</p>
+                        <StarRating
+                          rating={shopRating.service_rating || 0}
+                          onRatingChange={(rating) => setShopRating({ ...shopRating, service_rating: rating })}
+                          size="sm"
+                        />
+                      </div>
+                      
+                      {/* Delivery */}
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Truck className="w-6 h-6 text-green-400" />
+                        </div>
+                        <p className="text-gray-400 text-sm mb-2">Delivery</p>
+                        <StarRating
+                          rating={shopRating.delivery_rating || 0}
+                          onRatingChange={(rating) => setShopRating({ ...shopRating, delivery_rating: rating })}
+                          size="sm"
+                        />
+                      </div>
+                      
+                      {/* Packaging */}
+                      <div className="text-center">
+                        <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Gift className="w-6 h-6 text-purple-400" />
+                        </div>
+                        <p className="text-gray-400 text-sm mb-2">Packaging</p>
+                        <StarRating
+                          rating={shopRating.packaging_rating || 0}
+                          onRatingChange={(rating) => setShopRating({ ...shopRating, packaging_rating: rating })}
+                          size="sm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Would Recommend */}
+                    <div className="py-4">
+                      <p className="text-gray-400 text-sm text-center mb-4">Would you recommend us to friends?</p>
+                      <div className="flex justify-center gap-4">
+                        <button
+                          type="button"
+                          onClick={() => setShopRating({ ...shopRating, would_recommend: true })}
+                          className={`flex items-center gap-2 px-8 py-3 rounded-xl border transition-all ${
+                            shopRating.would_recommend 
+                              ? 'bg-green-500/20 border-green-500/50 text-green-400' 
+                              : 'border-gray-700 text-gray-500 hover:border-gray-600'
+                          }`}
+                        >
+                          <ThumbsUp className="w-5 h-5" />
+                          Yes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShopRating({ ...shopRating, would_recommend: false })}
+                          className={`flex items-center gap-2 px-8 py-3 rounded-xl border transition-all ${
+                            shopRating.would_recommend === false 
+                              ? 'bg-red-500/20 border-red-500/50 text-red-400' 
+                              : 'border-gray-700 text-gray-500 hover:border-gray-600'
+                          }`}
+                        >
+                          <ThumbsDown className="w-5 h-5" />
+                          No
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Feedback */}
+                    <div>
+                      <label className="text-gray-400 text-sm mb-2 block">Additional Feedback (optional)</label>
+                      <textarea
+                        value={shopRating.feedback || ''}
+                        onChange={(e) => setShopRating({ ...shopRating, feedback: e.target.value })}
+                        placeholder="Tell us how we can improve..."
+                        className="w-full bg-black-900 border border-gray-800 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500/50 focus:outline-none resize-none"
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 bg-black-900/95 backdrop-blur-sm border-t border-gold-500/10 px-6 py-4">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handlePrevPhase}
+                        className="flex-1 px-4 py-3 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors font-medium flex items-center justify-center gap-2"
+                      >
+                        <ArrowLeft size={18} />
+                        Back
+                      </button>
+                      <button
+                        onClick={handleNextPhase}
+                        disabled={!hasShopRating || isSubmitting}
+                        className={`flex-1 px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${
+                          hasShopRating
                             ? 'bg-gradient-to-r from-gold-500 to-amber-500 hover:from-gold-600 hover:to-amber-600 text-black shadow-lg shadow-gold-500/25'
                             : 'bg-gray-800 text-gray-500 cursor-not-allowed'
                         }`}
@@ -574,7 +710,7 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                         ) : (
                           <>
                             <Send size={18} />
-                            Submit Reviews
+                            Submit
                           </>
                         )}
                       </button>

@@ -36,7 +36,9 @@ import {
   Gift
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
+import productService from '../services/productServicePHP';
 import RatingModal, { ReviewData, ShopRatingData } from '../components/RatingModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
@@ -75,6 +77,7 @@ const STATUS_GROUPS: Record<StatusFilterGroup, OrderStatus[]> = {
 
 const Orders = () => {
   const { user, isAuthenticated } = useAuth();
+  const { addToCart } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -91,6 +94,13 @@ const Orders = () => {
   // Rating Modal state
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
   const [ratingOrder, setRatingOrder] = useState<Order | null>(null);
+  const [recommendations, setRecommendations] = useState<Array<{
+    id: number;
+    name: string;
+    price: number;
+    image?: string;
+    category?: string;
+  }>>([]);
 
   // Confirm Dialog state
   type ConfirmAction = 'confirm_delivery' | 'complete' | 'cancel' | 'return' | null;
@@ -195,9 +205,53 @@ const Orders = () => {
   };
 
   // Open rating modal for an order
-  const openRatingModal = (order: Order) => {
+  const openRatingModal = async (order: Order) => {
     setRatingOrder(order);
     setRatingModalOpen(true);
+    
+    // Fetch recommendations based on order items
+    try {
+      // Get products from the same categories as the ordered items
+      const response = await productService.getProducts({ limit: 8 });
+      if (response.success && response.data) {
+        // Filter out products that are already in the order
+        const orderedProductIds = order.items?.map(item => item.product_id) || [];
+        const filteredProducts = response.data
+          .filter(p => !orderedProductIds.includes(p.id))
+          .slice(0, 4)
+          .map(p => ({
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            image: p.image_main || undefined,
+            category: p.category?.name
+          }));
+        setRecommendations(filteredProducts);
+      }
+    } catch (error) {
+      console.error('Failed to fetch recommendations:', error);
+      setRecommendations([]);
+    }
+  };
+
+  // Handle add to cart from recommendations
+  const handleAddToCart = async (productId: number) => {
+    try {
+      const response = await productService.getProduct(productId);
+      if (response.success && response.data) {
+        const product = response.data;
+        addToCart({
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.image_main || '',
+          variation: product.variations?.[0]?.volume || 'Default'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+    }
   };
 
   // Handle review submission
@@ -1389,9 +1443,12 @@ const Orders = () => {
           onClose={() => {
             setRatingModalOpen(false);
             setRatingOrder(null);
+            setRecommendations([]);
           }}
           order={ratingOrder}
           onSubmit={handleSubmitReviews}
+          recommendations={recommendations}
+          onAddToCart={handleAddToCart}
         />
 
         {/* Confirm Dialog */}
