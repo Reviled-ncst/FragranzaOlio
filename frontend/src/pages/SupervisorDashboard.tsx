@@ -162,17 +162,19 @@ const SupervisorDashboard = () => {
       // Try to fetch real data from API
       const data: DashboardData = await supervisorService.getDashboard(user.id);
       
-      setStats({
-        totalTrainees: data.stats.totalTrainees,
-        avgProgress: data.trainees.length > 0 
-          ? Math.round(data.trainees.reduce((acc, t) => acc + t.progress, 0) / data.trainees.length)
-          : 0,
-        pendingApprovals: data.stats.pendingTimesheets + data.stats.pendingTasks,
-        hoursThisWeek: data.stats.totalHoursThisWeek
-      });
+      if (data?.stats) {
+        setStats({
+          totalTrainees: data.stats.totalTrainees ?? 0,
+          avgProgress: data.trainees?.length > 0 
+            ? Math.round(data.trainees.reduce((acc, t) => acc + t.progress, 0) / data.trainees.length)
+            : 0,
+          pendingApprovals: (data.stats.pendingTimesheets ?? 0) + (data.stats.pendingTasks ?? 0),
+          hoursThisWeek: data.stats.totalHoursThisWeek ?? 0
+        });
+      }
       
-      setTrainees(data.trainees);
-      setPendingApprovals(data.pendingApprovals);
+      setTrainees(data?.trainees ?? []);
+      setPendingApprovals(data?.pendingApprovals ?? []);
     } catch (err: unknown) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load data. Please try again.');

@@ -4,7 +4,9 @@
  * Handles all supervisor-related operations including trainees, dashboard, etc.
  */
 
-// CORS & security headers handled by middleware\nrequire_once __DIR__ . '/../middleware/cors.php';\nrequire_once __DIR__ . '/../config/database.php';
+// CORS & security headers handled by middleware
+require_once __DIR__ . '/../middleware/cors.php';
+require_once __DIR__ . '/../config/database.php';
 
 // Get the request method and path
 $method = $_SERVER['REQUEST_METHOD'];

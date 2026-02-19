@@ -542,11 +542,11 @@ export default function OJTTimesheet() {
       if (todayData.success && todayData.data) {
         // Handle array or single object
         const records: AttendanceRecord[] = Array.isArray(todayData.data) ? todayData.data : [todayData.data];
-        // Find record for THIS user only - use String comparison since user.id is string
-        const userId = user.id;
+        // Find record for THIS user only - normalize both sides to String for comparison
+        const userId = String(user.id);
         const userRecord = records.find((r) => {
-          const recUserId = String(r.user_id);
-          const recTraineeId = String((r as { trainee_id?: number }).trainee_id || '');
+          const recUserId = String(r.user_id ?? '');
+          const recTraineeId = String((r as { trainee_id?: number }).trainee_id ?? '');
           return recUserId === userId || recTraineeId === userId;
         });
         if (userRecord) {
@@ -576,11 +576,11 @@ export default function OJTTimesheet() {
       const weekData = await weekRes.json();
       if (weekData.success && Array.isArray(weekData.data)) {
         // Map attendance_date to date for consistency - filter by user ID
-        const userId = user.id;
+        const userId = String(user.id);
         const mapped: AttendanceRecord[] = (weekData.data as (AttendanceRecord & { trainee_id?: number; attendance_date?: string })[])
           .filter((r) => {
-            const recUserId = String(r.user_id);
-            const recTraineeId = String(r.trainee_id || '');
+            const recUserId = String(r.user_id ?? '');
+            const recTraineeId = String(r.trainee_id ?? '');
             return recTraineeId === userId || recUserId === userId;
           })
           .map((r) => ({

@@ -51,23 +51,29 @@ const HRDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // For now, use mock data - will connect to backend later
-      setStats({
-        totalEmployees: 24,
-        totalInterns: 12,
-        activeToday: 28,
-        pendingPayouts: 5,
-        totalHoursThisMonth: 4320,
-        pendingApprovals: 8
-      });
+      const response = await apiFetch(`${API_BASE_URL}/hr.php/dashboard`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        setStats({
+          totalEmployees: result.data.stats.totalEmployees ?? 0,
+          totalInterns: result.data.stats.totalInterns ?? 0,
+          activeToday: result.data.stats.activeToday ?? 0,
+          pendingPayouts: result.data.stats.pendingPayouts ?? 0,
+          totalHoursThisMonth: result.data.stats.totalHoursThisMonth ?? 0,
+          pendingApprovals: result.data.stats.pendingApprovals ?? 0
+        });
 
-      setRecentActivity([
-        { id: 1, type: 'clock_in', user: 'John Doe', message: 'Clocked in', time: '8:00 AM' },
-        { id: 2, type: 'clock_in', user: 'Jane Smith', message: 'Clocked in', time: '8:15 AM' },
-        { id: 3, type: 'leave_request', user: 'Mike Johnson', message: 'Requested leave', time: '9:30 AM' },
-        { id: 4, type: 'clock_out', user: 'Sarah Wilson', message: 'Clocked out', time: '5:00 PM' },
-        { id: 5, type: 'payout', user: 'HR System', message: 'Payroll processed', time: 'Yesterday' },
-      ]);
+        setRecentActivity(
+          (result.data.recentActivity ?? []).map((a: { id: number; type: string; user: string; message: string; time: string }) => ({
+            id: a.id,
+            type: a.type as RecentActivity['type'],
+            user: a.user,
+            message: a.message,
+            time: a.time
+          }))
+        );
+      }
 
       setLoading(false);
     } catch (error) {

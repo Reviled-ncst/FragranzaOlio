@@ -18,6 +18,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import HRLayout from '../components/layout/HRLayout';
+import { API_BASE_URL, apiFetch } from '../services/api';
 
 interface Intern {
   id: number;
@@ -52,15 +53,27 @@ const HRInterns = () => {
 
   const fetchInterns = async () => {
     try {
-      // Mock data - will connect to backend later
-      const mockInterns: Intern[] = [
-        { id: 1, firstName: 'Anna', lastName: 'Garcia', email: 'anna@student.pup.edu.ph', phone: '09171234567', university: 'Polytechnic University of the Philippines', course: 'BS Information Technology', supervisorName: 'John Doe', startDate: '2024-01-15', endDate: '2024-06-15', requiredHours: 500, completedHours: 320, status: 'active' },
-        { id: 2, firstName: 'Mark', lastName: 'Santos', email: 'mark@student.ust.edu.ph', phone: '09182345678', university: 'University of Santo Tomas', course: 'BS Computer Science', supervisorName: 'Jane Smith', startDate: '2024-02-01', endDate: '2024-07-01', requiredHours: 486, completedHours: 240, status: 'active' },
-        { id: 3, firstName: 'Lisa', lastName: 'Cruz', email: 'lisa@student.dlsu.edu.ph', university: 'De La Salle University', course: 'BS Business Administration', supervisorName: 'Mike Johnson', startDate: '2024-01-08', endDate: '2024-05-08', requiredHours: 400, completedHours: 400, status: 'completed' },
-        { id: 4, firstName: 'James', lastName: 'Reyes', email: 'james@student.feu.edu.ph', phone: '09204567890', university: 'Far Eastern University', course: 'BS Accountancy', supervisorName: 'John Doe', startDate: '2024-03-01', endDate: '2024-08-01', requiredHours: 600, completedHours: 150, status: 'active' },
-        { id: 5, firstName: 'Maria', lastName: 'Lim', email: 'maria@student.up.edu.ph', university: 'University of the Philippines', course: 'BS Marketing', startDate: '2024-02-15', requiredHours: 500, completedHours: 80, status: 'withdrawn' },
-      ];
-      setInterns(mockInterns);
+      const response = await apiFetch(`${API_BASE_URL}/hr.php/interns`);
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const mapped: Intern[] = result.data.map((i: Record<string, unknown>) => ({
+          id: i.id as number,
+          firstName: i.firstName as string,
+          lastName: i.lastName as string,
+          email: i.email as string,
+          phone: i.phone as string | undefined,
+          university: (i.university as string) || 'N/A',
+          course: (i.course as string) || 'N/A',
+          supervisorName: i.supervisorName as string | undefined,
+          startDate: i.startDate as string,
+          endDate: i.endDate as string | undefined,
+          requiredHours: (i.requiredHours as number) || 500,
+          completedHours: (i.completedHours as number) || 0,
+          status: (i.status as Intern['status']) || 'active'
+        }));
+        setInterns(mapped);
+      }
       setLoading(false);
     } catch (error) {
       console.error('Error fetching interns:', error);
