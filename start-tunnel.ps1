@@ -118,12 +118,21 @@ function Start-TunnelWithMonitor {
     Write-Host ""
     
     # Read stderr line by line
+    $lastPushedUrl = $null
+    $lastPushTime = [datetime]::MinValue
+    $pushCooldownSeconds = 60  # Minimum seconds between git pushes
     while (-not $process.HasExited) {
         $line = $process.StandardError.ReadLine()
         if ($line) {
             # Look for the tunnel URL
             if ($line -match "($urlPattern)") {
                 $newUrl = $matches[1]
+                
+                # Skip if this is the same URL we already pushed
+                if ($newUrl -eq $lastPushedUrl) {
+                    continue
+                }
+                
                 Write-Host ""
                 Write-Success "========================================="
                 Write-Success "  TUNNEL URL DETECTED!"
@@ -134,10 +143,22 @@ function Start-TunnelWithMonitor {
                 $updated = Update-TunnelUrl -NewUrl $newUrl
                 
                 if ($updated -and $AutoPush) {
-                    Push-Changes
+                    $elapsed = ([datetime]::Now - $lastPushTime).TotalSeconds
+                    if ($elapsed -ge $pushCooldownSeconds) {
+                        Push-Changes
+                        $lastPushTime = [datetime]::Now
+                    } else {
+                        $wait = [math]::Ceiling($pushCooldownSeconds - $elapsed)
+                        Write-Warn "Cooldown active: skipping push (next push allowed in ${wait}s)"
+                    }
+                    $lastPushedUrl = $newUrl
                 } elseif ($updated) {
                     Write-Warn "Run with -AutoPush to automatically deploy, or manually:"
                     Write-Host "  git add -A; git commit -m 'Update tunnel URL'; git push"
+                    $lastPushedUrl = $newUrl
+                } elseif (-not $updated) {
+                    # URL matched in files already, track it to avoid re-processing
+                    $lastPushedUrl = $newUrl
                 }
                 
                 $urlFound = $true

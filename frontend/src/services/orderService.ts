@@ -220,6 +220,19 @@ export interface Invoice {
   created_at: string;
 }
 
+export interface RecommendedProduct {
+  id: number;
+  name: string;
+  price: number;
+  image: string | null;
+  category: string | null;
+  category_slug: string | null;
+  average_rating: number;
+  review_count: number;
+  is_featured: boolean;
+  is_new: boolean;
+}
+
 // Order Service Functions
 const orderService = {
   /**
@@ -719,6 +732,36 @@ const orderService = {
     } catch (error) {
       console.error('Failed to get shop rating stats:', error);
       return { success: false };
+    }
+  },
+
+  /**
+   * Get smart product recommendations based on an order
+   * Returns products from same categories, top-rated, and featured items
+   */
+  async getRecommendations(params: {
+    order_id?: number;
+    product_ids?: number[];
+    category_ids?: number[];
+    limit?: number;
+  }): Promise<{ success: boolean; data?: RecommendedProduct[] }> {
+    try {
+      const response = await api.get<never, ApiResponse<RecommendedProduct[]>>('/sales.php', {
+        params: {
+          action: 'recommendations',
+          order_id: params.order_id,
+          product_ids: params.product_ids?.join(','),
+          category_ids: params.category_ids?.join(','),
+          limit: params.limit
+        }
+      });
+      return {
+        success: response.success ?? true,
+        data: response.data || []
+      };
+    } catch (error) {
+      console.error('Failed to get recommendations:', error);
+      return { success: false, data: [] };
     }
   },
 

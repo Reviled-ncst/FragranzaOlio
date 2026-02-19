@@ -209,24 +209,37 @@ const Orders = () => {
     setRatingOrder(order);
     setRatingModalOpen(true);
     
-    // Fetch recommendations based on order items
+    // Fetch smart recommendations based on order items
     try {
-      // Get products from the same categories as the ordered items
-      const response = await productService.getProducts({ limit: 8 });
-      if (response.success && response.data) {
-        // Filter out products that are already in the order
-        const orderedProductIds = order.items?.map(item => item.product_id) || [];
-        const filteredProducts = response.data
-          .filter(p => !orderedProductIds.includes(p.id))
-          .slice(0, 4)
-          .map(p => ({
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            image: p.image_main || undefined,
-            category: p.category?.name
-          }));
-        setRecommendations(filteredProducts);
+      const response = await orderService.getRecommendations({
+        order_id: order.id,
+        limit: 4
+      });
+      if (response.success && response.data?.length) {
+        setRecommendations(response.data.map(p => ({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          image: p.image || undefined,
+          category: p.category || undefined
+        })));
+      } else {
+        // Fallback: fetch generic products if smart recs return nothing
+        const fallback = await productService.getProducts({ limit: 8 });
+        if (fallback.success && fallback.data) {
+          const orderedProductIds = order.items?.map(item => item.product_id) || [];
+          const filteredProducts = fallback.data
+            .filter(p => !orderedProductIds.includes(p.id))
+            .slice(0, 4)
+            .map(p => ({
+              id: p.id,
+              name: p.name,
+              price: p.price,
+              image: p.image_main || undefined,
+              category: p.category?.name
+            }));
+          setRecommendations(filteredProducts);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch recommendations:', error);

@@ -103,6 +103,9 @@ function handleGetRequests($db, $action) {
         case 'shop_rating_stats':
             getShopRatingStats($db);
             break;
+        case 'recommendations':
+            getRecommendations($db);
+            break;
         default:
             getDashboardStats($db);
     }
@@ -2622,6 +2625,167 @@ function createShopRating($db, $data) {
             'rating_id' => $ratingId
         ]);
         
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+/**
+ * Get smart product recommendations based on an order's items
+ * Strategy:
+ * 1. Same category as ordered products (highest priority)
+ * 2. Top-rated products overall
+ * 3. Featured/new products as fallback
+ * Excludes products already in the order
+ */
+function getRecommendations($db) {
+    try {
+        $orderId = $_GET['order_id'] ?? null;
+        $productIds = isset($_GET['product_ids']) ? explode(',', $_GET['product_ids']) : [];
+        $categoryIds = isset($_GET['category_ids']) ? explode(',', $_GET['category_ids']) : [];
+        $limit = isset($_GET['limit']) ? min(12, max(1, (int)$_GET['limit'])) : 4;
+
+        $excludeIds = [];
+
+        // If order_id provided, get ordered product IDs and their categories
+        if ($orderId) {
+            $stmt = $db->prepare("
+                SELECT oi.product_id, p.category_id 
+                FROM order_items oi 
+                LEFT JOIN products p ON oi.product_id = p.id 
+                WHERE oi.order_id = :order_id
+            ");
+            $stmt->execute([':order_id' => $orderId]);
+            $orderItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($orderItems as $item) {
+                if ($item['product_id']) {
+                    $excludeIds[] = (int)$item['product_id'];
+                }
+                if ($item['category_id'] && !in_array((int)$item['category_id'], $categoryIds)) {
+                    $categoryIds[] = (int)$item['category_id'];
+                }
+            }
+        }
+
+        // Merge explicit product_ids into exclude list
+        foreach ($productIds as $pid) {
+            $pid = (int)$pid;
+            if ($pid > 0 && !in_array($pid, $excludeIds)) {
+                $excludeIds[] = $pid;
+            }
+        }
+
+        $recommendations = [];
+
+        // Phase 1: Products from same categories, ordered by rating
+        if (!empty($categoryIds)) {
+            $catPlaceholders = implode(',', array_map(function($i) { return ':cat' . $i; }, range(0, count($categoryIds) - 1)));
+            $params = [];
+            
+            foreach ($categoryIds as $i => $catId) {
+                $params[':cat' . $i] = (int)$catId;
+            }
+
+            $excludeClause = '';
+            if (!empty($excludeIds)) {
+                $exPlaceholders = implode(',', array_map(function($i) { return ':ex' . $i; }, range(0, count($excludeIds) - 1)));
+                $excludeClause = " AND p.id NOT IN ($exPlaceholders)";
+                foreach ($excludeIds as $i => $exId) {
+                    $params[':ex' . $i] = (int)$exId;
+                }
+            }
+
+            $sql = "
+                SELECT p.id, p.name, p.price, p.image, p.average_rating, p.review_count,
+                       p.is_featured, p.is_new, p.stock_status,
+                       c.name as category_name, c.slug as category_slug
+                FROM products p
+                LEFT JOIN categories c ON p.category_id = c.id
+                WHERE p.category_id IN ($catPlaceholders)
+                  AND p.stock_status != 'out_of_stock'
+                  $excludeClause
+                ORDER BY p.average_rating DESC, p.is_featured DESC, p.review_count DESC
+                LIMIT :lim
+            ";
+            $params[':lim'] = $limit;
+
+            $stmt = $db->prepare($sql);
+            foreach ($params as $key => $value) {
+                if ($key === ':lim') {
+                    $stmt->bindValue($key, $value, PDO::PARAM_INT);
+                } else {
+                    $stmt->bindValue($key, $value, PDO::PARAM_INT);
+                }
+            }
+            $stmt->execute();
+            $recommendations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        // Phase 2: If we don't have enough, fill with top-rated / featured products
+        if (count($recommendations) < $limit) {
+            $remaining = $limit - count($recommendations);
+            $alreadyIds = array_merge($excludeIds, array_column($recommendations, 'id'));
+
+            $params2 = [];
+            $excludeClause2 = '';
+            if (!empty($alreadyIds)) {
+                $exPlaceholders2 = implode(',', array_map(function($i) { return ':ex2_' . $i; }, range(0, count($alreadyIds) - 1)));
+                $excludeClause2 = " AND p.id NOT IN ($exPlaceholders2)";
+                foreach ($alreadyIds as $i => $exId) {
+                    $params2[':ex2_' . $i] = (int)$exId;
+                }
+            }
+
+            $sql2 = "
+                SELECT p.id, p.name, p.price, p.image, p.average_rating, p.review_count,
+                       p.is_featured, p.is_new, p.stock_status,
+                       c.name as category_name, c.slug as category_slug
+                FROM products p
+                LEFT JOIN categories c ON p.category_id = c.id
+                WHERE p.stock_status != 'out_of_stock'
+                  $excludeClause2
+                ORDER BY p.average_rating DESC, p.is_featured DESC, p.is_new DESC, RAND()
+                LIMIT :remaining
+            ";
+            $params2[':remaining'] = $remaining;
+
+            $stmt2 = $db->prepare($sql2);
+            foreach ($params2 as $key => $value) {
+                if ($key === ':remaining') {
+                    $stmt2->bindValue($key, $value, PDO::PARAM_INT);
+                } else {
+                    $stmt2->bindValue($key, $value, PDO::PARAM_INT);
+                }
+            }
+            $stmt2->execute();
+            $fallback = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            $recommendations = array_merge($recommendations, $fallback);
+        }
+
+        // Format response
+        $formatted = array_map(function($p) {
+            return [
+                'id' => (int)$p['id'],
+                'name' => $p['name'],
+                'price' => (float)$p['price'],
+                'image' => $p['image'],
+                'category' => $p['category_name'],
+                'category_slug' => $p['category_slug'],
+                'average_rating' => (float)($p['average_rating'] ?? 0),
+                'review_count' => (int)($p['review_count'] ?? 0),
+                'is_featured' => (bool)($p['is_featured'] ?? false),
+                'is_new' => (bool)($p['is_new'] ?? false),
+            ];
+        }, $recommendations);
+
+        echo json_encode([
+            'success' => true,
+            'data' => $formatted,
+            'count' => count($formatted)
+        ]);
+
     } catch (PDOException $e) {
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => $e->getMessage()]);
