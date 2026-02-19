@@ -39,6 +39,9 @@ try {
         case 'supervisors':
             getSupervisors($conn);
             break;
+        case 'attendance':
+            handleAttendance($conn, $id);
+            break;
         default:
             handleDashboard($conn);
     }
@@ -286,6 +289,226 @@ function getInternDetail($conn, $internId) {
             'tasksCompleted' => (int)$intern['tasks_completed'],
             'totalTasks' => (int)$intern['total_tasks'],
             'status' => $intern['assignment_status'] ?? ($intern['user_status'] === 'active' ? 'active' : 'withdrawn')
+        ]
+    ]);
+}
+
+/**
+ * Handle attendance endpoints
+ */
+function handleAttendance($conn, $userId = null) {
+    if ($userId) {
+        getUserAttendanceHistory($conn, $userId);
+    } else {
+        getAttendanceByDate($conn);
+    }
+}
+
+/**
+ * Get all attendance records for a given date
+ */
+function getAttendanceByDate($conn) {
+    $date = $_GET['date'] ?? date('Y-m-d');
+    $role = $_GET['role'] ?? null;
+
+    $query = "
+        SELECT
+            a.id,
+            a.trainee_id as user_id,
+            CONCAT(u.first_name, ' ', u.last_name) as name,
+            u.email,
+            u.role,
+            a.attendance_date,
+            a.time_in,
+            a.time_out,
+            a.total_hours,
+            a.overtime_hours,
+            a.status,
+            a.break_start,
+            a.break_end,
+            a.notes,
+            COALESCE(CONCAT(s.first_name, ' ', s.last_name), 'N/A') as supervisor_name
+        FROM ojt_attendance a
+        JOIN users u ON a.trainee_id = u.id
+        LEFT JOIN ojt_assignments oa ON a.trainee_id = oa.trainee_id AND oa.status = 'active'
+        LEFT JOIN users s ON oa.supervisor_id = s.id
+        WHERE a.attendance_date = ?
+    ";
+
+    $params = [$date];
+
+    if ($role && $role !== 'all') {
+        $query .= " AND u.role = ?";
+        $params[] = $role;
+    }
+
+    $query .= " ORDER BY a.time_in ASC";
+
+    $stmt = $conn->prepare($query);
+    $stmt->execute($params);
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Format times
+    $formatted = array_map(function($r) {
+        return [
+            'id' => (int)$r['id'],
+            'userId' => (int)$r['user_id'],
+            'name' => $r['name'],
+            'email' => $r['email'],
+            'role' => $r['role'],
+            'date' => $r['attendance_date'],
+            'clockIn' => $r['time_in'] ? date('h:i A', strtotime($r['time_in'])) : null,
+            'clockOut' => $r['time_out'] ? date('h:i A', strtotime($r['time_out'])) : null,
+            'clockInRaw' => $r['time_in'],
+            'clockOutRaw' => $r['time_out'],
+            'totalHours' => round((float)$r['total_hours'], 2),
+            'overtimeHours' => round((float)$r['overtime_hours'], 2),
+            'status' => $r['status'],
+            'breakStart' => $r['break_start'],
+            'breakEnd' => $r['break_end'],
+            'notes' => $r['notes'],
+            'supervisorName' => $r['supervisor_name']
+        ];
+    }, $records);
+
+    // Stats
+    $present = count(array_filter($formatted, fn($r) => $r['status'] === 'present'));
+    $late = count(array_filter($formatted, fn($r) => $r['status'] === 'late'));
+    $totalHours = array_sum(array_column($formatted, 'totalHours'));
+
+    // Get absent users (those without attendance on this date)
+    $stmtAll = $conn->prepare("SELECT id, CONCAT(first_name, ' ', last_name) as name, email, role FROM users WHERE role IN ('ojt', 'ojt_supervisor', 'sales', 'hr') AND status = 'active'");
+    $stmtAll->execute();
+    $allUsers = $stmtAll->fetchAll(PDO::FETCH_ASSOC);
+
+    $presentIds = array_column($formatted, 'userId');
+    $absentUsers = [];
+    foreach ($allUsers as $user) {
+        if (!in_array((int)$user['id'], $presentIds)) {
+            if ($role && $role !== 'all' && $user['role'] !== $role) continue;
+            $absentUsers[] = [
+                'id' => 0,
+                'userId' => (int)$user['id'],
+                'name' => $user['name'],
+                'email' => $user['email'],
+                'role' => $user['role'],
+                'date' => $date,
+                'clockIn' => null,
+                'clockOut' => null,
+                'clockInRaw' => null,
+                'clockOutRaw' => null,
+                'totalHours' => 0,
+                'overtimeHours' => 0,
+                'status' => 'absent',
+                'breakStart' => null,
+                'breakEnd' => null,
+                'notes' => null,
+                'supervisorName' => 'N/A'
+            ];
+        }
+    }
+
+    $allRecords = array_merge($formatted, $absentUsers);
+    $absent = count($absentUsers);
+
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'records' => $allRecords,
+            'stats' => [
+                'present' => $present,
+                'late' => $late,
+                'absent' => $absent,
+                'totalHours' => round($totalHours, 2)
+            ]
+        ]
+    ]);
+}
+
+/**
+ * Get attendance history for a specific user
+ */
+function getUserAttendanceHistory($conn, $userId) {
+    $startDate = $_GET['start'] ?? date('Y-m-01');
+    $endDate = $_GET['end'] ?? date('Y-m-t');
+
+    // Get user info
+    $stmtUser = $conn->prepare("SELECT id, first_name, last_name, email, role, university, course FROM users WHERE id = ?");
+    $stmtUser->execute([(int)$userId]);
+    $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+    if (!$user) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'User not found']);
+        return;
+    }
+
+    // Get supervisor
+    $stmtSup = $conn->prepare("SELECT CONCAT(s.first_name, ' ', s.last_name) as supervisor_name FROM ojt_assignments oa JOIN users s ON oa.supervisor_id = s.id WHERE oa.trainee_id = ? AND oa.status = 'active' LIMIT 1");
+    $stmtSup->execute([(int)$userId]);
+    $sup = $stmtSup->fetch(PDO::FETCH_ASSOC);
+
+    $stmt = $conn->prepare("
+        SELECT
+            a.id,
+            a.attendance_date,
+            a.time_in,
+            a.time_out,
+            a.total_hours,
+            a.overtime_hours,
+            a.status,
+            a.break_start,
+            a.break_end,
+            a.notes
+        FROM ojt_attendance a
+        WHERE a.trainee_id = ? AND a.attendance_date BETWEEN ? AND ?
+        ORDER BY a.attendance_date DESC, a.time_in DESC
+    ");
+    $stmt->execute([(int)$userId, $startDate, $endDate]);
+    $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $formatted = array_map(function($r) {
+        return [
+            'id' => (int)$r['id'],
+            'date' => $r['attendance_date'],
+            'clockIn' => $r['time_in'] ? date('h:i A', strtotime($r['time_in'])) : null,
+            'clockOut' => $r['time_out'] ? date('h:i A', strtotime($r['time_out'])) : null,
+            'totalHours' => round((float)$r['total_hours'], 2),
+            'overtimeHours' => round((float)$r['overtime_hours'], 2),
+            'status' => $r['status'],
+            'breakStart' => $r['break_start'] ? date('h:i A', strtotime($r['break_start'])) : null,
+            'breakEnd' => $r['break_end'] ? date('h:i A', strtotime($r['break_end'])) : null,
+            'notes' => $r['notes']
+        ];
+    }, $records);
+
+    // Summary stats
+    $totalDays = count($formatted);
+    $totalHours = array_sum(array_column($formatted, 'totalHours'));
+    $avgHours = $totalDays > 0 ? round($totalHours / $totalDays, 2) : 0;
+    $lateDays = count(array_filter($formatted, fn($r) => $r['status'] === 'late'));
+    $presentDays = count(array_filter($formatted, fn($r) => $r['status'] === 'present'));
+
+    echo json_encode([
+        'success' => true,
+        'data' => [
+            'user' => [
+                'id' => (int)$user['id'],
+                'name' => $user['first_name'] . ' ' . $user['last_name'],
+                'email' => $user['email'],
+                'role' => $user['role'],
+                'university' => $user['university'],
+                'course' => $user['course'],
+                'supervisorName' => $sup['supervisor_name'] ?? 'N/A'
+            ],
+            'records' => $formatted,
+            'summary' => [
+                'totalDays' => $totalDays,
+                'presentDays' => $presentDays,
+                'lateDays' => $lateDays,
+                'totalHours' => round($totalHours, 2),
+                'avgHoursPerDay' => $avgHours
+            ]
         ]
     ]);
 }
