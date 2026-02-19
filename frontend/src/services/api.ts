@@ -8,7 +8,7 @@ const isProduction = typeof window !== 'undefined' &&
 const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
 // Direct backend URL for file uploads (bypasses Vercel proxy size limits)
-const DIRECT_BACKEND_URL = 'https://confirmed-metallica-keen-black.trycloudflare.com/backend/api';
+const DIRECT_BACKEND_URL = 'https://conditions-contribute-room-sim.trycloudflare.com/backend/api';
 
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;
