@@ -11,7 +11,10 @@
 5. [Session Logs](#session-logs)
 6. [API Reference](#api-reference)
 7. [Database Schema](#database-schema)
-8. [Troubleshooting](#troubleshooting)
+8. [Key Files Reference](#key-files-reference)
+9. [Process Workflows](#process-workflows)
+10. [Recommendations & Best Practices](#recommendations--best-practices)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -391,7 +394,147 @@ ordered → paid_waiting_approval → confirmed → processing → in_transit �
 
 ---
 
-## 🔧 Troubleshooting
+## � Key Files Reference
+
+### Frontend Files
+
+| File | Purpose | Key Functions |
+|------|---------|---------------|
+| `frontend/src/pages/SalesOrders.tsx` | Sales order management | Order list, status updates, barcode scanning |
+| `frontend/src/pages/Orders.tsx` | Customer order history | View orders, verify receipt, rate products |
+| `frontend/src/pages/SalesDashboard.tsx` | Sales analytics dashboard | Stats, charts, tabs for orders/customers |
+| `frontend/src/pages/SalesProducts.tsx` | Product CRUD management | Add/edit products, variations, images |
+| `frontend/src/pages/SalesInventory.tsx` | Inventory management | Stock levels, transfers, alerts |
+| `frontend/src/pages/Checkout.tsx` | Customer checkout flow | Payment selection, shipping, order placement |
+| `frontend/src/services/orderService.ts` | Order API calls | Create, update, verify orders |
+| `frontend/src/services/api.ts` | Base API configuration | Axios instance, interceptors |
+| `frontend/src/context/AuthContext.tsx` | Authentication state | Firebase auth, user roles |
+
+### Backend Files
+
+| File | Purpose | Key Endpoints |
+|------|---------|---------------|
+| `backend/api/sales.php` | Sales operations | Orders, customers, status updates, verification |
+| `backend/api/products.php` | Product CRUD | List, create, update, delete products |
+| `backend/api/inventory.php` | Stock management | Stock in/out, transfers, alerts |
+| `backend/api/auth.php` | Authentication | Login, register, verify email |
+| `backend/api/upload.php` | File uploads | Product images, documents |
+| `backend/config/database.php` | DB connection | MySQL PDO configuration |
+| `backend/middleware/cors.php` | CORS handling | Cross-origin request headers |
+
+### Deployment Files
+
+| File | Purpose | When to Edit |
+|------|---------|--------------|
+| `api/proxy.ts` | Vercel serverless proxy | When tunnel URL changes |
+| `api/image.ts` | Image proxy for Vercel | When tunnel URL changes |
+| `vercel.json` | Vercel build config | Rarely - routes and build settings |
+| `start-tunnel.ps1` | Tunnel starter script | Never - just run it |
+| `update-tunnel-url.ps1` | Manual URL updater | If auto-detect fails |
+| `tunnel-url.txt` | Current tunnel URL | Auto-updated by scripts |
+
+### Database Files
+
+| File | Purpose | When to Run |
+|------|---------|-------------|
+| `database/COMPLETE_SETUP.sql` | Full schema import | First-time setup |
+| `database/inventory_schema.sql` | Inventory tables | Adding inventory feature |
+| `database/products_schema.sql` | Products tables | Products feature setup |
+| `database/sales_schema.sql` | Sales/orders tables | Sales feature setup |
+
+---
+
+## 📋 Process Workflows
+
+### 1. Starting Development Session
+```powershell
+# 1. Start XAMPP (Apache + MySQL)
+# 2. Start Cloudflare tunnel for Vercel testing
+.\start-tunnel.ps1 -AutoPush
+
+# 3. Start frontend dev server (optional, for local testing)
+cd frontend; npm run dev
+```
+
+### 2. Making Code Changes
+```powershell
+# 1. Edit files in VS Code
+# 2. Backend changes are live immediately (symlinked)
+# 3. Frontend changes hot-reload via Vite
+# 4. Test locally at http://localhost:3000
+```
+
+### 3. Deploying to Vercel
+```powershell
+# Option A: Use start-tunnel.ps1 with -AutoPush (handles everything)
+.\start-tunnel.ps1 -AutoPush
+
+# Option B: Manual commit and push
+git add -A
+git commit -m "Your message"
+git push origin main
+# Vercel auto-deploys on push
+```
+
+### 4. Database Schema Changes
+```powershell
+# 1. Create SQL migration file in /database
+# 2. Run via MySQL CLI
+C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE database/your_migration.sql"
+
+# Or use phpMyAdmin at http://localhost/phpmyadmin
+```
+
+### 5. Order Processing Flow (Sales)
+1. Customer places order → status: `ordered`
+2. For store pickup: status → `paid_ready_pickup`
+3. Sales scans barcode → status → `picked_up`
+4. Customer clicks "Verify Receipt" → status → `completed`
+
+### 6. Stock Deduction Flow
+1. Order reaches `confirmed/processing/picked_up/delivered` status
+2. System auto-deducts from `products.stock_quantity`
+3. Creates `inventory_transactions` record
+4. Records `processed_by` (sales rep ID) and `processed_at`
+
+---
+
+## 💡 Recommendations & Best Practices
+
+### Development
+- **Always use symlinks** for backend to avoid manual file syncing
+- **Test locally first** before pushing to Vercel
+- **Keep tunnel running** while testing on Vercel
+- **Check console errors** - "Unexpected token '<'" usually means wrong tunnel URL
+
+### Code Quality
+- **TypeScript strict mode** - Fix type errors before committing
+- **Run `npx tsc --noEmit`** to check for type errors
+- **Use consistent naming** - camelCase for JS, snake_case for PHP/SQL
+
+### Git Workflow
+- **Commit frequently** with descriptive messages
+- **Push after completing** each feature
+- **Update SESSION_NOTES.md** to document changes
+
+### Security
+- **Never commit .env** files with real credentials
+- **Use environment variables** in Vercel for production secrets
+- **Validate all user input** in PHP endpoints
+
+### Performance
+- **Lazy load images** using loading="lazy"
+- **Cache API responses** where appropriate
+- **Use pagination** for large lists (orders, products)
+
+### Debugging
+- **Check browser console** first for frontend errors
+- **Check XAMPP Apache logs** for PHP errors: `C:\xampp\apache\logs\error.log`
+- **Use `console.log`** with emoji prefixes for easy filtering (📦, 🔐, ❌, ✅)
+
+---
+
+## �🔧 Troubleshooting
 
 ### "Unexpected token '<'" Error
 **Cause:** API returning HTML instead of JSON (wrong URL or server error)
