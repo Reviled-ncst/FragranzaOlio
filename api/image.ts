@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Backend URL for images - Cloudflare tunnel to local XAMPP
-const BACKEND_URL = process.env.BACKEND_URL || 'https://confirmed-metallica-keen-black.trycloudflare.com/backend';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://conditions-contribute-room-sim.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -19,13 +19,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Get the image path from query parameter
   const { path } = req.query;
-  
+
   if (!path) {
     return res.status(400).json({ error: 'Missing path parameter' });
   }
 
   const imagePath = Array.isArray(path) ? path.join('/') : path;
-  
+
   // Build the full image URL - images are served from backend root
   // Ensure path has leading slash
   const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
@@ -40,20 +40,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!response.ok) {
-      // Return a placeholder or 404
       return res.status(404).json({ error: 'Image not found', path: imagePath });
     }
 
     // Get content type from response
     const contentType = response.headers.get('content-type') || 'image/png';
-    
+
     // Get the image buffer
     const imageBuffer = await response.arrayBuffer();
-    
+
     // Set caching headers
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
-    
+
     // Send the image
     return res.send(Buffer.from(imageBuffer));
   } catch (error) {
