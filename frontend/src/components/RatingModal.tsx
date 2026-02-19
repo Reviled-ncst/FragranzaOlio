@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Star, 
@@ -19,9 +19,15 @@ import {
   ArrowRight,
   ArrowLeft,
   ShoppingBag,
-  Heart
+  Heart,
+  Video,
+  Upload,
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { Order, OrderItem } from '../services/orderService';
+import orderService from '../services/orderService';
+import { getImageUrl } from '../services/api';
 
 interface RatingModalProps {
   isOpen: boolean;
@@ -48,6 +54,7 @@ export interface ReviewData {
   title?: string;
   review?: string;
   images?: string[];
+  videos?: string[];
 }
 
 export interface ShopRatingData {
@@ -88,16 +95,14 @@ const StarRating = ({
         {[1, 2, 3, 4, 5].map((star) => {
           const isActive = star <= (hoveredStar || rating);
           return (
-            <motion.button
+            <button
               key={star}
               type="button"
               disabled={readonly}
-              whileHover={!readonly ? { scale: 1.2 } : undefined}
-              whileTap={!readonly ? { scale: 0.9 } : undefined}
               onClick={() => onRatingChange?.(star)}
               onMouseEnter={() => !readonly && setHoveredStar(star)}
               onMouseLeave={() => !readonly && setHoveredStar(0)}
-              className={`transition-colors ${readonly ? 'cursor-default' : 'cursor-pointer'}`}
+              className={`transition-transform duration-150 ${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-125 active:scale-90'}`}
             >
               <Star
                 className={`${sizeClasses[size]} transition-all duration-200 ${
@@ -106,19 +111,17 @@ const StarRating = ({
                     : 'text-gray-600 hover:text-gray-500'
                 }`}
               />
-            </motion.button>
+            </button>
           );
         })}
       </div>
-      {!readonly && (hoveredStar || rating) > 0 && (
-        <motion.p 
-          initial={{ opacity: 0, y: -4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-gold-400 text-sm font-medium"
-        >
-          {ratingLabels[hoveredStar || rating]}
-        </motion.p>
-      )}
+      <div className="h-5">
+        {!readonly && (hoveredStar || rating) > 0 && (
+          <p className="text-gold-400 text-sm font-medium animate-fade-in">
+            {ratingLabels[hoveredStar || rating]}
+          </p>
+        )}
+      </div>
     </div>
   );
 };
@@ -134,10 +137,123 @@ const ProductReviewCard = ({
   onReviewChange: (review: ReviewData) => void;
 }) => {
   const [isExpanded, setIsExpanded] = useState(review.rating > 0);
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [isUploadingVideos, setIsUploadingVideos] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const handleRatingChange = (rating: number) => {
     onReviewChange({ ...review, rating });
     if (!isExpanded) setIsExpanded(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Validate: max 5 images total
+    const currentImages = review.images?.length || 0;
+    if (currentImages + files.length > 5) {
+      setUploadError('Maximum 5 images allowed');
+      return;
+    }
+
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const maxSize = 10 * 1024 * 1024; // 10MB
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError(`Invalid file type: ${file.name}`);
+        return;
+      }
+      if (file.size > maxSize) {
+        setUploadError(`File too large (max 10MB): ${file.name}`);
+        return;
+      }
+      validFiles.push(file);
+    }
+
+    setUploadError(null);
+    setIsUploadingImages(true);
+
+    try {
+      const result = await orderService.uploadReviewMedia(validFiles, 'images');
+      if (result.success && result.urls) {
+        const newImages = [...(review.images || []), ...result.urls];
+        onReviewChange({ ...review, images: newImages });
+      } else {
+        setUploadError(result.error || 'Failed to upload images');
+      }
+    } catch (err) {
+      setUploadError('Failed to upload images');
+    } finally {
+      setIsUploadingImages(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Validate: max 2 videos total
+    const currentVideos = review.videos?.length || 0;
+    if (currentVideos + files.length > 2) {
+      setUploadError('Maximum 2 videos allowed');
+      return;
+    }
+
+    // Validate file types and sizes
+    const validFiles: File[] = [];
+    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+    const maxSize = 50 * 1024 * 1024; // 50MB
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!allowedTypes.includes(file.type)) {
+        setUploadError(`Invalid video type: ${file.name}`);
+        return;
+      }
+      if (file.size > maxSize) {
+        setUploadError(`Video too large (max 50MB): ${file.name}`);
+        return;
+      }
+      validFiles.push(file);
+    }
+
+    setUploadError(null);
+    setIsUploadingVideos(true);
+
+    try {
+      const result = await orderService.uploadReviewMedia(validFiles, 'videos');
+      if (result.success && result.urls) {
+        const newVideos = [...(review.videos || []), ...result.urls];
+        onReviewChange({ ...review, videos: newVideos });
+      } else {
+        setUploadError(result.error || 'Failed to upload videos');
+      }
+    } catch (err) {
+      setUploadError('Failed to upload videos');
+    } finally {
+      setIsUploadingVideos(false);
+      if (videoInputRef.current) videoInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    const newImages = [...(review.images || [])];
+    newImages.splice(index, 1);
+    onReviewChange({ ...review, images: newImages });
+  };
+
+  const removeVideo = (index: number) => {
+    const newVideos = [...(review.videos || [])];
+    newVideos.splice(index, 1);
+    onReviewChange({ ...review, videos: newVideos });
   };
 
   return (
@@ -223,16 +339,127 @@ const ProductReviewCard = ({
               />
             </div>
 
-            {/* Image Upload Placeholder */}
-            <div>
-              <label className="text-gray-400 text-sm mb-1 block">Add Photos (optional)</label>
-              <div className="flex gap-2">
-                <button
+            {/* Upload Error */}
+            {uploadError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-3 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2"
+              >
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{uploadError}</span>
+                <button 
                   type="button"
-                  className="w-16 h-16 border border-dashed border-gray-700 rounded-lg flex items-center justify-center text-gray-600 hover:border-gold-500/50 hover:text-gold-500 transition-colors"
+                  onClick={() => setUploadError(null)}
+                  className="ml-auto text-red-400 hover:text-red-300"
                 >
-                  <ImagePlus className="w-6 h-6" />
+                  <X className="w-4 h-4" />
                 </button>
+              </motion.div>
+            )}
+
+            {/* Image Upload */}
+            <div className="mb-3">
+              <label className="text-gray-400 text-sm mb-2 block">
+                Add Photos <span className="text-gray-600">(optional, max 5, 10MB each)</span>
+              </label>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <div className="flex flex-wrap gap-2">
+                {/* Uploaded Images Preview */}
+                {review.images?.map((url, index) => (
+                  <div key={index} className="relative group w-16 h-16">
+                    <img
+                      src={getImageUrl(url)}
+                      alt={`Upload ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg border border-gray-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+                
+                {/* Add Image Button */}
+                {(review.images?.length || 0) < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={isUploadingImages}
+                    className="w-16 h-16 border border-dashed border-gray-700 rounded-lg flex items-center justify-center text-gray-600 hover:border-gold-500/50 hover:text-gold-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUploadingImages ? (
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <ImagePlus className="w-6 h-6" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Video Upload */}
+            <div>
+              <label className="text-gray-400 text-sm mb-2 block">
+                Add Videos <span className="text-gray-600">(optional, max 2, 50MB each)</span>
+              </label>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                multiple
+                onChange={handleVideoUpload}
+                className="hidden"
+              />
+              <div className="flex flex-wrap gap-2">
+                {/* Uploaded Videos Preview */}
+                {review.videos?.map((url, index) => (
+                  <div key={index} className="relative group w-24 h-16">
+                    <video
+                      src={getImageUrl(url)}
+                      className="w-full h-full object-cover rounded-lg border border-gray-700"
+                    />
+                    <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                      <Video className="w-5 h-5 text-white" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeVideo(index)}
+                      className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+                
+                {/* Add Video Button */}
+                {(review.videos?.length || 0) < 2 && (
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    disabled={isUploadingVideos}
+                    className="w-24 h-16 border border-dashed border-gray-700 rounded-lg flex flex-col items-center justify-center gap-1 text-gray-600 hover:border-gold-500/50 hover:text-gold-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUploadingVideos ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Video className="w-5 h-5" />
+                        <span className="text-xs">Add Video</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>

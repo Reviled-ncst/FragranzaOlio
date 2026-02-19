@@ -519,6 +519,7 @@ const orderService = {
     title?: string;
     review?: string;
     images?: string[];
+    videos?: string[];
   }>): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await api.post<never, ApiResponse>('/sales.php?action=reviews', { reviews });
@@ -702,6 +703,53 @@ const orderService = {
     } catch (error) {
       console.error('Failed to get shop rating stats:', error);
       return { success: false };
+    }
+  },
+
+  /**
+   * Upload images and videos for reviews
+   * Returns URLs of uploaded files
+   */
+  async uploadReviewMedia(files: File[], type: 'images' | 'videos'): Promise<{
+    success: boolean;
+    urls?: string[];
+    error?: string;
+  }> {
+    try {
+      const formData = new FormData();
+      
+      // Use the correct field name for backend (images or videos)
+      // PHP expects array notation with [] for multiple files
+      const fieldName = type === 'images' ? 'images' : 'videos';
+      files.forEach(file => {
+        formData.append(fieldName, file);
+      });
+
+      const response = await api.post<never, ApiResponse<{ 
+        images?: Array<{ url: string }>; 
+        videos?: Array<{ url: string }>; 
+      }>>('/review_upload.php', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Extract URLs from the response
+      const mediaItems = type === 'images' 
+        ? response.data?.images 
+        : response.data?.videos;
+      const urls = mediaItems?.map(item => item.url) || [];
+
+      return {
+        success: response.success ?? true,
+        urls
+      };
+    } catch (error) {
+      console.error('Failed to upload review media:', error);
+      return {
+        success: false,
+        error: getApiErrorMessage(error) || 'Failed to upload files'
+      };
     }
   }
 };

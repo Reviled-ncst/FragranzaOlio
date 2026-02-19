@@ -2236,15 +2236,25 @@ function createReview($db, $data) {
     try {
         $db->beginTransaction();
         
+        // Process images and videos
+        $images = null;
+        $videos = null;
+        if (!empty($data['images']) && is_array($data['images'])) {
+            $images = json_encode($data['images']);
+        }
+        if (!empty($data['videos']) && is_array($data['videos'])) {
+            $videos = json_encode($data['videos']);
+        }
+        
         $stmt = $db->prepare("
             INSERT INTO product_reviews (
                 product_id, order_id, order_item_id, user_id,
                 customer_name, customer_email, rating,
-                title, review, is_verified_purchase, status
+                title, review, images, videos, is_verified_purchase, status
             ) VALUES (
                 :product_id, :order_id, :order_item_id, :user_id,
                 :customer_name, :customer_email, :rating,
-                :title, :review, :is_verified_purchase, :status
+                :title, :review, :images, :videos, :is_verified_purchase, :status
             )
         ");
         
@@ -2258,6 +2268,8 @@ function createReview($db, $data) {
             ':rating' => $rating,
             ':title' => $data['title'] ?? null,
             ':review' => $data['review'] ?? null,
+            ':images' => $images,
+            ':videos' => $videos,
             ':is_verified_purchase' => $isVerifiedPurchase ? 1 : 0,
             ':status' => $isVerifiedPurchase ? 'approved' : 'pending' // Auto-approve verified purchases
         ]);
@@ -2353,16 +2365,26 @@ function createReviewsBatch($db, $data) {
                 }
             }
             
+            // Process images and videos
+            $images = null;
+            $videos = null;
+            if (!empty($reviewData['images']) && is_array($reviewData['images'])) {
+                $images = json_encode($reviewData['images']);
+            }
+            if (!empty($reviewData['videos']) && is_array($reviewData['videos'])) {
+                $videos = json_encode($reviewData['videos']);
+            }
+            
             // Insert review
             $stmt = $db->prepare("
                 INSERT INTO product_reviews (
                     product_id, order_id, order_item_id, user_id,
                     customer_name, customer_email, rating,
-                    title, review, is_verified_purchase, status
+                    title, review, images, videos, is_verified_purchase, status
                 ) VALUES (
                     :product_id, :order_id, :order_item_id, :user_id,
                     :customer_name, :customer_email, :rating,
-                    :title, :review, :is_verified_purchase, :status
+                    :title, :review, :images, :videos, :is_verified_purchase, :status
                 )
             ");
             
@@ -2376,6 +2398,8 @@ function createReviewsBatch($db, $data) {
                 ':rating' => $rating,
                 ':title' => $reviewData['title'] ?? null,
                 ':review' => $reviewData['review'] ?? null,
+                ':images' => $images,
+                ':videos' => $videos,
                 ':is_verified_purchase' => $isVerifiedPurchase ? 1 : 0,
                 ':status' => $isVerifiedPurchase ? 'approved' : 'pending'
             ]);
