@@ -20,15 +20,17 @@ const patchCanvasContext = () => {
   if (canvasPatched) return;
   canvasPatched = true;
   const original = HTMLCanvasElement.prototype.getContext;
-  HTMLCanvasElement.prototype.getContext = function (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (HTMLCanvasElement.prototype as any).getContext = function (
+    this: HTMLCanvasElement,
     contextId: string,
-    options?: Record<string, unknown>
+    options?: any // eslint-disable-line @typescript-eslint/no-explicit-any
   ) {
     if (contextId === '2d') {
       options = { ...options, willReadFrequently: true };
     }
-    return original.call(this, contextId, options);
-  } as typeof original;
+    return original.call(this, contextId as any, options);
+  };
 };
 
 /**
