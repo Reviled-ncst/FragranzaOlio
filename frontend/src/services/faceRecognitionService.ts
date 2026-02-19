@@ -13,6 +13,24 @@ let loadingPromise: Promise<void> | null = null;
 // Model path (relative to public folder)
 const MODEL_URL = '/models';
 
+// Patch canvas getContext to add willReadFrequently for 2d contexts
+// This suppresses "Multiple readback operations" warnings from face-api.js
+let canvasPatched = false;
+const patchCanvasContext = () => {
+  if (canvasPatched) return;
+  canvasPatched = true;
+  const original = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (
+    contextId: string,
+    options?: Record<string, unknown>
+  ) {
+    if (contextId === '2d') {
+      options = { ...options, willReadFrequently: true };
+    }
+    return original.call(this, contextId, options);
+  } as typeof original;
+};
+
 /**
  * Load face-api.js library and models
  * Only loads once, subsequent calls return cached promise
@@ -24,6 +42,9 @@ export const loadModels = async (): Promise<void> => {
   
   loadingPromise = (async () => {
     try {
+      // Patch canvas before face-api.js loads to avoid willReadFrequently warnings
+      patchCanvasContext();
+      
       console.log('Loading face-api.js library...');
       
       // Dynamic import of face-api.js
@@ -165,7 +186,7 @@ export const drawFaceOverlay = (
   videoElement: HTMLVideoElement,
   result: FaceDetectionResult
 ): void => {
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx || !result.box) return;
   
   // Match canvas size to video

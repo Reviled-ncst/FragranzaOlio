@@ -237,7 +237,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
         if (overlayCanvasRef.current && videoRef.current) {
           const canvas = overlayCanvasRef.current;
           const video = videoRef.current;
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
           
           if (ctx) {
             canvas.width = video.videoWidth;
@@ -323,7 +323,7 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     
     if (ctx) {
       canvas.width = video.videoWidth;

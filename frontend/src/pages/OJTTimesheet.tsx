@@ -215,7 +215,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
               const video = videoRef.current;
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
-              const ctx = canvas.getContext('2d');
+              const ctx = canvas.getContext('2d', { willReadFrequently: true });
               if (ctx) {
                 ctx.drawImage(video, 0, 0);
                 const photoData = canvas.toDataURL('image/jpeg', 0.8);
@@ -238,7 +238,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
         if (overlayCanvasRef.current && videoRef.current) {
           const canvas = overlayCanvasRef.current;
           const video = videoRef.current;
-          const ctx = canvas.getContext('2d');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
           
           if (ctx) {
             canvas.width = video.videoWidth;
@@ -323,7 +323,7 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
       const video = videoRef.current;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         const photoData = canvas.toDataURL('image/jpeg', 0.8);
