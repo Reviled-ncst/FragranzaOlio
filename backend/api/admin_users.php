@@ -4,14 +4,7 @@
  * Fragranza Olio - User Management for Admin
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
-// Include CORS middleware
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 
 // Handle preflight requests
@@ -89,21 +82,8 @@ class AdminUsersController {
             }
         }
         
-        // Method 2: Try email from header (for proxy auth)
-        $email = $headers['X-Admin-Email'] ?? $_GET['admin_email'] ?? null;
-        if ($email) {
-            $stmt = $this->db->prepare("
-                SELECT id, role, email, first_name, last_name
-                FROM users 
-                WHERE email = ? AND status = 'active'
-            ");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
-            
-            if ($user && $user['role'] === 'admin') {
-                return $user;
-            }
-        }
+        // SECURITY: Removed Method 2 (X-Admin-Email header) - it allowed admin impersonation
+        // by anyone who knows an admin's email address. Auth must use Bearer token only.
         
         return null;
     }
@@ -446,7 +426,7 @@ class AdminUsersController {
             
         } catch (PDOException $e) {
             error_log("Create user error: " . $e->getMessage());
-            return $this->response(false, 'Failed to create user: ' . $e->getMessage(), null, 500);
+            return $this->response(false, 'Failed to create user. Please try again.', null, 500);
         }
     }
     

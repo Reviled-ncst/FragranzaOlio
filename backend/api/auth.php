@@ -4,24 +4,17 @@
  * Fragranza Olio - User Registration & Login
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
-// Include CORS middleware
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
+
+// Rate limiting
+require_once __DIR__ . '/../middleware/rate_limit.php';
+
+// Input sanitization
+require_once __DIR__ . '/../middleware/sanitize.php';
 
 // Include Email Service
 require_once __DIR__ . '/../services/EmailService.php';
-
-// Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
 
 require_once __DIR__ . '/../config/database.php';
 
@@ -36,6 +29,15 @@ class AuthController {
      * Register a new user
      */
     public function register($data) {
+        // Rate limit: 10 registrations per hour per IP
+        checkRateLimit('register', 10, 3600);
+        
+        // Sanitize all input
+        $data = sanitizeInput($data, [
+            'email' => 'email',
+            'phone' => 'phone'
+        ]);
+        
         try {
             // Validate required fields
             $required = ['firstName', 'lastName', 'email', 'password', 'birthDate', 'gender', 'phone'];
@@ -60,6 +62,20 @@ class AuthController {
             // Validate password strength
             if (strlen($data['password']) < 8) {
                 return $this->response(false, 'Password must be at least 8 characters', null, 400);
+            }
+            
+            // SECURITY: Enforce password complexity
+            if (!preg_match('/[A-Z]/', $data['password'])) {
+                return $this->response(false, 'Password must contain at least one uppercase letter', null, 400);
+            }
+            if (!preg_match('/[a-z]/', $data['password'])) {
+                return $this->response(false, 'Password must contain at least one lowercase letter', null, 400);
+            }
+            if (!preg_match('/[0-9]/', $data['password'])) {
+                return $this->response(false, 'Password must contain at least one number', null, 400);
+            }
+            if (!preg_match('/[^A-Za-z0-9]/', $data['password'])) {
+                return $this->response(false, 'Password must contain at least one special character', null, 400);
             }
             
             // Validate password confirmation
@@ -113,39 +129,43 @@ class AuthController {
             $userId = $this->db->lastInsertId();
             
             // Handle OJT intern role - assign to supervisor
+            // SECURITY: Only allow 'customer' and 'ojt' (with valid supervisor) roles via registration
             $role = $data['role'] ?? 'customer';
+            $allowedRegistrationRoles = ['customer', 'ojt'];
+            if (!in_array($role, $allowedRegistrationRoles)) {
+                $role = 'customer';
+            }
+            
             if ($role === 'ojt' && !empty($data['supervisorId'])) {
-                // Update user role
-                $stmt = $this->db->prepare("UPDATE users SET role = 'ojt' WHERE id = ?");
-                $stmt->execute([$userId]);
-                
-                // Create OJT assignment
-                $stmt = $this->db->prepare("
-                    INSERT INTO ojt_assignments (supervisor_id, trainee_id, department, start_date, total_required_hours, status)
-                    VALUES (?, ?, ?, CURDATE(), ?, 'active')
-                ");
-                $stmt->execute([
-                    $data['supervisorId'],
-                    $userId,
-                    $data['department'] ?? 'General',
-                    $data['requiredHours'] ?? 500
-                ]);
-                
-                // Update user with university/course info
-                if (!empty($data['university']) || !empty($data['course'])) {
-                    $stmt = $this->db->prepare("UPDATE users SET university = ?, course = ? WHERE id = ?");
+                // Verify supervisor exists and is active
+                $supervisorStmt = $this->db->prepare("SELECT id FROM users WHERE id = ? AND role = 'ojt_supervisor' AND status = 'active'");
+                $supervisorStmt->execute([$data['supervisorId']]);
+                if (!$supervisorStmt->fetch()) {
+                    $role = 'customer';
+                } else {
+                    $stmt = $this->db->prepare("UPDATE users SET role = 'ojt' WHERE id = ?");
+                    $stmt->execute([$userId]);
+                    
+                    $stmt = $this->db->prepare("
+                        INSERT INTO ojt_assignments (supervisor_id, trainee_id, department, start_date, total_required_hours, status)
+                        VALUES (?, ?, ?, CURDATE(), ?, 'active')
+                    ");
                     $stmt->execute([
-                        $data['university'] ?? null,
-                        $data['course'] ?? null,
-                        $userId
+                        $data['supervisorId'],
+                        $userId,
+                        $data['department'] ?? 'General',
+                        $data['requiredHours'] ?? 500
                     ]);
+                    
+                    if (!empty($data['university']) || !empty($data['course'])) {
+                        $stmt = $this->db->prepare("UPDATE users SET university = ?, course = ? WHERE id = ?");
+                        $stmt->execute([
+                            $data['university'] ?? null,
+                            $data['course'] ?? null,
+                            $userId
+                        ]);
+                    }
                 }
-            } elseif ($role === 'ojt_supervisor') {
-                $stmt = $this->db->prepare("UPDATE users SET role = 'ojt_supervisor' WHERE id = ?");
-                $stmt->execute([$userId]);
-            } elseif ($role !== 'customer') {
-                $stmt = $this->db->prepare("UPDATE users SET role = ? WHERE id = ?");
-                $stmt->execute([$role, $userId]);
             }
             
             // Log activity
@@ -169,6 +189,12 @@ class AuthController {
      * User login
      */
     public function login($data) {
+        // Rate limit: 5 login attempts per minute per IP
+        checkRateLimit('login', 5, 60);
+        
+        // Sanitize input
+        $data = sanitizeInput($data, ['email' => 'email']);
+        
         try {
             // Validate required fields
             if (empty($data['email']) || empty($data['password'])) {
@@ -369,20 +395,43 @@ class AuthController {
     
     /**
      * Mark email as verified (called by frontend after Firebase verification)
+     * SECURITY: Requires valid session token - user can only verify their own email
      */
-    public function markEmailVerified($email) {
+    public function markEmailVerified($email, $sessionToken) {
         try {
             if (empty($email)) {
                 return $this->response(false, 'Email is required', null, 400);
+            }
+            
+            if (empty($sessionToken)) {
+                return $this->response(false, 'Authentication required', null, 401);
+            }
+            
+            // Verify the session token belongs to the user requesting verification
+            $stmt = $this->db->prepare("
+                SELECT u.id, u.email FROM users u
+                JOIN user_sessions s ON u.id = s.user_id
+                WHERE s.session_token = ? AND s.expires_at > NOW()
+            ");
+            $stmt->execute([$sessionToken]);
+            $sessionUser = $stmt->fetch();
+            
+            if (!$sessionUser) {
+                return $this->response(false, 'Invalid or expired session', null, 401);
+            }
+            
+            // SECURITY: User can only mark their own email as verified
+            if (strtolower($sessionUser['email']) !== strtolower(trim($email))) {
+                return $this->response(false, 'Unauthorized: cannot verify another user\'s email', null, 403);
             }
             
             // Update user's email_verified status
             $stmt = $this->db->prepare("
                 UPDATE users 
                 SET email_verified = 1, status = 'active'
-                WHERE email = ?
+                WHERE email = ? AND id = ?
             ");
-            $stmt->execute([$email]);
+            $stmt->execute([$email, $sessionUser['id']]);
             
             if ($stmt->rowCount() === 0) {
                 return $this->response(false, 'User not found', null, 404);
@@ -518,6 +567,9 @@ class AuthController {
      * Request password reset - sends reset token
      */
     public function forgotPassword($email) {
+        // Rate limit: 3 password resets per hour per IP
+        checkRateLimit('password_reset', 3, 3600);
+        
         try {
             if (empty($email)) {
                 return $this->response(false, 'Email is required', null, 400);
@@ -548,12 +600,18 @@ class AuthController {
             // Log activity
             $this->logActivity($user['id'], 'password_reset_request', ['email' => $email]);
             
-            // In production, send email here
-            // For development, return the token
-            return $this->response(true, 'If an account exists with this email, you will receive a password reset link.', [
-                'resetToken' => $resetToken, // Remove in production
-                'expiresAt' => $resetExpires
-            ]);
+            // Send reset email
+            try {
+                $emailService = getEmailService();
+                $siteUrl = 'https://fragranza-web.vercel.app';
+                $resetUrl = $siteUrl . '/reset-password?token=' . $resetToken;
+                $emailService->sendPasswordResetEmail($user['email'], $user['first_name'], $resetToken, $resetUrl);
+            } catch (Exception $emailError) {
+                error_log("Failed to send reset email: " . $emailError->getMessage());
+            }
+            
+            // SECURITY: Never return reset token in response - send via email only
+            return $this->response(true, 'If an account exists with this email, you will receive a password reset link.');
             
         } catch (PDOException $e) {
             error_log("Forgot password error: " . $e->getMessage());
@@ -688,7 +746,7 @@ switch ($method) {
                 $auth->resendVerification($input['email'] ?? '');
                 break;
             case 'mark-email-verified':
-                $auth->markEmailVerified($input['email'] ?? '');
+                $auth->markEmailVerified($input['email'] ?? '', $token);
                 break;
             default:
                 http_response_code(400);
@@ -700,9 +758,8 @@ switch ($method) {
         switch ($action) {
             case 'current-user':
             case 'me':
-                // Get token from header, GET param, or localStorage key
-                $sessionToken = $token ?: ($_GET['token'] ?? '');
-                $auth->getCurrentUser($sessionToken);
+                // SECURITY: Only accept token from Authorization header
+                $auth->getCurrentUser($token);
                 break;
             case 'verify-email':
                 $auth->verifyEmail($_GET['token'] ?? '');

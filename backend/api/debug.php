@@ -1,19 +1,23 @@
 <?php
+/**
+ * Debug API - DISABLED IN PRODUCTION
+ */
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
 
-$serverName = $_SERVER['SERVER_NAME'] ?? 'not set';
-$isNgrok = strpos($serverName, 'ngrok') !== false;
-$isLocalhost = in_array($serverName, ['localhost', '127.0.0.1']);
+// SECURITY: Only allow access from localhost
+$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+$serverName = $_SERVER['SERVER_NAME'] ?? '';
+$isLocal = in_array($remoteAddr, ['127.0.0.1', '::1']) && 
+           in_array($serverName, ['localhost', '127.0.0.1']);
+
+if (!$isLocal) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Debug endpoint disabled in production']);
+    exit;
+}
 
 echo json_encode([
-    'server_name' => $serverName,
-    'is_ngrok' => $isNgrok,
-    'is_localhost' => $isLocalhost,
-    'http_host' => $_SERVER['HTTP_HOST'] ?? 'not set',
-    'all_server' => [
-        'SERVER_NAME' => $_SERVER['SERVER_NAME'] ?? null,
-        'HTTP_HOST' => $_SERVER['HTTP_HOST'] ?? null,
-        'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? null,
-    ]
+    'status' => 'ok',
+    'environment' => 'local',
+    'timestamp' => date('Y-m-d H:i:s')
 ], JSON_PRETTY_PRINT);

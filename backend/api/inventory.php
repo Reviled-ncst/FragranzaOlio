@@ -4,19 +4,18 @@
  * Handles stock-in, stock-out, transfers, and inventory queries
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../middleware/sanitize.php';
 
 $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
+
+// SECURITY: All inventory operations require admin or supervisor role
+requireRole($db, ['admin', 'ojt_supervisor']);
 
 try {
     switch ($method) {
@@ -70,7 +69,8 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    error_log('Inventory error: ' . $e->getMessage());
+    echo json_encode(['error' => 'An internal error occurred']);
 }
 
 /**
@@ -207,6 +207,9 @@ function getTransactions($db) {
  * Stock In - Receive stock at a branch
  */
 function stockIn($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     $required = ['branch_id', 'product_id', 'quantity'];
     foreach ($required as $field) {
         if (!isset($data[$field]) || empty($data[$field])) {
@@ -285,6 +288,9 @@ function stockIn($db, $data) {
  * Stock Out - Remove stock from a branch
  */
 function stockOut($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     $required = ['branch_id', 'product_id', 'quantity', 'reason'];
     foreach ($required as $field) {
         if (!isset($data[$field]) || empty($data[$field])) {
@@ -368,6 +374,9 @@ function stockOut($db, $data) {
  * Transfer Stock between branches
  */
 function transferStock($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     $required = ['source_branch_id', 'destination_branch_id', 'product_id', 'quantity'];
     foreach ($required as $field) {
         if (!isset($data[$field]) || empty($data[$field])) {
@@ -538,6 +547,9 @@ function completeTransfer($db, $data) {
  * Adjust stock (for corrections/counts)
  */
 function adjustStock($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     $required = ['branch_id', 'product_id', 'new_quantity', 'reason'];
     foreach ($required as $field) {
         if (!isset($data[$field])) {
@@ -766,6 +778,11 @@ function resolveStockAlerts($db, $branchId, $productId) {
  * Create a new branch
  */
 function createBranch($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, [
+        'contact_email' => 'email', 'contact_phone' => 'phone'
+    ]);
+    
     $required = ['name', 'code'];
     foreach ($required as $field) {
         if (!isset($data[$field]) || empty($data[$field])) {

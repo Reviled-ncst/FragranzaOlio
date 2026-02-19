@@ -3,9 +3,43 @@
  * Database Configuration
  * Fragranza Olio - Database Connection Settings
  * 
- * For InfinityFree: Update these values from your control panel
- * Control Panel → MySQL Databases
+ * Credentials are loaded from backend/.env file
+ * See backend/.env.example for the template
  */
+
+/**
+ * Load environment variables from .env file
+ */
+function loadEnvFile(): void {
+    $envFile = __DIR__ . '/../.env';
+    if (!file_exists($envFile)) {
+        return; // Fall back to defaults if no .env file
+    }
+    
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        // Skip comments
+        if (str_starts_with(trim($line), '#')) {
+            continue;
+        }
+        
+        // Parse KEY=VALUE
+        if (strpos($line, '=') !== false) {
+            list($key, $value) = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            
+            // Don't override existing environment variables
+            if (!isset($_ENV[$key]) && getenv($key) === false) {
+                putenv("$key=$value");
+                $_ENV[$key] = $value;
+            }
+        }
+    }
+}
+
+// Load .env file
+loadEnvFile();
 
 // Check if we're in production (InfinityFree) or local (XAMPP/ngrok/Cloudflare tunnel)
 $serverName = $_SERVER['SERVER_NAME'] ?? '';
@@ -19,18 +53,18 @@ if ($isProduction) {
     // ============================================
     // INFINITYFREE PRODUCTION SETTINGS
     // ============================================
-    define('DB_HOST', 'sql311.infinityfree.com');
-    define('DB_NAME', 'if0_41131668_fragranza');
-    define('DB_USER', 'if0_41131668');
-    define('DB_PASS', 'Revengeme1@');
+    define('DB_HOST', getenv('PROD_DB_HOST') ?: 'localhost');
+    define('DB_NAME', getenv('PROD_DB_NAME') ?: 'fragranza_db');
+    define('DB_USER', getenv('PROD_DB_USER') ?: 'root');
+    define('DB_PASS', getenv('PROD_DB_PASS') ?: '');
 } else {
     // ============================================
     // LOCAL DEVELOPMENT (XAMPP)
     // ============================================
-    define('DB_HOST', 'localhost');
-    define('DB_NAME', 'fragranza_db');
-    define('DB_USER', 'root');
-    define('DB_PASS', '');
+    define('DB_HOST', getenv('LOCAL_DB_HOST') ?: 'localhost');
+    define('DB_NAME', getenv('LOCAL_DB_NAME') ?: 'fragranza_db');
+    define('DB_USER', getenv('LOCAL_DB_USER') ?: 'root');
+    define('DB_PASS', getenv('LOCAL_DB_PASS') ?: '');
 }
 
 define('DB_CHARSET', 'utf8mb4');
@@ -64,11 +98,11 @@ class Database {
             $this->createTables();
             
         } catch (PDOException $e) {
+            error_log('Database connection failed: ' . $e->getMessage());
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'message' => 'Database connection failed',
-                'error' => $e->getMessage()
+                'message' => 'Database connection failed'
             ]);
             exit;
         }

@@ -5,14 +5,14 @@
  * Supports both multipart/form-data and base64 JSON uploads
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/auth.php';
+
+// SECURITY: Require admin role for product image uploads
+$db = Database::getInstance()->getConnection();
+requireRole($db, 'admin');
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -39,17 +39,11 @@ if (strpos($contentType, 'application/json') !== false) {
     if (isset($jsonData['image_base64']) && isset($jsonData['filename'])) {
         // Base64 upload
         $base64Data = $jsonData['image_base64'];
-        $originalFilename = $jsonData['filename'];
+        $originalFilename = basename($jsonData['filename']); // SECURITY: Strip path components
         
         // Remove data URL prefix if present
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
             $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
-            $mimeType = 'image/' . $matches[1];
-        } else {
-            // Detect from extension
-            $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
-            $mimeTypes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'];
-            $mimeType = $mimeTypes[$ext] ?? 'image/jpeg';
         }
         
         $imageData = base64_decode($base64Data);
@@ -59,6 +53,13 @@ if (strpos($contentType, 'application/json') !== false) {
             exit;
         }
         
+        // SECURITY: Verify actual content type using finfo (not the claimed MIME type)
+        $tmpFile = tempnam(sys_get_temp_dir(), 'upload_');
+        file_put_contents($tmpFile, $imageData);
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($tmpFile);
+        unlink($tmpFile);
+        
         // Check size
         if (strlen($imageData) > $maxFileSize) {
             http_response_code(400);
@@ -66,16 +67,25 @@ if (strpos($contentType, 'application/json') !== false) {
             exit;
         }
         
-        // Validate mime type
+        // Validate mime type from actual content
         if (!in_array($mimeType, $allowedTypes)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Invalid file type']);
+            echo json_encode(['success' => false, 'message' => 'Invalid file type. Detected: ' . $mimeType]);
             exit;
         }
         
-        // Generate filename
-        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'jpg';
-        $filename = uniqid('product_', true) . '.' . strtolower($extension);
+        // SECURITY: Verify it's a valid image
+        $imageInfo = @getimagesize('data://application/octet-stream;base64,' . base64_encode($imageData));
+        if ($imageInfo === false) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid image file']);
+            exit;
+        }
+        
+        // SECURITY: Derive extension from validated MIME type, not from user input
+        $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        $extension = $mimeToExt[$mimeType] ?? 'jpg';
+        $filename = uniqid('product_', true) . '.' . $extension;
         $destination = $uploadDir . $filename;
         
         // Save file
@@ -142,9 +152,10 @@ if ($file['size'] > $maxFileSize) {
     exit;
 }
 
-// Generate unique filename
-$extension = pathinfo($file['name'], PATHINFO_EXTENSION);
-$filename = uniqid('product_', true) . '.' . strtolower($extension);
+// Generate unique filename - SECURITY: derive extension from validated MIME type
+$mimeToExtMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+$extension = $mimeToExtMap[$mimeType] ?? 'jpg';
+$filename = uniqid('product_', true) . '.' . $extension;
 $destination = $uploadDir . $filename;
 
 // Move uploaded file

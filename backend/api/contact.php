@@ -4,15 +4,10 @@
  * Handles contact form submissions
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/sanitize.php';
 
 $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -62,6 +57,9 @@ function submitContact($db) {
         $phone = isset($data['phone']) ? htmlspecialchars(strip_tags($data['phone'])) : null;
         $company = isset($data['company']) ? htmlspecialchars(strip_tags($data['company'])) : null;
         $inquiryType = $data['inquiry_type'] ?? $data['inquiryType'] ?? 'general';
+        $inquiryType = validateWhitelist($inquiryType, [
+            'general', 'product', 'order', 'wholesale', 'partnership', 'feedback', 'complaint', 'support', 'other'
+        ], 'general');
         $message = htmlspecialchars(strip_tags($data['message']));
 
         $sql = "INSERT INTO contact_inquiries (name, email, phone, company, inquiry_type, message) 
@@ -88,7 +86,8 @@ function submitContact($db) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to submit inquiry', 'error' => $e->getMessage()]);
+        error_log('Contact form error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to submit inquiry']);
     }
 }
 
@@ -129,6 +128,7 @@ function getInquiries($db) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch inquiries', 'error' => $e->getMessage()]);
+        error_log('Fetch inquiries error: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch inquiries']);
     }
 }

@@ -5,14 +5,14 @@
  * Supports multiple files upload
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/auth.php';
+
+// SECURITY: Require authenticated user for review uploads
+$db = Database::getInstance()->getConnection();
+requireAuth($db);
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -86,12 +86,11 @@ if (!empty($_FILES)) {
                 continue;
             }
             
-            // Generate unique filename
-            $extension = pathinfo($name, PATHINFO_EXTENSION);
-            $filename = 'review_' . uniqid('', true) . '.' . strtolower($extension);
+            // Generate unique filename - SECURITY: derive extension from MIME type
+            $imgMimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+            $extension = $imgMimeToExt[$mimeType] ?? 'jpg';
+            $filename = 'review_' . uniqid('', true) . '.' . $extension;
             $destination = $imageDir . $filename;
-            
-            if (move_uploaded_file($tmpName, $destination)) {
                 $uploadedFiles['images'][] = [
                     'filename' => $filename,
                     'path' => '/uploads/reviews/images/' . $filename,
@@ -143,9 +142,10 @@ if (!empty($_FILES)) {
                 continue;
             }
             
-            // Generate unique filename
-            $extension = pathinfo($name, PATHINFO_EXTENSION);
-            $filename = 'review_' . uniqid('', true) . '.' . strtolower($extension);
+            // Generate unique filename - SECURITY: derive extension from MIME type
+            $vidMimeToExt = ['video/mp4' => 'mp4', 'video/webm' => 'webm', 'video/quicktime' => 'mov', 'video/x-msvideo' => 'avi'];
+            $extension = $vidMimeToExt[$mimeType] ?? 'mp4';
+            $filename = 'review_' . uniqid('', true) . '.' . $extension;
             $destination = $videoDir . $filename;
             
             if (move_uploaded_file($tmpName, $destination)) {
@@ -175,16 +175,10 @@ if (strpos($contentType, 'application/json') !== false) {
             if (empty($imgData['data'])) continue;
             
             $base64Data = $imgData['data'];
-            $originalFilename = $imgData['filename'] ?? 'image.jpg';
             
             // Remove data URL prefix if present
             if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
                 $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
-                $mimeType = 'image/' . $matches[1];
-            } else {
-                $ext = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
-                $mimeTypes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif'];
-                $mimeType = $mimeTypes[$ext] ?? 'image/jpeg';
             }
             
             $imageData = base64_decode($base64Data);
@@ -193,13 +187,27 @@ if (strpos($contentType, 'application/json') !== false) {
                 continue;
             }
             
+            // SECURITY: Verify actual content type using finfo
+            $tmpFile = tempnam(sys_get_temp_dir(), 'review_upload_');
+            file_put_contents($tmpFile, $imageData);
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mimeType = $finfo->file($tmpFile);
+            unlink($tmpFile);
+            
+            if (!in_array($mimeType, $allowedImageTypes)) {
+                $errors[] = "Invalid image type detected: $mimeType";
+                continue;
+            }
+            
             if (strlen($imageData) > $maxImageSize) {
                 $errors[] = "Image exceeds 10MB limit";
                 continue;
             }
             
-            $extension = pathinfo($originalFilename, PATHINFO_EXTENSION) ?: 'jpg';
-            $filename = 'review_' . uniqid('', true) . '.' . strtolower($extension);
+            // SECURITY: Derive extension from validated MIME type
+            $b64MimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+            $extension = $b64MimeToExt[$mimeType] ?? 'jpg';
+            $filename = 'review_' . uniqid('', true) . '.' . $extension;
             $destination = $imageDir . $filename;
             
             if (file_put_contents($destination, $imageData) !== false) {

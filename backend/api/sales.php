@@ -4,15 +4,11 @@
  * Handles orders, customers, invoices, complaints, and analytics
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../middleware/sanitize.php';
 
 $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -42,10 +38,8 @@ try {
     }
 } catch (Exception $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-}
-
-function handleGetRequests($db, $action) {
+    error_log('Sales API error: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     switch ($action) {
         case 'orders':
             getOrders($db);
@@ -113,6 +107,18 @@ function handleGetRequests($db, $action) {
 function handlePostRequests($db, $action) {
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // SECURITY: Actions requiring authentication
+    $authRequiredActions = ['review', 'reviews', 'shop-rating', 'shop_rating', 'complaint', 'complaint-message', 'settings', 'change_password', 'customer-verify-order'];
+    $adminActions = ['customer', 'invoice'];
+    
+    if (in_array($action, $authRequiredActions)) {
+        $authUser = requireAuth($db);
+        $data['_auth_user'] = $authUser;
+    } elseif (in_array($action, $adminActions)) {
+        $authUser = requireRole($db, ['admin', 'ojt_supervisor']);
+        $data['_auth_user'] = $authUser;
+    }
+    
     switch ($action) {
         case 'order':
             createOrder($db, $data);
@@ -157,6 +163,16 @@ function handlePostRequests($db, $action) {
 function handlePutRequests($db, $action) {
     $data = json_decode(file_get_contents('php://input'), true);
     
+    // SECURITY: All PUT operations require authentication
+    $adminActions = ['order', 'order-status', 'customer', 'invoice', 'invoice-status', 'complaint', 'complaint-status'];
+    if (in_array($action, $adminActions)) {
+        $authUser = requireRole($db, ['admin', 'ojt_supervisor']);
+        $data['_auth_user'] = $authUser;
+    } else {
+        $authUser = requireAuth($db);
+        $data['_auth_user'] = $authUser;
+    }
+    
     switch ($action) {
         case 'order':
             updateOrder($db, $data);
@@ -189,6 +205,9 @@ function handlePutRequests($db, $action) {
 }
 
 function handleDeleteRequests($db, $action) {
+    // SECURITY: All DELETE operations require admin role
+    requireRole($db, 'admin');
+    
     $id = $_GET['id'] ?? null;
     
     switch ($action) {
@@ -352,14 +371,21 @@ function getOrders($db) {
     }
     
     // Get total count
+    // Get total count (using prepared statements to prevent SQL injection)
     $countSql = "SELECT COUNT(*) FROM orders o LEFT JOIN customers c ON o.customer_id = c.id WHERE 1=1";
+    $countParams = [];
     if ($customerEmail) {
-        $countSql .= " AND (c.email = '$customerEmail' OR o.shipping_email = '$customerEmail')";
+        $countSql .= " AND (c.email = :email1 OR o.shipping_email = :email2)";
+        $countParams[':email1'] = $customerEmail;
+        $countParams[':email2'] = $customerEmail;
     }
     if ($status && $status !== 'all') {
-        $countSql .= " AND o.status = '$status'";
+        $countSql .= " AND o.status = :status";
+        $countParams[':status'] = $status;
     }
-    $totalCount = $db->query($countSql)->fetchColumn();
+    $countStmt = $db->prepare($countSql);
+    $countStmt->execute($countParams);
+    $totalCount = $countStmt->fetchColumn();
     
     // Get stats
     $stats = [
@@ -503,6 +529,12 @@ function trackOrder($db, $orderNumber, $email) {
 }
 
 function createOrder($db, $data) {
+    // Sanitize all input
+    $data = sanitizeInput($data, [
+        'customer_email' => 'email', 'shipping_email' => 'email',
+        'customer_phone' => 'phone', 'shipping_phone' => 'phone'
+    ]);
+    
     try {
         $db->beginTransaction();
         
@@ -683,6 +715,9 @@ function createOrder($db, $data) {
 }
 
 function updateOrderStatus($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     error_log("updateOrderStatus called with: " . json_encode($data));
     
     if (empty($data['id']) || empty($data['status'])) {
@@ -1003,6 +1038,9 @@ function customerVerifyOrder($db, $data) {
 }
 
 function updateOrder($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     if (empty($data['id'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Order ID required']);
@@ -1155,6 +1193,11 @@ function getCustomer($db, $id) {
 }
 
 function createCustomer($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, [
+        'email' => 'email', 'phone' => 'phone', 'contact_email' => 'email'
+    ]);
+    
     $stmt = $db->prepare("
         INSERT INTO customers (
             user_id, first_name, last_name, email, phone,
@@ -1191,6 +1234,11 @@ function createCustomer($db, $data) {
 }
 
 function updateCustomer($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, [
+        'email' => 'email', 'phone' => 'phone'
+    ]);
+    
     if (empty($data['id'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Customer ID required']);
@@ -1362,6 +1410,11 @@ function getInvoice($db, $id, $orderId = null) {
 }
 
 function createInvoice($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, [
+        'billing_email' => 'email', 'billing_phone' => 'phone'
+    ]);
+    
     $invoiceNumber = 'INV-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
     
     $stmt = $db->prepare("
@@ -1573,6 +1626,9 @@ function getComplaint($db, $id) {
 }
 
 function createComplaint($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     $ticketNumber = 'TKT-' . date('Ymd') . '-' . str_pad(rand(1, 999), 3, '0', STR_PAD_LEFT);
     
     $stmt = $db->prepare("
@@ -1617,6 +1673,9 @@ function createComplaint($db, $data) {
 }
 
 function addComplaintMessage($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     if (empty($data['complaint_id']) || empty($data['message'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Complaint ID and message required']);
@@ -1645,6 +1704,9 @@ function addComplaintMessage($db, $data) {
 }
 
 function updateComplaintStatus($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data);
+    
     if (empty($data['id']) || empty($data['status'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Complaint ID and status required']);
@@ -1764,6 +1826,11 @@ function getUserSettings($db, $userId) {
 }
 
 function saveUserSettings($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, [
+        'email' => 'email', 'phone' => 'phone'
+    ]);
+    
     if (empty($data['user_id'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'User ID required']);
@@ -2202,6 +2269,9 @@ function getOrderReviewStatus($db, $orderId) {
 }
 
 function createReview($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, ['customer_email' => 'email']);
+    
     if (empty($data['product_id']) || empty($data['rating'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Product ID and rating required']);
@@ -2317,8 +2387,9 @@ function createReview($db, $data) {
         
     } catch (Exception $e) {
         $db->rollBack();
+        error_log('Review submission error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to submit review: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Failed to submit review']);
     }
 }
 
@@ -2326,6 +2397,9 @@ function createReview($db, $data) {
  * Batch create reviews for multiple products in an order
  */
 function createReviewsBatch($db, $data) {
+    // Sanitize batch input (reviews array will be sanitized recursively)
+    $data = sanitizeInput($data, ['customer_email' => 'email']);
+    
     if (empty($data['reviews']) || !is_array($data['reviews'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'message' => 'Reviews array required']);
@@ -2451,8 +2525,9 @@ function createReviewsBatch($db, $data) {
         
     } catch (Exception $e) {
         $db->rollBack();
+        error_log('Batch review submission error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to submit reviews: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Failed to submit reviews']);
     }
 }
 
@@ -2487,8 +2562,9 @@ function getShopRatingStats($db) {
         
         echo json_encode(['success' => true, 'data' => $stats]);
     } catch (PDOException $e) {
+        error_log('Shop rating stats error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     }
 }
 
@@ -2526,8 +2602,9 @@ function getShopRatings($db) {
             ]
         ]);
     } catch (PDOException $e) {
+        error_log('Shop ratings list error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     }
 }
 
@@ -2549,12 +2626,16 @@ function getShopRating($db, $orderId) {
             'has_rating' => $rating ? true : false
         ]);
     } catch (PDOException $e) {
+        error_log('Shop rating lookup error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     }
 }
 
 function createShopRating($db, $data) {
+    // Sanitize input
+    $data = sanitizeInput($data, ['customer_email' => 'email']);
+    
     try {
         // Validate required fields
         if (empty($data['rating'])) {
@@ -2626,8 +2707,9 @@ function createShopRating($db, $data) {
         ]);
         
     } catch (PDOException $e) {
+        error_log('Shop rating creation error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     }
 }
 
@@ -2787,7 +2869,8 @@ function getRecommendations($db) {
         ]);
 
     } catch (PDOException $e) {
+        error_log('Recommendations error: ' . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
     }
 }

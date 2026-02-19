@@ -4,15 +4,11 @@
  * Handles all product-related operations
  */
 
-// Send CORS headers immediately
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Max-Age: 86400");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit(); }
-
+// CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../middleware/sanitize.php';
 
 $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -28,20 +24,23 @@ if (preg_match('/\/products\/(\d+)/', $requestUri, $matches)) {
 
 switch ($method) {
     case 'GET':
+        // Public: product listing and details
         if ($productId) {
-            // Get single product
             getProduct($db, $productId);
         } else {
-            // Get all products with optional filters
             getProducts($db);
         }
         break;
     
     case 'POST':
+        // SECURITY: Require admin role for product creation
+        requireRole($db, 'admin');
         createProduct($db);
         break;
     
     case 'PUT':
+        // SECURITY: Require admin role for product updates
+        requireRole($db, 'admin');
         if ($productId) {
             updateProduct($db, $productId);
         } else {
@@ -51,6 +50,8 @@ switch ($method) {
         break;
     
     case 'DELETE':
+        // SECURITY: Require admin role for product deletion
+        requireRole($db, 'admin');
         if ($productId) {
             deleteProduct($db, $productId);
         } else {
@@ -201,7 +202,8 @@ function getProducts($db) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch products', 'error' => $e->getMessage()]);
+        error_log('Failed to fetch products: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch products']);
     }
 }
 
@@ -261,7 +263,8 @@ function getProduct($db, $id) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to fetch product', 'error' => $e->getMessage()]);
+        error_log('Failed to fetch product: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to fetch product']);
     }
 }
 
@@ -271,6 +274,11 @@ function getProduct($db, $id) {
 function createProduct($db) {
     try {
         $data = json_decode(file_get_contents('php://input'), true);
+        
+        // Sanitize input
+        if (is_array($data)) {
+            $data = sanitizeInput($data);
+        }
 
         // Validate required fields
         $required = ['name', 'price', 'category_id'];
@@ -332,7 +340,8 @@ function createProduct($db) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to create product', 'error' => $e->getMessage()]);
+        error_log('Failed to create product: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to create product']);
     }
 }
 
@@ -343,6 +352,11 @@ function updateProduct($db, $id) {
     try {
         $rawInput = file_get_contents('php://input');
         $data = json_decode($rawInput, true);
+        
+        // Sanitize input
+        if (is_array($data)) {
+            $data = sanitizeInput($data);
+        }
         
         // Debug: log what we received
         error_log("Update product $id - Raw input: " . $rawInput);
@@ -402,7 +416,8 @@ function updateProduct($db, $id) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to update product', 'error' => $e->getMessage()]);
+        error_log('Failed to update product: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to update product']);
     }
 }
 
@@ -428,6 +443,7 @@ function deleteProduct($db, $id) {
 
     } catch (PDOException $e) {
         http_response_code(500);
-        echo json_encode(['success' => false, 'message' => 'Failed to delete product', 'error' => $e->getMessage()]);
+        error_log('Failed to delete product: ' . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'Failed to delete product']);
     }
 }
