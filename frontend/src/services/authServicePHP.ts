@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL, apiFetch } from './api';
+import { getErrorMessage } from '../types/api';
 
 export type UserRole = 'customer' | 'sales' | 'ojt' | 'ojt_supervisor' | 'hr' | 'admin';
 
@@ -155,11 +156,11 @@ export const authService = {
         message: 'Registration successful!',
         data: result.data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Registration error:', error);
       return {
         success: false,
-        message: error.message || 'Network error during registration',
+        message: getErrorMessage(error) || 'Network error during registration',
       };
     }
   },
@@ -209,11 +210,11 @@ export const authService = {
         message: 'Login successful!',
         data: result.data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Login error:', error);
       return {
         success: false,
-        message: error.message || 'Network error during login',
+        message: getErrorMessage(error) || 'Network error during login',
       };
     }
   },
@@ -248,7 +249,7 @@ export const authService = {
         success: true,
         message: 'Logged out successfully',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Logout error:', error);
       // Still clear local storage
       removeStoredUser();
@@ -305,11 +306,11 @@ export const authService = {
         message: 'User retrieved',
         data: result.data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Get current user error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to get current user',
+        message: getErrorMessage(error) || 'Failed to get current user',
       };
     }
   },
@@ -365,11 +366,11 @@ export const authService = {
         message: 'Profile updated successfully',
         data: result.data,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Update profile error:', error);
       return {
         success: false,
-        message: error.message || 'Network error during update',
+        message: getErrorMessage(error) || 'Network error during update',
       };
     }
   },
@@ -402,7 +403,7 @@ export const authService = {
       }
 
       return result.data || [];
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Get supervisors error:', error);
       return [];
     }
@@ -433,11 +434,11 @@ export const authService = {
         success: true,
         message: result.message || 'Email verified successfully!',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Verify email error:', error);
       return {
         success: false,
-        message: error.message || 'Network error during verification',
+        message: getErrorMessage(error) || 'Network error during verification',
       };
     }
   },
@@ -471,11 +472,11 @@ export const authService = {
         success: true,
         message: result.message || 'Verification email sent!',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Resend verification error:', error);
       return {
         success: false,
-        message: error.message || 'Network error',
+        message: getErrorMessage(error) || 'Network error',
       };
     }
   },
@@ -509,11 +510,11 @@ export const authService = {
         success: true,
         message: result.message || 'Password reset email sent!',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Reset password error:', error);
       return {
         success: false,
-        message: error.message || 'Network error',
+        message: getErrorMessage(error) || 'Network error',
       };
     }
   },

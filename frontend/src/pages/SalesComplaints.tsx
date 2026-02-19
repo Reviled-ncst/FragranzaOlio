@@ -167,7 +167,7 @@ const SalesComplaints = () => {
       if (data.success) {
         fetchComplaints();
         if (selectedComplaint) {
-          setSelectedComplaint({ ...selectedComplaint, status: status as any });
+          setSelectedComplaint({ ...selectedComplaint, status: status as Complaint['status'] });
         }
       } else {
         alert(data.message || 'Failed to update status');

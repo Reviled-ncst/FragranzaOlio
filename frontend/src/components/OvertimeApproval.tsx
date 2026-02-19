@@ -13,6 +13,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../services/api';
+import { getErrorMessage } from '../types/api';
 
 interface OvertimeRecord {
   id: number;
@@ -67,7 +68,7 @@ const OvertimeApproval = ({ supervisorId, onApproval }: OvertimeApprovalProps) =
       } else {
         setError(data.error || 'Could not load overtime records');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching overtime:', err);
       setError('Failed to connect to server');
     } finally {
@@ -111,8 +112,8 @@ const OvertimeApproval = ({ supervisorId, onApproval }: OvertimeApprovalProps) =
       } else {
         setError(data.error || 'Failed to approve overtime');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || 'Network error');
     } finally {
       setProcessingId(null);
     }

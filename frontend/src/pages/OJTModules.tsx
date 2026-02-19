@@ -56,15 +56,27 @@ const OJTModules = () => {
         
         if (data.success) {
           // Transform API data to match our interface
-          const transformedModules = data.modules.map((m: any, index: number) => {
+          interface ApiModule {
+            id: number;
+            title: string;
+            description?: string;
+            duration_hours: string;
+            content_type?: string;
+            progress_status?: string;
+            progress_percent?: number;
+            score?: number | null;
+            category: string;
+            is_required: string | boolean;
+          }
+          const transformedModules: Module[] = (data.modules as ApiModule[]).map((m, index: number) => {
             // Determine status based on progress and previous module completion
-            let status = m.progress_status || 'not_started';
+            let status: Module['status'] = (m.progress_status || 'not_started') as Module['status'];
             
             // Convert 'not_started' to 'available' or 'locked' based on sequence
             if (status === 'not_started') {
               // First module is always available, others depend on previous completion
               const previousCompleted = index === 0 || 
-                data.modules.slice(0, index).every((prev: any) => prev.progress_status === 'completed' || !prev.is_required);
+                (data.modules as ApiModule[]).slice(0, index).every((prev) => prev.progress_status === 'completed' || !prev.is_required);
               status = previousCompleted ? 'available' : 'locked';
             }
             
@@ -73,10 +85,10 @@ const OJTModules = () => {
               title: m.title,
               description: m.description || 'No description available',
               duration: `${m.duration_hours} ${parseFloat(m.duration_hours) === 1 ? 'hour' : 'hours'}`,
-              type: m.content_type || 'reading',
+              type: (m.content_type || 'reading') as Module['type'],
               status: status,
               progress: m.progress_percent || 0,
-              score: m.score,
+              score: m.score ?? null,
               category: m.category,
               is_required: m.is_required === '1' || m.is_required === true
             };

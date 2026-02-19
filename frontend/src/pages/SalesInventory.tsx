@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl } from '../services/api';
+import { getErrorMessage } from '../types/api';
 import { 
   Warehouse,
   Package,
@@ -134,8 +135,8 @@ const SalesInventory = () => {
       setStats(statsData);
       setAlerts(alertsData);
       setProducts(productsResponse.data || []);
-    } catch (err: any) {
-      setError(err.message || 'Failed to load inventory data');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -145,7 +146,7 @@ const SalesInventory = () => {
     try {
       const data = await inventoryService.getStockLevels(selectedBranch || undefined);
       setStockLevels(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load stock levels:', err);
     }
   };
@@ -155,7 +156,7 @@ const SalesInventory = () => {
       const type = transactionTypeFilter === 'all' ? undefined : transactionTypeFilter;
       const data = await inventoryService.getTransactions(100, type, selectedBranch || undefined);
       setTransactions(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load transactions:', err);
     }
   };
@@ -271,8 +272,8 @@ const SalesInventory = () => {
       loadData();
       if (activeTab === 'stock-levels') loadStockLevels();
       if (activeTab === 'transactions') loadTransactions();
-    } catch (err: any) {
-      setFormError(err.message);
+    } catch (err: unknown) {
+      setFormError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

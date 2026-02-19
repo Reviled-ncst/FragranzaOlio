@@ -510,7 +510,7 @@ const SalesCustomers = () => {
                     <label className="block text-gray-400 text-sm mb-1">Status</label>
                     <select
                       value={editForm.status || 'active'}
-                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value as Customer['status'] })}
                       className="w-full px-3 py-2 bg-black-800 border border-gold-500/30 rounded-lg text-white"
                     >
                       <option value="active">Active</option>
@@ -522,7 +522,7 @@ const SalesCustomers = () => {
                     <label className="block text-gray-400 text-sm mb-1">Customer Type</label>
                     <select
                       value={editForm.customer_type || 'retail'}
-                      onChange={(e) => setEditForm({ ...editForm, customer_type: e.target.value as any })}
+                      onChange={(e) => setEditForm({ ...editForm, customer_type: e.target.value })}
                       className="w-full px-3 py-2 bg-black-800 border border-gold-500/30 rounded-lg text-white"
                     >
                       <option value="retail">Retail</option>

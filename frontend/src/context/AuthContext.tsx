@@ -70,7 +70,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           removeStoredUser();
           localStorage.removeItem(SESSION_VERIFIED_KEY);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Session verification error:', error);
         // Don't clear user on network errors - they might just be offline
       } finally {

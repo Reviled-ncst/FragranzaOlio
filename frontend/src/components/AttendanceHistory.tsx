@@ -13,6 +13,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { API_BASE_URL } from '../services/api';
+import { getErrorMessage } from '../types/api';
 
 interface AttendanceRecord {
   id: number;
@@ -65,7 +66,7 @@ const AttendanceHistory = ({ userId }: AttendanceHistoryProps) => {
         setRecords([]);
         setError(data.error);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching history:', err);
       setRecords([]);
       setError('Could not load attendance history');

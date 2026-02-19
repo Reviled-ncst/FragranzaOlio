@@ -669,7 +669,7 @@ const Checkout = () => {
                                   type="button"
                                   onClick={() => {
                                     setIsStorePickup(false);
-                                    setSelectedDeliveryType(quote.vehicleType as any);
+                                    setSelectedDeliveryType(quote.vehicleType as typeof selectedDeliveryType);
                                   }}
                                   className={`flex flex-col items-center p-3 rounded-lg border transition-all ${
                                     isSelected

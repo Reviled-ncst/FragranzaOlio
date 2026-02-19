@@ -72,7 +72,7 @@ const SupervisorAttendance = () => {
       } else {
         setError(data.error || 'Failed to fetch attendance');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching attendance:', err);
       setError('Failed to load attendance data');
       setAttendance([]);

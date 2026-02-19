@@ -59,12 +59,13 @@ const VerifyEmail = () => {
         await applyActionCode(auth, actionCode);
         setStatus('success');
         setMessage('Your email has been verified successfully! You can now log in.');
-      } catch (error: any) {
+      } catch (error: unknown) {
         setStatus('error');
         let errorMessage = 'Verification failed. The link may be expired or invalid.';
-        if (error.code === 'auth/invalid-action-code') {
+        const firebaseError = error as { code?: string };
+        if (firebaseError.code === 'auth/invalid-action-code') {
           errorMessage = 'Verification link is invalid or has expired.';
-        } else if (error.code === 'auth/expired-action-code') {
+        } else if (firebaseError.code === 'auth/expired-action-code') {
           errorMessage = 'Verification link has expired. Please request a new one.';
         }
         setMessage(errorMessage);

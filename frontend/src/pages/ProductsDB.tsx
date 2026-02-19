@@ -82,9 +82,10 @@ const ProductsPage = () => {
       } else {
         setError(response.error || 'Failed to load products');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching products:', err);
-      setError(err.message || 'An error occurred');
+      const message = err instanceof Error ? err.message : 'An error occurred';
+      setError(message);
     } finally {
       setIsLoading(false);
     }

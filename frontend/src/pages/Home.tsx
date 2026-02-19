@@ -193,8 +193,8 @@ const Home = () => {
               const apiCat = response.categories?.find(
                 (c: Category) => c.name.toLowerCase() === cat.name.toLowerCase()
               );
-              // Cast to any to access potential product_count from API response
-              const productCount = apiCat ? (apiCat as any).product_count : null;
+              // Access product_count from API response (extended category data)
+              const productCount = apiCat ? (apiCat as Category & { product_count?: number }).product_count : null;
               return productCount ? { ...cat, productCount } : cat;
             });
             setDynamicCategories(updatedCategories);

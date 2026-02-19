@@ -104,9 +104,10 @@ export const productService = {
       }
 
       return { success: true, data: data || [] };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Categories error:', error);
-      return { success: false, data: [], error: error.message };
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: [], error: message };
     }
   },
 
@@ -229,14 +230,15 @@ export const productService = {
         categories: categories || [],
         pagination: { page, limit, total, totalPages },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Products error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
       return {
         success: false,
         data: [],
         categories: [],
         pagination: { page: 1, limit: 12, total: 0, totalPages: 0 },
-        error: error.message,
+        error: message,
       };
     }
   },
@@ -275,9 +277,10 @@ export const productService = {
       }
 
       return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Product error:', error);
-      return { success: false, data: null, error: error.message };
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: null, error: message };
     }
   },
 
@@ -325,8 +328,9 @@ export const productService = {
         categories: [],
         pagination: { page: 1, limit, total: data?.length || 0, totalPages: 1 },
       };
-    } catch (error: any) {
-      return { success: false, data: [], categories: [], pagination: { page: 1, limit, total: 0, totalPages: 0 }, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: [], categories: [], pagination: { page: 1, limit, total: 0, totalPages: 0 }, error: message };
     }
   },
 
@@ -350,8 +354,9 @@ export const productService = {
       }
 
       return { success: true, data };
-    } catch (error: any) {
-      return { success: false, data: null, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: null, error: message };
     }
   },
 
@@ -372,8 +377,9 @@ export const productService = {
       }
 
       return { success: true, data };
-    } catch (error: any) {
-      return { success: false, data: null, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: null, error: message };
     }
   },
 
@@ -392,8 +398,9 @@ export const productService = {
       }
 
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: message };
     }
   },
 
@@ -429,8 +436,9 @@ export const productService = {
       }
 
       return { success: true, data };
-    } catch (error: any) {
-      return { success: false, data: null, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: null, error: message };
     }
   },
 
@@ -456,8 +464,9 @@ export const productService = {
         categories: [],
         pagination: { page: 1, limit: 100, total: data?.length || 0, totalPages: 1 },
       };
-    } catch (error: any) {
-      return { success: false, data: [], categories: [], pagination: { page: 1, limit: 100, total: 0, totalPages: 0 }, error: error.message };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, data: [], categories: [], pagination: { page: 1, limit: 100, total: 0, totalPages: 0 }, error: message };
     }
   },
 };

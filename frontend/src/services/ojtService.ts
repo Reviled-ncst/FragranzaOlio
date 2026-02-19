@@ -5,6 +5,13 @@
 
 import api, { uploadFile } from './api';
 
+// API Response type (axios interceptor unwraps the response)
+interface ApiDataResponse<T> {
+  success?: boolean;
+  data: T;
+  message?: string;
+}
+
 // ============ TASKS ============
 
 const TASKS_API = '/ojt_tasks.php';
@@ -87,7 +94,7 @@ class OjtTaskService {
     if (options?.search) params.append('search', options.search);
     
     const response = await api.get(`${TASKS_API}?${params.toString()}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<Task[]>).data;
   }
 
   /**
@@ -95,7 +102,7 @@ class OjtTaskService {
    */
   async getTask(taskId: number): Promise<Task> {
     const response = await api.get(`${TASKS_API}/${taskId}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<Task>).data;
   }
 
   /**
@@ -103,7 +110,7 @@ class OjtTaskService {
    */
   async createTask(data: CreateTaskData): Promise<Task> {
     const response = await api.post(TASKS_API, data);
-    return (response as any).data;
+    return (response as ApiDataResponse<Task>).data;
   }
 
   /**
@@ -111,7 +118,7 @@ class OjtTaskService {
    */
   async updateTask(taskId: number, data: UpdateTaskData): Promise<Task> {
     const response = await api.put(`${TASKS_API}/${taskId}`, data);
-    return (response as any).data;
+    return (response as ApiDataResponse<Task>).data;
   }
 
   /**
@@ -182,7 +189,7 @@ class OjtTaskService {
    */
   async getMyTasks(traineeId: number | string): Promise<Task[]> {
     const response = await api.get(`${TASKS_API}/my-tasks?trainee_id=${traineeId}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<Task[]>).data;
   }
 }
 
@@ -277,7 +284,7 @@ class OjtTimesheetService {
     if (options?.week_start) params.append('week_start', options.week_start);
     
     const response = await api.get(`${TIMESHEETS_API}?${params.toString()}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet[]>).data;
   }
 
   /**
@@ -285,7 +292,7 @@ class OjtTimesheetService {
    */
   async getTimesheet(timesheetId: number): Promise<Timesheet> {
     const response = await api.get(`${TIMESHEETS_API}/${timesheetId}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet>).data;
   }
 
   /**
@@ -295,7 +302,7 @@ class OjtTimesheetService {
     const response = await api.get(
       `${TIMESHEETS_API}/pending?supervisor_id=${supervisorId}`
     );
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet[]>).data;
   }
 
   /**
@@ -305,7 +312,7 @@ class OjtTimesheetService {
     const response = await api.get(
       `${TIMESHEETS_API}/my-timesheets?trainee_id=${traineeId}`
     );
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet[]>).data;
   }
 
   /**
@@ -315,7 +322,7 @@ class OjtTimesheetService {
     const response = await api.get(
       `${TIMESHEETS_API}/current-week?trainee_id=${traineeId}`
     );
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet>).data;
   }
 
   /**
@@ -323,7 +330,7 @@ class OjtTimesheetService {
    */
   async createTimesheet(data: CreateTimesheetData): Promise<Timesheet> {
     const response = await api.post(TIMESHEETS_API, data);
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet>).data;
   }
 
   /**
@@ -331,7 +338,7 @@ class OjtTimesheetService {
    */
   async updateTimesheet(timesheetId: number, data: UpdateTimesheetData): Promise<Timesheet> {
     const response = await api.put(`${TIMESHEETS_API}/${timesheetId}`, data);
-    return (response as any).data;
+    return (response as ApiDataResponse<Timesheet>).data;
   }
 
   /**

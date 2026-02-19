@@ -15,6 +15,12 @@ import {
 import { auth } from '../config/firebase';
 import { API_BASE_URL, apiFetch } from './api';
 
+/** Firebase error type for proper error handling */
+interface FirebaseError {
+  code?: string;
+  message?: string;
+}
+
 /**
  * Generate a deterministic service password for Firebase
  * Since we only use Firebase for email, not auth, we use a consistent password
@@ -54,9 +60,10 @@ export const firebaseEmailService = {
         });
         await signOut(auth);
         return { success: true, message: 'Verification email sent! Please check your inbox.' };
-      } catch (signInError: any) {
+      } catch (signInError: unknown) {
+        const firebaseSignInError = signInError as FirebaseError;
         // User doesn't exist, create new account
-        if (signInError.code === 'auth/user-not-found' || signInError.code === 'auth/invalid-credential') {
+        if (firebaseSignInError.code === 'auth/user-not-found' || firebaseSignInError.code === 'auth/invalid-credential') {
           const userCredential = await createUserWithEmailAndPassword(auth, email, servicePassword);
           const firebaseUser = userCredential.user;
 
@@ -71,11 +78,12 @@ export const firebaseEmailService = {
         }
         throw signInError;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Firebase email error:', error);
+      const firebaseError = error as FirebaseError;
 
       // Handle email-already-in-use with different password (legacy issue)
-      if (error.code === 'auth/email-already-in-use') {
+      if (firebaseError.code === 'auth/email-already-in-use') {
         return { 
           success: false, 
           message: 'Account exists with different credentials. Please contact support.' 
@@ -83,9 +91,9 @@ export const firebaseEmailService = {
       }
 
       let message = 'Failed to send verification email';
-      if (error.code === 'auth/invalid-email') {
+      if (firebaseError.code === 'auth/invalid-email') {
         message = 'Invalid email address';
-      } else if (error.code === 'auth/too-many-requests') {
+      } else if (firebaseError.code === 'auth/too-many-requests') {
         message = 'Too many requests. Please wait a few minutes before trying again.';
       }
 
@@ -109,8 +117,9 @@ export const firebaseEmailService = {
       console.log(`🔐 Firebase email verified status for ${email}: ${isVerified}`);
       await signOut(auth);
       return isVerified;
-    } catch (error: any) {
-      console.log('🔐 Firebase checkEmailVerified error:', error.code, error.message);
+    } catch (error: unknown) {
+      const firebaseError = error as FirebaseError;
+      console.log('🔐 Firebase checkEmailVerified error:', firebaseError.code, firebaseError.message);
       // These errors mean user doesn't exist in Firebase or password mismatch
       // In both cases, treat as legacy user (not registered via Firebase) - allow login
       const allowLoginErrors = [
@@ -122,7 +131,7 @@ export const firebaseEmailService = {
         'auth/too-many-requests'
       ];
       
-      if (allowLoginErrors.includes(error.code)) {
+      if (firebaseError.code && allowLoginErrors.includes(firebaseError.code)) {
         console.log('🔐 User not in Firebase or Firebase error - allowing login via PHP auth');
         return true;
       }
@@ -157,17 +166,18 @@ export const firebaseEmailService = {
         success: true,
         message: 'Password reset email sent! Check your inbox.',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Password reset error:', error);
+      const firebaseError = error as FirebaseError;
 
       let message = 'Failed to send password reset email';
-      if (error.code === 'auth/user-not-found') {
+      if (firebaseError.code === 'auth/user-not-found') {
         // Don't reveal if user exists
         return {
           success: true,
           message: 'If an account exists, you will receive a password reset email.',
         };
-      } else if (error.code === 'auth/too-many-requests') {
+      } else if (firebaseError.code === 'auth/too-many-requests') {
         message = 'Too many requests. Please wait before trying again.';
       }
 
@@ -220,9 +230,10 @@ export const firebaseEmailService = {
       }
       
       return { verified: false, synced: false };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const firebaseError = error as FirebaseError;
       // If user doesn't exist in Firebase, treat as needing verification
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+      if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/invalid-credential') {
         // No Firebase account - need to send verification
         return { verified: false, synced: false };
       }

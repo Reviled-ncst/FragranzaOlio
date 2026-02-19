@@ -61,8 +61,8 @@ const OJTDocuments = () => {
     try {
       // For now, we'll show sample documents since the API might not have data
       // In production, this would fetch from the API
-      const response = await api.get(`/api/ojt_documents.php?trainee_id=${user.id}`);
-      const docs = (response as any).data || [];
+      const response = await api.get<{ data?: Document[] }>(`/api/ojt_documents.php?trainee_id=${user.id}`);
+      const docs = response.data?.data || [];
       
       if (docs.length === 0) {
         // Show sample documents if none exist

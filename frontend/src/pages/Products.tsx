@@ -9,6 +9,7 @@ import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
 import { productService, Product as APIProduct, Category } from '../services/productServicePHP';
 import { getImageUrl } from '../services/api';
+import { getErrorMessage } from '../types/api';
 
 // Transform API product to ProductCard format
 interface ProductCardData {
@@ -1005,9 +1006,9 @@ const Products = () => {
           console.warn('Products.tsx: API returned error, using fallback data:', response.error);
           setError(response.error || 'Failed to load products');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Products.tsx: Fetch error:', err);
-        setError(err.message);
+        setError(getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }

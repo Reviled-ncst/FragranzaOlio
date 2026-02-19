@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getImageUrl, IMAGE_BASE_URL } from '../services/api';
+import { getErrorMessage } from '../types/api';
 import { 
   Plus, 
   Search, 
@@ -283,9 +284,9 @@ const SalesProducts = () => {
         console.error('❌ API returned error:', response.error);
         setError(response.error || 'Failed to load products');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('❌ Fetch error:', err);
-      setError(err.message || 'Failed to load products');
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -630,8 +631,8 @@ const SalesProducts = () => {
       } else {
         alert(response.error || 'Failed to save product');
       }
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err));
     } finally {
       setIsSaving(false);
     }

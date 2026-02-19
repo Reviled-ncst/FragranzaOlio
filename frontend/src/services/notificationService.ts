@@ -43,8 +43,8 @@ export interface ActivityLog {
   entity_type: string;
   entity_id?: number;
   description?: string;
-  old_values?: any;
-  new_values?: any;
+  old_values?: Record<string, unknown>;
+  new_values?: Record<string, unknown>;
   ip_address?: string;
   created_at: string;
 }

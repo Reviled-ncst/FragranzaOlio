@@ -4,6 +4,15 @@
  */
 
 import api from './api';
+import { getApiErrorMessage } from '../types/api';
+
+// API Response type (since interceptor unwraps axios response)
+interface ApiResponse<T = unknown> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  stats?: Record<string, number>;
+}
 
 // Types - Order Flow:
 // ordered → paid_waiting_approval / cod_waiting_approval → paid_ready_pickup / processing → in_transit → delivered/picked_up → completed → return_requested/refund_requested
@@ -220,7 +229,7 @@ const orderService = {
   async getMyOrders(email: string): Promise<OrdersResponse> {
     try {
       console.log('🔍 orderService.getMyOrders: Fetching orders for:', email);
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Order[]>>('/sales.php', {
         params: {
           action: 'orders',
           customer_email: email,
@@ -229,12 +238,12 @@ const orderService = {
       });
       
       console.log('🔍 orderService.getMyOrders: Raw response:', response);
-      console.log('🔍 orderService.getMyOrders: Order statuses:', response.data?.map((o: any) => ({ id: o.id, status: o.status })));
+      console.log('🔍 orderService.getMyOrders: Order statuses:', response.data?.map((o: Order) => ({ id: o.id, status: o.status })));
       
       return {
         success: response.success ?? true,
         data: response.data || [],
-        stats: response.stats
+        stats: response.stats as OrdersResponse['stats']
       };
     } catch (error) {
       console.error('🔍 orderService.getMyOrders: Failed to fetch orders:', error);
@@ -247,7 +256,7 @@ const orderService = {
    */
   async getOrder(orderId: number): Promise<OrderResponse> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Order>>('/sales.php', {
         params: {
           action: 'order',
           id: orderId
@@ -256,7 +265,7 @@ const orderService = {
       
       return {
         success: true,
-        data: (response as any).data
+        data: response.data as Order
       };
     } catch (error) {
       console.error('Failed to fetch order:', error);
@@ -273,7 +282,7 @@ const orderService = {
    */
   async getOrderByNumber(orderNumber: string): Promise<OrderResponse> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Order>>('/sales.php', {
         params: {
           action: 'order',
           order_number: orderNumber
@@ -282,7 +291,7 @@ const orderService = {
       
       return {
         success: true,
-        data: response.data
+        data: response.data as Order
       };
     } catch (error) {
       console.error('Failed to fetch order:', error);
@@ -299,7 +308,7 @@ const orderService = {
    */
   async createOrder(data: CreateOrderData): Promise<{ success: boolean; order_id?: number; order_number?: string; invoice_number?: string; message?: string }> {
     try {
-      const response: any = await api.post('/sales.php?action=order', data);
+      const response = await api.post<never, ApiResponse<{ id: number; order_number: string; invoice_number: string }>>('/sales.php?action=order', data);
       
       return {
         success: true,
@@ -308,11 +317,11 @@ const orderService = {
         invoice_number: response.data?.invoice_number,
         message: response.message || 'Order placed successfully'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create order:', error);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to place order'
+        message: getApiErrorMessage(error) || 'Failed to place order'
       };
     }
   },
@@ -322,7 +331,7 @@ const orderService = {
    */
   async trackOrder(orderNumber: string, email: string): Promise<OrderResponse> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Order>>('/sales.php', {
         params: {
           action: 'track_order',
           order_number: orderNumber,
@@ -331,15 +340,15 @@ const orderService = {
       });
       
       return {
-        success: response.success,
-        data: response.data,
+        success: response.success ?? true,
+        data: response.data as Order,
         message: response.message
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
         data: {} as Order,
-        message: error.response?.data?.message || 'Order not found'
+        message: getApiErrorMessage(error) || 'Order not found'
       };
     }
   },
@@ -349,7 +358,7 @@ const orderService = {
    */
   async getInvoice(orderId: number): Promise<{ success: boolean; data?: Invoice; message?: string }> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Invoice>>('/sales.php', {
         params: {
           action: 'invoice',
           order_id: orderId
@@ -374,7 +383,7 @@ const orderService = {
    */
   async getInvoiceByNumber(invoiceNumber: string): Promise<{ success: boolean; data?: Invoice; message?: string }> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Invoice>>('/sales.php', {
         params: {
           action: 'invoice',
           invoice_number: invoiceNumber
@@ -399,7 +408,7 @@ const orderService = {
    */
   async cancelOrder(orderId: number, reason?: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const response: any = await api.put('/sales.php?action=order-status', {
+      const response = await api.put<never, ApiResponse>('/sales.php?action=order-status', {
         id: orderId,
         status: 'cancelled',
         notes: reason
@@ -409,10 +418,10 @@ const orderService = {
         success: true,
         message: response.message || 'Order cancelled successfully'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to cancel order'
+        message: getApiErrorMessage(error) || 'Failed to cancel order'
       };
     }
   },
@@ -422,7 +431,7 @@ const orderService = {
    */
   async requestReturn(orderId: number, reason?: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const response: any = await api.put('/sales.php?action=order-status', {
+      const response = await api.put<never, ApiResponse>('/sales.php?action=order-status', {
         id: orderId,
         status: 'return_requested',
         notes: reason || 'Return/refund requested by customer'
@@ -432,10 +441,10 @@ const orderService = {
         success: true,
         message: response.message || 'Return request submitted successfully'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to request return'
+        message: getApiErrorMessage(error) || 'Failed to request return'
       };
     }
   },
@@ -447,7 +456,7 @@ const orderService = {
     try {
       console.log('📦 Completing order:', orderId, 'with status: completed');
       
-      const response: any = await api.put('/sales.php?action=order-status', {
+      const response = await api.put<never, ApiResponse>('/sales.php?action=order-status', {
         id: orderId,
         status: 'completed'
       });
@@ -458,11 +467,11 @@ const orderService = {
         success: true,
         message: response.message || 'Order marked as completed'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('📦 Complete order error:', error);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to complete order'
+        message: getApiErrorMessage(error) || 'Failed to complete order'
       };
     }
   },
@@ -474,7 +483,7 @@ const orderService = {
     try {
       console.log('📦 Updating order status:', orderId, 'to:', status);
       
-      const response: any = await api.put('/sales.php?action=order-status', {
+      const response = await api.put<never, ApiResponse>('/sales.php?action=order-status', {
         id: orderId,
         status: status,
         notes: notes
@@ -486,11 +495,11 @@ const orderService = {
         success: true,
         message: response.message || `Order status updated to ${status}`
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('📦 Update status error:', error);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to update order status'
+        message: getApiErrorMessage(error) || 'Failed to update order status'
       };
     }
   },
@@ -512,17 +521,17 @@ const orderService = {
     images?: string[];
   }>): Promise<{ success: boolean; message?: string }> {
     try {
-      const response: any = await api.post('/sales.php?action=reviews', { reviews });
+      const response = await api.post<never, ApiResponse>('/sales.php?action=reviews', { reviews });
       
       return {
         success: response.success ?? true,
         message: response.message || 'Reviews submitted successfully'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to submit reviews:', error);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to submit reviews'
+        message: getApiErrorMessage(error) || 'Failed to submit reviews'
       };
     }
   },
@@ -532,7 +541,7 @@ const orderService = {
    */
   async getOrderReviewStatus(orderId: number): Promise<{ success: boolean; data?: { reviewed: number[]; unreviewed: number[] } }> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<{ reviewed: number[]; unreviewed: number[] }>>('/sales.php', {
         params: {
           action: 'order-reviews',
           order_id: orderId
@@ -571,7 +580,16 @@ const orderService = {
     };
   }> {
     try {
-      const response: any = await api.get('/sales.php', {
+      const response = await api.get<never, ApiResponse<Array<{
+        id: number;
+        rating: number;
+        title: string;
+        review: string;
+        customer_name: string;
+        is_verified_purchase: boolean;
+        helpful_count: number;
+        created_at: string;
+      }>> & { stats?: { average_rating: number; total_reviews: number; rating_breakdown: Record<number, number>; } }>('/sales.php', {
         params: {
           action: 'product-reviews',
           product_id: productId,
@@ -598,7 +616,7 @@ const orderService = {
     try {
       console.log('📦 Verifying order receipt:', orderNumber, 'for email:', email);
       
-      const response: any = await api.post('/sales.php?action=customer-verify-order', {
+      const response = await api.post<never, ApiResponse>('/sales.php?action=customer-verify-order', {
         order_number: orderNumber,
         email: email
       });
@@ -609,11 +627,11 @@ const orderService = {
         success: response.success !== false,
         message: response.message || 'Order verified successfully'
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('📦 Verify order error:', error);
       return {
         success: false,
-        message: error.response?.data?.message || 'Failed to verify order'
+        message: getApiErrorMessage(error) || 'Failed to verify order'
       };
     }
   }

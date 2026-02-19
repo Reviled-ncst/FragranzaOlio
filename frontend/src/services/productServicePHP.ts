@@ -4,6 +4,7 @@
  */
 
 import { API_BASE_URL, apiFetch } from './api';
+import { getErrorMessage } from '../types/api';
 
 // Detect if we're on Vercel (production)
 const isProduction = typeof window !== 'undefined' && 
@@ -41,6 +42,9 @@ export interface Product {
   short_description: string | null;
   category_id: number | null;
   category?: Category;
+  // Flat category fields from API (before transform)
+  category_name?: string;
+  category_slug?: string;
   price: number;
   compare_price: number | null;
   cost_price: number | null;
@@ -115,9 +119,9 @@ export const productService = {
       });
       const result = await response.json();
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Categories error:', error);
-      return { success: false, data: [], error: error.message };
+      return { success: false, data: [], error: getErrorMessage(error) };
     }
   },
 
@@ -150,7 +154,7 @@ export const productService = {
       
       // Transform flat category fields into nested category object
       if (result.success && result.data) {
-        result.data = result.data.map((product: any) => ({
+        result.data = result.data.map((product: Product) => ({
           ...product,
           category: product.category_id ? {
             id: product.category_id,
@@ -161,14 +165,14 @@ export const productService = {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(' Error fetching products:', error);
       return {
         success: false,
         data: [],
         categories: [],
         pagination: { page: 1, limit: 12, total: 0, totalPages: 0 },
-        error: error.message,
+        error: getErrorMessage(error),
       };
     }
   },
@@ -197,9 +201,9 @@ export const productService = {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Product error:', error);
-      return { success: false, data: null, error: error.message };
+      return { success: false, data: null, error: getErrorMessage(error) };
     }
   },
 
@@ -227,16 +231,16 @@ export const productService = {
       }
       
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Product error:', error);
-      return { success: false, data: null, error: error.message };
+      return { success: false, data: null, error: getErrorMessage(error) };
     }
   },
 
   /**
    * Create new product
    */
-  createProduct: async (data: Partial<Product>): Promise<{ success: boolean; data?: any; error?: string }> => {
+  createProduct: async (data: Partial<Product>): Promise<{ success: boolean; data?: Product; error?: string }> => {
     try {
       const response = await apiFetch(`${API_BASE_URL}/products.php`, {
         method: 'POST',
@@ -249,9 +253,9 @@ export const productService = {
 
       const result = await response.json();
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Create product error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
   },
 
@@ -271,9 +275,9 @@ export const productService = {
 
       const result = await response.json();
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Update product error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
   },
 
@@ -289,9 +293,9 @@ export const productService = {
 
       const result = await response.json();
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Delete product error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
   },
 
@@ -337,9 +341,9 @@ export const productService = {
         const result = await response.json();
         return result;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload image error:', error);
-      return { success: false, error: error.message };
+      return { success: false, error: getErrorMessage(error) };
     }
   },
 };

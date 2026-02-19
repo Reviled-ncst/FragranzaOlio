@@ -18,7 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import SupervisorLayout from '../components/layout/SupervisorLayout';
-import { supervisorService } from '../services/supervisorService';
+import { supervisorService, TraineeOverview } from '../services/supervisorService';
 
 interface TraineeReport {
   id: number;
@@ -59,28 +59,38 @@ const SupervisorReports = () => {
       const data = await supervisorService.getPerformance(user.id, dateRange);
       
       if (data.trainees) {
-        const transformedReports: TraineeReport[] = data.trainees.map((t: any) => ({
-          id: t.id,
-          name: `${t.first_name} ${t.last_name}`,
-          email: t.email,
-          hoursCompleted: t.hours_completed || 0,
-          requiredHours: t.required_hours || 500,
-          progress: Math.round(((t.hours_completed || 0) / (t.required_hours || 500)) * 100),
-          tasksCompleted: t.tasks_completed || 0,
-          totalTasks: t.total_tasks || 0,
-          avgWeeklyHours: t.avg_weekly_hours || 0,
-          daysAbsent: t.days_absent || 0,
-          status: t.hours_completed >= t.required_hours ? 'completed' as const : 
-                  t.hours_completed > (t.required_hours * 0.7) ? 'ahead' as const :
-                  t.hours_completed >= (t.required_hours * 0.4) ? 'on-track' as const : 'behind' as const
-        }));
+        const transformedReports: TraineeReport[] = data.trainees.map((t: TraineeOverview) => {
+          const hoursCompleted = t.completed_hours || 0;
+          const requiredHours = t.total_required_hours || 500;
+          return {
+            id: t.id,
+            name: t.name,
+            email: t.email,
+            hoursCompleted,
+            requiredHours,
+            progress: Math.round((hoursCompleted / requiredHours) * 100),
+            tasksCompleted: t.tasks_completed || 0,
+            totalTasks: t.total_tasks || 0,
+            avgWeeklyHours: 0, // Not available in TraineeOverview
+            daysAbsent: 0, // Not available in TraineeOverview
+            status: hoursCompleted >= requiredHours ? 'completed' as const : 
+                    hoursCompleted > (requiredHours * 0.7) ? 'ahead' as const :
+                    hoursCompleted >= (requiredHours * 0.4) ? 'on-track' as const : 'behind' as const
+          };
+        });
         setReports(transformedReports);
       }
       
       if (data.weekly_data) {
-        setWeeklyData(data.weekly_data);
+        // Transform WeeklyHoursData to WeeklyData
+        const transformedWeekly: WeeklyData[] = data.weekly_data.map(w => ({
+          week: w.week_start,
+          hours: w.total_hours,
+          tasks: 0 // Not available in WeeklyHoursData
+        }));
+        setWeeklyData(transformedWeekly);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching reports:', err);
       setError('Failed to load data. Please try again.');
       setReports([]);

@@ -7,6 +7,13 @@ import api from './api';
 
 const API_BASE = '/supervisor.php';
 
+// API Response type (axios interceptor unwraps the response)
+interface ApiDataResponse<T> {
+  success?: boolean;
+  data: T;
+  message?: string;
+}
+
 export interface DashboardStats {
   totalTrainees: number;
   pendingTimesheets: number;
@@ -151,7 +158,7 @@ class SupervisorService {
     const response = await api.get(`${API_BASE}/dashboard?supervisor_id=${supervisorId}`);
     // API returns {success: true, data: {...}}, and axios interceptor extracts response.data
     // So response is {success: true, data: {...}} and we need response.data
-    return (response as any).data;
+    return (response as ApiDataResponse<DashboardData>).data;
   }
 
   /**
@@ -172,7 +179,7 @@ class SupervisorService {
     if (options?.department) params.append('department', options.department);
     
     const response = await api.get(`${API_BASE}/trainees?${params.toString()}`);
-    return (response as any).data || [];
+    return (response as ApiDataResponse<Trainee[]>).data || [];
   }
 
   /**
@@ -182,7 +189,7 @@ class SupervisorService {
     const response = await api.get(
       `${API_BASE}/trainees/${traineeId}?supervisor_id=${supervisorId}`
     );
-    return (response as any).data;
+    return (response as ApiDataResponse<TraineeDetail>).data;
   }
 
   /**
@@ -193,7 +200,7 @@ class SupervisorService {
     taskStats: TaskStats[];
   }> {
     const response = await api.get(`${API_BASE}/stats?supervisor_id=${supervisorId}`);
-    return (response as any).data;
+    return (response as ApiDataResponse<{ weeklyHours: WeeklyHoursData[]; taskStats: TaskStats[] }>).data;
   }
 
   /**
@@ -202,13 +209,13 @@ class SupervisorService {
   async getPerformance(
     supervisorId: string | number,
     period?: string
-  ): Promise<{ trainees: any[]; weekly_data: any[] }> {
+  ): Promise<{ trainees: TraineeOverview[]; weekly_data: WeeklyHoursData[] }> {
     let url = `${API_BASE}/performance?supervisor_id=${supervisorId}`;
     if (period) {
       url += `&period=${period}`;
     }
     const response = await api.get(url);
-    return (response as any).data || { trainees: [], weekly_data: [] };
+    return (response as ApiDataResponse<{ trainees: TraineeOverview[]; weekly_data: WeeklyHoursData[] }>).data || { trainees: [], weekly_data: [] };
   }
 }
 

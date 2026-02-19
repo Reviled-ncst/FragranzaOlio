@@ -30,6 +30,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAuthModal } from '../context/AuthModalContext';
 import { useCart } from '../context/CartContext';
 import { getImageUrl } from '../services/api';
+import { getErrorMessage } from '../types/api';
 
 // Transform API product to display format
 interface DisplayProduct {
@@ -138,9 +139,9 @@ const ProductDetail = () => {
         } else {
           setError(response.error || 'Product not found');
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to fetch product:', err);
-        setError(err.message || 'Failed to load product');
+        setError(getErrorMessage(err) || 'Failed to load product');
       } finally {
         setIsLoading(false);
       }

@@ -391,9 +391,10 @@ const SalesOrders = () => {
             // Error callback (ignore scan failures)
           }
         );
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Scanner error:', err);
-        setScannerError(err.message || 'Failed to start camera. Please ensure camera permissions are granted.');
+        const message = err instanceof Error ? err.message : 'Failed to start camera. Please ensure camera permissions are granted.';
+        setScannerError(message);
       }
     }, 100);
   };

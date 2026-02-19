@@ -17,10 +17,21 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../services/api';
 import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult } from '../services/faceRecognitionService';
+import { getErrorMessage } from '../types/api';
 
 interface AttendanceClockProps {
   userId: number;
   onClockAction?: () => void;
+}
+
+interface AttendanceRecordData {
+  time_in: string | null;
+  time_out: string | null;
+  break_start: string | null;
+  break_end: string | null;
+  work_hours: number | null;
+  overtime_hours: number | null;
+  overtime_approved: boolean;
 }
 
 interface ClockStatus {
@@ -28,7 +39,7 @@ interface ClockStatus {
   clocked_in: boolean;
   clocked_out: boolean;
   on_break: boolean;
-  record: any;
+  record: AttendanceRecordData | null;
 }
 
 interface LocationData {
@@ -196,9 +207,9 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
           startFaceDetection();
         };
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Camera error:', err);
-      setCameraError(err.message || 'Could not access camera');
+      setCameraError(getErrorMessage(err) || 'Could not access camera');
     }
   };
 
@@ -386,8 +397,8 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
         }
         setError(data.error || 'Failed to process clock action');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || 'Network error');
     } finally {
       setIsProcessing(false);
     }
@@ -414,8 +425,8 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
       } else {
         setError(data.error);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -441,8 +452,8 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
       } else {
         setError(data.error);
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setIsProcessing(false);
     }
@@ -480,8 +491,8 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
       } else {
         setError(data.error || 'Failed to request permission');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || 'Network error');
     } finally {
       setIsRequestingPermission(false);
     }
@@ -636,9 +647,9 @@ const AttendanceClock = ({ userId, onClockAction }: AttendanceClockProps) => {
         ) : (
           <button
             onClick={handleBreakStart}
-            disabled={isProcessing || !status?.clocked_in || status?.clocked_out || (status?.record?.break_start && status?.record?.break_end)}
+            disabled={isProcessing || !status?.clocked_in || status?.clocked_out || Boolean(status?.record?.break_start && status?.record?.break_end)}
             className={`flex flex-col items-center justify-center p-4 rounded-xl transition-all ${
-              !status?.clocked_in || status?.clocked_out || (status?.record?.break_start && status?.record?.break_end)
+              !status?.clocked_in || status?.clocked_out || Boolean(status?.record?.break_start && status?.record?.break_end)
                 ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
                 : 'bg-yellow-600 hover:bg-yellow-700 text-white'
             }`}

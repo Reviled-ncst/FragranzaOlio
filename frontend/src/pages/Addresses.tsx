@@ -859,7 +859,7 @@ const Addresses = () => {
                         <select
                           name="type"
                           value={formData.type}
-                          onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as any }))}
+                          onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as 'home' | 'office' | 'other' }))}
                           className="w-full bg-black-800 border border-gold-500/30 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-gold-500"
                         >
                           <option value="home">🏠 Home</option>

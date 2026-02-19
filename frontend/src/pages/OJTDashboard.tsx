@@ -24,6 +24,26 @@ import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
 import api from '../services/api';
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+interface AttendanceRecord {
+  id: number;
+  attendance_date: string;
+  work_hours: number | string;
+  time_in: string | null;
+  time_out: string | null;
+}
+
+interface Assignment {
+  start_date?: string;
+  end_date?: string;
+  total_required_hours?: number;
+}
+
 interface Task {
   id: number;
   title: string;
@@ -70,33 +90,37 @@ const OJTDashboard = () => {
         api.get(`/ojt_timesheets.php/get-assignment?trainee_id=${user.id}`)
       ]);
 
-      const tasks: Task[] = tasksRes.status === 'fulfilled' 
-        ? ((tasksRes.value as any).data || []) 
-        : [];
+      // Helper to safely extract API response data (axios interceptor returns data directly)
+      const getResponseData = <T,>(res: PromiseSettledResult<unknown>): ApiResponse<T> | null => {
+        if (res.status === 'fulfilled') {
+          return res.value as ApiResponse<T>;
+        }
+        return null;
+      };
+
+      const tasksResponse = getResponseData<Task[]>(tasksRes);
+      const tasks: Task[] = tasksResponse?.data || [];
       
-      const attendanceData = attendanceRes.status === 'fulfilled' 
-        ? ((attendanceRes.value as any).data || []) 
-        : [];
+      const attendanceResponse = getResponseData<AttendanceRecord[]>(attendanceRes);
+      const attendanceData: AttendanceRecord[] = attendanceResponse?.data || [];
       
-      const assignmentData = assignmentRes.status === 'fulfilled' 
-        ? ((assignmentRes.value as any) || {}) 
-        : {};
-      const assignment = assignmentData.success ? (assignmentData.data || {}) : {};
+      const assignmentResponse = getResponseData<Assignment>(assignmentRes);
+      const assignment: Assignment = assignmentResponse?.success ? (assignmentResponse.data || {}) : {};
 
       // Calculate hours from attendance
-      const totalHours = attendanceData.reduce((sum: number, a: any) => sum + (parseFloat(a.work_hours) || 0), 0);
+      const totalHours = attendanceData.reduce((sum, a) => sum + (parseFloat(String(a.work_hours)) || 0), 0);
       
       // Today's hours
       const today = new Date().toISOString().split('T')[0];
-      const todayAttendance = attendanceData.find((a: any) => a.attendance_date === today);
-      const todayHours = todayAttendance ? (parseFloat(todayAttendance.work_hours) || 0) : 0;
+      const todayAttendance = attendanceData.find((a) => a.attendance_date === today);
+      const todayHours = todayAttendance ? (parseFloat(String(todayAttendance.work_hours)) || 0) : 0;
 
       // This week's hours
       const weekStart = new Date();
       weekStart.setDate(weekStart.getDate() - weekStart.getDay());
       const weekHours = attendanceData
-        .filter((a: any) => new Date(a.attendance_date) >= weekStart)
-        .reduce((sum: number, a: any) => sum + (parseFloat(a.work_hours) || 0), 0);
+        .filter((a) => new Date(a.attendance_date) >= weekStart)
+        .reduce((sum, a) => sum + (parseFloat(String(a.work_hours)) || 0), 0);
 
       // Calculate dates and weeks
       const startDate = assignment.start_date || '2025-11-01';

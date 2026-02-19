@@ -541,16 +541,21 @@ export default function OJTTimesheet() {
       const todayData = await todayRes.json();
       if (todayData.success && todayData.data) {
         // Handle array or single object
-        const records = Array.isArray(todayData.data) ? todayData.data : [todayData.data];
-        // Find record for THIS user only
-        const userRecord = records.find((r: any) => r.trainee_id == user.id);
+        const records: AttendanceRecord[] = Array.isArray(todayData.data) ? todayData.data : [todayData.data];
+        // Find record for THIS user only - use String comparison since user.id is string
+        const userId = user.id;
+        const userRecord = records.find((r) => {
+          const recUserId = String(r.user_id);
+          const recTraineeId = String((r as { trainee_id?: number }).trainee_id || '');
+          return recUserId === userId || recTraineeId === userId;
+        });
         if (userRecord) {
           setTodayAttendance({
             ...userRecord,
-            time_in: userRecord.time_in ? userRecord.time_in.split(' ').pop() : null,
-            time_out: userRecord.time_out ? userRecord.time_out.split(' ').pop() : null,
-            break_start: userRecord.break_start ? userRecord.break_start.split(' ').pop() : null,
-            break_end: userRecord.break_end ? userRecord.break_end.split(' ').pop() : null,
+            time_in: userRecord.time_in?.split(' ').pop() || null,
+            time_out: userRecord.time_out?.split(' ').pop() || null,
+            break_start: userRecord.break_start?.split(' ').pop() || null,
+            break_end: userRecord.break_end?.split(' ').pop() || null,
           });
         } else {
           setTodayAttendance(null);
@@ -571,13 +576,18 @@ export default function OJTTimesheet() {
       const weekData = await weekRes.json();
       if (weekData.success && Array.isArray(weekData.data)) {
         // Map attendance_date to date for consistency - filter by user ID
-        const mapped = weekData.data
-          .filter((r: any) => r.trainee_id == user.id)
-          .map((r: any) => ({
+        const userId = user.id;
+        const mapped: AttendanceRecord[] = (weekData.data as (AttendanceRecord & { trainee_id?: number; attendance_date?: string })[])
+          .filter((r) => {
+            const recUserId = String(r.user_id);
+            const recTraineeId = String(r.trainee_id || '');
+            return recTraineeId === userId || recUserId === userId;
+          })
+          .map((r) => ({
             ...r,
             date: r.attendance_date || r.date,
-            time_in: r.time_in ? r.time_in.split(' ').pop() : null,
-            time_out: r.time_out ? r.time_out.split(' ').pop() : null,
+            time_in: r.time_in?.split(' ').pop() || null,
+            time_out: r.time_out?.split(' ').pop() || null,
         }));
         setWeekRecords(mapped);
       }

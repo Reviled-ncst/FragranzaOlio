@@ -173,7 +173,7 @@ const SupervisorDashboard = () => {
       
       setTrainees(data.trainees);
       setPendingApprovals(data.pendingApprovals);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching dashboard data:', err);
       setError('Failed to load data. Please try again.');
       setTrainees([]);

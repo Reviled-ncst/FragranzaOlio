@@ -194,7 +194,7 @@ export const uploadFile = async (
   endpoint: string,
   formData: FormData,
   onProgress?: (percent: number) => void
-): Promise<any> => {
+): Promise<unknown> => {
   const url = isProduction 
     ? `${DIRECT_BACKEND_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
     : `${devApiUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;

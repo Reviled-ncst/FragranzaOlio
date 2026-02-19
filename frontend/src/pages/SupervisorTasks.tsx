@@ -108,7 +108,7 @@ const SupervisorTasks = () => {
       
       setTasks(tasksData);
       setTrainees(traineesData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching data:', err);
       setError('Failed to load data. Please try again.');
       setTasks([]);
@@ -194,7 +194,7 @@ const SupervisorTasks = () => {
       await fetchData();
       setShowTaskModal(false);
       resetForm();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error saving task:', err);
       alert('Failed to save task. Please try again.');
     } finally {
@@ -212,7 +212,7 @@ const SupervisorTasks = () => {
       await fetchData();
       setShowDeleteConfirm(false);
       setSelectedTask(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting task:', err);
       alert('Failed to delete task. Please try again.');
     } finally {
@@ -240,7 +240,7 @@ const SupervisorTasks = () => {
       setShowReviewModal(false);
       setSelectedTask(null);
       setReviewForm({ action: 'approve', feedback: '', rating: 0 });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error reviewing task:', err);
       alert('Failed to submit review. Please try again.');
     } finally {
@@ -342,11 +342,12 @@ const SupervisorTasks = () => {
     completed: tasks.filter(t => t.status === 'completed').length
   };
 
-  const tabs = [
-    { id: 'all', label: 'All Tasks', count: taskStats.total, icon: ClipboardList },
-    { id: 'pending_review', label: 'Pending Review', count: taskStats.underReview, icon: FileCheck, highlight: taskStats.underReview > 0 },
-    { id: 'active', label: 'Active', count: taskStats.pending + taskStats.inProgress, icon: Clock },
-    { id: 'completed', label: 'Completed', count: taskStats.completed, icon: CheckCircle },
+  type TabId = 'all' | 'pending_review' | 'active' | 'completed';
+  const tabs: Array<{ id: TabId; label: string; count: number; icon: typeof ClipboardList; highlight?: boolean }> = [
+    { id: 'all' as const, label: 'All Tasks', count: taskStats.total, icon: ClipboardList },
+    { id: 'pending_review' as const, label: 'Pending Review', count: taskStats.underReview, icon: FileCheck, highlight: taskStats.underReview > 0 },
+    { id: 'active' as const, label: 'Active', count: taskStats.pending + taskStats.inProgress, icon: Clock },
+    { id: 'completed' as const, label: 'Completed', count: taskStats.completed, icon: CheckCircle },
   ];
 
   return (
@@ -464,7 +465,7 @@ const SupervisorTasks = () => {
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-gold-500/20 to-gold-600/10 text-gold-400 border border-gold-500/40'

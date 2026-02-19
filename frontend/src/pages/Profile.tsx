@@ -240,13 +240,13 @@ const Profile = () => {
         {/* Tabs */}
         <div className="flex gap-1 sm:gap-2 mb-4 sm:mb-6 border-b border-gold-500/20 pb-2 overflow-x-auto scrollbar-hide -mx-4 sm:mx-0 px-4 sm:px-0">
           {[
-            { id: 'profile', label: 'Profile', icon: User },
-            { id: 'security', label: 'Security', icon: Shield },
-            { id: 'preferences', label: 'Preferences', icon: Bell },
+            { id: 'profile' as const, label: 'Profile', icon: User },
+            { id: 'security' as const, label: 'Security', icon: Shield },
+            { id: 'preferences' as const, label: 'Preferences', icon: Bell },
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg transition-colors whitespace-nowrap flex-shrink-0 ${
                 activeTab === tab.id
                   ? 'bg-gold-500/20 text-gold-400'

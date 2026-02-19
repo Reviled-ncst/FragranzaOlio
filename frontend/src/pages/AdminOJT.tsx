@@ -20,6 +20,24 @@ import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import AdminLayout from '../components/layout/AdminLayout';
 
+interface ApiUser {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  department?: string;
+  university?: string;
+  course?: string;
+  supervisorId?: number;
+  supervisorName?: string;
+  requiredHours?: number;
+  hoursCompleted?: number;
+  ojtStartDate?: string;
+  ojtEndDate?: string;
+  hireDate?: string;
+  status?: string;
+}
+
 interface OJTTrainee {
   id: number;
   firstName: string;
@@ -28,13 +46,13 @@ interface OJTTrainee {
   department: string;
   university: string;
   course: string;
-  supervisorId: number;
+  supervisorId?: number;
   supervisorName: string;
   requiredHours: number;
   hoursCompleted: number;
-  startDate: string;
-  endDate: string;
-  status: string;
+  startDate?: string;
+  endDate?: string;
+  status?: string;
 }
 
 interface OJTSupervisor {
@@ -75,7 +93,7 @@ export default function AdminOJT() {
       const traineesData = await traineesRes.json();
       
       if (traineesData.success && traineesData.data?.users) {
-        const mappedTrainees = traineesData.data.users.map((u: any) => ({
+        const mappedTrainees: OJTTrainee[] = (traineesData.data.users as ApiUser[]).map((u) => ({
           id: u.id,
           firstName: u.firstName,
           lastName: u.lastName,
@@ -101,7 +119,7 @@ export default function AdminOJT() {
       const supervisorsData = await supervisorsRes.json();
       
       if (supervisorsData.success && supervisorsData.data?.users) {
-        const mappedSupervisors = supervisorsData.data.users.map((u: any) => ({
+        const mappedSupervisors = (supervisorsData.data.users as ApiUser[]).map((u) => ({
           id: u.id,
           firstName: u.firstName,
           lastName: u.lastName,
@@ -114,11 +132,11 @@ export default function AdminOJT() {
 
       // Calculate stats
       if (traineesData.success && traineesData.data?.users) {
-        const allTrainees = traineesData.data.users;
-        const active = allTrainees.filter((t: any) => t.status === 'active').length;
-        const totalHours = allTrainees.reduce((sum: number, t: any) => sum + (Number(t.hoursCompleted) || 0), 0);
+        const allTrainees: ApiUser[] = traineesData.data.users;
+        const active = allTrainees.filter((t) => t.status === 'active').length;
+        const totalHours = allTrainees.reduce((sum, t) => sum + (Number(t.hoursCompleted) || 0), 0);
         const avgCompletion = allTrainees.length > 0 
-          ? allTrainees.reduce((sum: number, t: any) => {
+          ? allTrainees.reduce((sum, t) => {
               const required = t.requiredHours || 500;
               const completed = t.hoursCompleted || 0;
               return sum + (completed / required * 100);
@@ -128,7 +146,7 @@ export default function AdminOJT() {
         setStats({
           totalTrainees: allTrainees.length,
           activeTrainees: active,
-          completedTrainees: allTrainees.filter((t: any) => (t.hoursCompleted || 0) >= (t.requiredHours || 500)).length,
+          completedTrainees: allTrainees.filter((t) => (t.hoursCompleted || 0) >= (t.requiredHours || 500)).length,
           totalSupervisors: supervisorsData.data?.users?.length || 0,
           avgCompletionRate: Math.round(avgCompletion),
           totalHoursRendered: Math.round(totalHours)
@@ -198,15 +216,15 @@ export default function AdminOJT() {
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-gray-800 pb-2 overflow-x-auto">
-          {[
+          {([
             { id: 'overview', label: 'Overview', icon: TrendingUp },
             { id: 'trainees', label: 'Trainees', icon: Users },
             { id: 'supervisors', label: 'Supervisors', icon: Award },
             { id: 'attendance', label: 'Attendance', icon: Calendar },
-          ].map(tab => (
+          ] as const).map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30'

@@ -38,6 +38,22 @@ import adminUsersService, {
   UpdateUserData 
 } from '../services/adminUsersService';
 
+// Extended AdminUser with OJT-specific fields
+interface AdminUserWithOJT extends AdminUser {
+  university?: string;
+  course?: string;
+  requiredHours?: number;
+  renderHours?: number;
+  ojtStartDate?: string;
+  ojtEndDate?: string;
+}
+
+// Supervisor API response
+interface SupervisorApiItem {
+  id: number;
+  name: string;
+}
+
 // Role configuration
 const ROLE_CONFIG: Record<UserRole, { label: string; color: string; icon: typeof Users }> = {
   admin: { label: 'Administrator', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: Shield },
@@ -304,7 +320,7 @@ const AdminUsers = () => {
       const response = await apiFetch(`${API_BASE_URL}/auth.php?action=get-supervisors`);
       const result = await response.json();
       if (result.success && result.data) {
-        setSupervisors(result.data.map((s: any) => ({ id: s.id, fullName: s.name })));
+        setSupervisors((result.data as SupervisorApiItem[]).map((s) => ({ id: s.id, fullName: s.name })));
       }
     } catch (err) {
       console.error('Failed to fetch supervisors');
@@ -327,6 +343,7 @@ const AdminUsers = () => {
   const handleEditUser = (user: AdminUser) => {
     setModalMode('edit');
     setSelectedUser(user);
+    const ojtUser = user as AdminUserWithOJT;
     setFormData({
       firstName: user.firstName,
       lastName: user.lastName,
@@ -347,12 +364,12 @@ const AdminUsers = () => {
       notes: user.notes || '',
       status: user.status,
       // OJT-specific fields
-      university: (user as any).university || '',
-      course: (user as any).course || '',
-      requiredHours: (user as any).requiredHours?.toString() || '500',
-      renderHours: (user as any).renderHours?.toString() || '24',
-      ojtStartDate: (user as any).ojtStartDate || '',
-      ojtEndDate: (user as any).ojtEndDate || '',
+      university: ojtUser.university || '',
+      course: ojtUser.course || '',
+      requiredHours: ojtUser.requiredHours?.toString() || '500',
+      renderHours: ojtUser.renderHours?.toString() || '24',
+      ojtStartDate: ojtUser.ojtStartDate || '',
+      ojtEndDate: ojtUser.ojtEndDate || '',
     });
     setFormErrors({});
     setShowModal(true);

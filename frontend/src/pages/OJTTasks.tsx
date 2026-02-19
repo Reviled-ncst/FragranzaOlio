@@ -23,6 +23,12 @@ import { Navigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
 import api, { uploadFile } from '../services/api';
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
 interface Task {
   id: number;
   title: string;
@@ -135,8 +141,8 @@ const OJTTasks = () => {
     
     setIsLoading(true);
     try {
-      const response = await api.get(`/ojt_tasks.php?assigned_to=${user.id}`);
-      setTasks((response as any).data || []);
+      const response = await api.get(`/ojt_tasks.php?assigned_to=${user.id}`) as ApiResponse<Task[]>;
+      setTasks(response.data || []);
     } catch (err) {
       console.error('Error fetching tasks:', err);
       setError('Failed to load tasks');
@@ -178,7 +184,8 @@ const OJTTasks = () => {
       }
       
       // Use direct upload to bypass Vercel proxy (which doesn't handle FormData)
-      const data = await uploadFile(`/ojt_tasks.php/${selectedTask.id}/submit`, formData);
+      const response = await uploadFile(`/ojt_tasks.php/${selectedTask.id}/submit`, formData);
+      const data = response as { success?: boolean; error?: string };
       
       if (!data.success) {
         throw new Error(data.error || 'Failed to submit task');
@@ -186,9 +193,9 @@ const OJTTasks = () => {
       
       handleCloseModal();
       await fetchTasks();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error submitting task:', err);
-      setError(err.message || 'Failed to submit task');
+      setError(err instanceof Error ? err.message : 'Failed to submit task');
     } finally {
       setIsSubmitting(false);
     }

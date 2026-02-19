@@ -216,9 +216,10 @@ export const authService = {
           },
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ignore abort errors
-      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+      const err = error as Error & { name?: string };
+      if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
         console.warn('⚠️ Request aborted');
         return {
           success: false,
@@ -228,7 +229,7 @@ export const authService = {
       console.error('❌ Registration error:', error);
       return {
         success: false,
-        message: error?.message || 'An error occurred during registration. Please try again.',
+        message: err?.message || 'An error occurred during registration. Please try again.',
       };
     }
   },
@@ -394,9 +395,10 @@ export const authService = {
         message: 'User retrieved successfully',
         data: { user },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Ignore abort errors (caused by React StrictMode)
-      if (error?.name === 'AbortError' || error?.message?.includes('aborted')) {
+      const err = error as Error & { name?: string };
+      if (err?.name === 'AbortError' || err?.message?.includes('aborted')) {
         return {
           success: false,
           message: 'Request was cancelled',

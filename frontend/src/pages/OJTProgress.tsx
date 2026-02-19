@@ -15,6 +15,37 @@ import { Navigate } from 'react-router-dom';
 import OJTLayout from '../components/layout/OJTLayout';
 import api from '../services/api';
 
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+interface Task {
+  id: number;
+  title: string;
+  status: string;
+  rating?: number | string;
+}
+
+interface AttendanceRecord {
+  id: number;
+  total_hours: number | string;
+}
+
+interface Assignment {
+  start_date?: string;
+  end_date?: string;
+  total_required_hours?: number;
+}
+
+interface ModulesData {
+  success?: boolean;
+  summary?: {
+    overall_progress?: number;
+  };
+}
+
 interface ProgressData {
   totalHours: number;
   targetHours: number;
@@ -47,22 +78,35 @@ const OJTProgress = () => {
           api.get(`/ojt_modules.php?trainee_id=${user.id}`)
         ]);
 
-        const tasks = tasksRes.status === 'fulfilled' ? ((tasksRes.value as any).data || []) : [];
-        const attendance = attendanceRes.status === 'fulfilled' ? ((attendanceRes.value as any).data || []) : [];
-        const assignmentData = assignmentRes.status === 'fulfilled' ? (assignmentRes.value as any) : {};
-        const assignment = assignmentData.success ? (assignmentData.data || {}) : {};
-        const moduleData = modulesRes.status === 'fulfilled' ? ((modulesRes.value as any) || {}) : {};
+        // Helper to safely extract API response data (axios interceptor returns data directly)
+        const getResponseData = <T,>(res: PromiseSettledResult<unknown>): ApiResponse<T> | null => {
+          if (res.status === 'fulfilled') {
+            return res.value as ApiResponse<T>;
+          }
+          return null;
+        };
+
+        const tasksResponse = getResponseData<Task[]>(tasksRes);
+        const tasks: Task[] = tasksResponse?.data || [];
+        
+        const attendanceResponse = getResponseData<AttendanceRecord[]>(attendanceRes);
+        const attendance: AttendanceRecord[] = attendanceResponse?.data || [];
+        
+        const assignmentResponse = getResponseData<Assignment>(assignmentRes);
+        const assignment: Assignment = assignmentResponse?.success ? (assignmentResponse.data || {}) : {};
+        
+        const moduleData: ModulesData = modulesRes.status === 'fulfilled' ? (modulesRes.value as ModulesData) : {};
 
         // Calculate progress from real data
         // Count 'approved' or 'completed' tasks as completed
-        const completedTasks = tasks.filter((t: any) => t.status === 'completed' || t.status === 'approved').length;
+        const completedTasks = tasks.filter((t) => t.status === 'completed' || t.status === 'approved').length;
         // Calculate total hours from attendance records
-        const totalHours = attendance.reduce((sum: number, a: any) => sum + (parseFloat(a.total_hours) || 0), 0);
+        const totalHours = attendance.reduce((sum, a) => sum + (parseFloat(String(a.total_hours)) || 0), 0);
         
         // Calculate average rating from completed tasks
-        const ratedTasks = tasks.filter((t: any) => t.rating);
+        const ratedTasks = tasks.filter((t) => t.rating);
         const avgRating = ratedTasks.length > 0 
-          ? ratedTasks.reduce((sum: number, t: any) => sum + parseInt(t.rating), 0) / ratedTasks.length 
+          ? ratedTasks.reduce((sum, t) => sum + parseInt(String(t.rating), 10), 0) / ratedTasks.length 
           : 0;
 
         // Calculate weeks

@@ -76,7 +76,7 @@ const SupervisorTimesheets = () => {
     try {
       const data = await ojtTimesheetService.getTimesheets({ supervisor_id: user.id });
       setTimesheets(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching timesheets:', err);
       setError('Failed to load data. Please try again.');
       setTimesheets([]);
@@ -98,7 +98,7 @@ const SupervisorTimesheets = () => {
       await ojtTimesheetService.approveTimesheet(timesheet.id, user.id);
       await fetchTimesheets();
       setShowDetailModal(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error approving timesheet:', err);
       alert('Failed to approve timesheet. Please try again.');
     } finally {
@@ -117,7 +117,7 @@ const SupervisorTimesheets = () => {
       setShowRejectModal(false);
       setShowDetailModal(false);
       setRejectReason('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error rejecting timesheet:', err);
       alert('Failed to reject timesheet. Please try again.');
     } finally {

@@ -67,8 +67,8 @@ const SupervisorTrainees = () => {
       
       // Transform API data to match component interface
       const transformedData: Trainee[] = data.map((t: ApiTrainee) => {
-        const hoursCompleted = (t as any).completed_hours || t.hours_completed || 0;
-        const requiredHours = (t as any).total_required_hours || t.required_hours || 500;
+        const hoursCompleted = t.completed_hours || t.hours_completed || 0;
+        const requiredHours = t.total_required_hours || t.required_hours || 500;
         const progress = Math.round((hoursCompleted / requiredHours) * 100);
         
         let status: 'on-track' | 'behind' | 'ahead' | 'completed';
@@ -104,7 +104,7 @@ const SupervisorTrainees = () => {
       });
       
       setTrainees(transformedData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching trainees:', err);
       setError('Failed to load data. Please try again.');
       setTrainees([]);

@@ -12,6 +12,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { API_BASE_URL, apiFetch } from '../services/api';
+import { getErrorMessage } from '../types/api';
 
 interface LatePermissionRecord {
   id: number;
@@ -61,7 +62,7 @@ const LatePermissionApproval = ({ supervisorId, onApproval }: LatePermissionAppr
       } else {
         setError(data.error || 'Could not load late permission requests');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching late permissions:', err);
       setError('Failed to connect to server');
     } finally {
@@ -99,8 +100,8 @@ const LatePermissionApproval = ({ supervisorId, onApproval }: LatePermissionAppr
       } else {
         setError(data.error || 'Failed to approve');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || 'Network error');
     } finally {
       setProcessingId(null);
     }
@@ -138,8 +139,8 @@ const LatePermissionApproval = ({ supervisorId, onApproval }: LatePermissionAppr
       } else {
         setError(data.error || 'Failed to deny');
       }
-    } catch (err: any) {
-      setError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err) || 'Network error');
     } finally {
       setProcessingId(null);
     }
