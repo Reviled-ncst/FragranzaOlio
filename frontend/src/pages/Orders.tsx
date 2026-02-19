@@ -257,10 +257,20 @@ const Orders = () => {
   // Handle review submission
   const handleSubmitReviews = async (reviews: ReviewData[], shopRating?: ShopRatingData): Promise<boolean> => {
     try {
+      // Attach user info to reviews
+      const reviewsWithUser = reviews.map(r => ({
+        ...r,
+        user_id: user?.id ? Number(user.id) : undefined,
+        customer_email: user?.email,
+        customer_name: user?.firstName && user?.lastName 
+          ? `${user.firstName} ${user.lastName}` 
+          : user?.email?.split('@')[0] || 'Customer'
+      }));
+
       // Submit product reviews
       let reviewSuccess = true;
-      if (reviews.length > 0) {
-        const result = await orderService.submitReviews(reviews);
+      if (reviewsWithUser.length > 0) {
+        const result = await orderService.submitReviews(reviewsWithUser);
         reviewSuccess = result.success;
       }
       
@@ -269,8 +279,11 @@ const Orders = () => {
       if (shopRating && shopRating.rating > 0) {
         const shopResult = await orderService.submitShopRating({
           ...shopRating,
+          user_id: user?.id ? Number(user.id) : undefined,
           customer_email: user?.email,
-          customer_name: user?.email?.split('@')[0] || 'Customer'
+          customer_name: user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : user?.email?.split('@')[0] || 'Customer'
         });
         shopRatingSuccess = shopResult.success;
       }

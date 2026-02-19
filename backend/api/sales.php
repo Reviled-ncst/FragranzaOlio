@@ -2106,6 +2106,13 @@ function getProductReviews($db, $productId) {
     $stmt->execute([':product_id' => $productId]);
     $reviews = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Decode JSON fields for images/videos
+    foreach ($reviews as &$review) {
+        $review['images'] = $review['images'] ? json_decode($review['images'], true) : [];
+        $review['videos'] = $review['videos'] ? json_decode($review['videos'], true) : [];
+    }
+    unset($review);
+    
     // Get rating stats
     $statsStmt = $db->prepare("
         SELECT 

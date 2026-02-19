@@ -520,6 +520,9 @@ const orderService = {
     review?: string;
     images?: string[];
     videos?: string[];
+    user_id?: number;
+    customer_name?: string;
+    customer_email?: string;
   }>): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await api.post<never, ApiResponse>('/sales.php?action=reviews', { reviews });
@@ -570,27 +573,40 @@ const orderService = {
       title: string;
       review: string;
       customer_name: string;
+      reviewer_name: string;
       is_verified_purchase: boolean;
       helpful_count: number;
+      images: string[];
+      videos: string[];
       created_at: string;
     }>;
     stats?: {
-      average_rating: number;
-      total_reviews: number;
-      rating_breakdown: Record<number, number>;
+      total: number;
+      average: number;
+      distribution: Record<number, number>;
     };
   }> {
     try {
-      const response = await api.get<never, ApiResponse<Array<{
-        id: number;
-        rating: number;
-        title: string;
-        review: string;
-        customer_name: string;
-        is_verified_purchase: boolean;
-        helpful_count: number;
-        created_at: string;
-      }>> & { stats?: { average_rating: number; total_reviews: number; rating_breakdown: Record<number, number>; } }>('/sales.php', {
+      const response = await api.get<never, ApiResponse<{
+        reviews: Array<{
+          id: number;
+          rating: number;
+          title: string;
+          review: string;
+          customer_name: string;
+          reviewer_name: string;
+          is_verified_purchase: boolean;
+          helpful_count: number;
+          images: string[];
+          videos: string[];
+          created_at: string;
+        }>;
+        stats: {
+          total: number;
+          average: number;
+          distribution: Record<number, number>;
+        };
+      }>>('/sales.php', {
         params: {
           action: 'product-reviews',
           product_id: productId,
@@ -601,8 +617,8 @@ const orderService = {
       
       return {
         success: true,
-        data: response.data,
-        stats: response.stats
+        data: response.data?.reviews || [],
+        stats: response.data?.stats
       };
     } catch (error) {
       console.error('Failed to get product reviews:', error);
