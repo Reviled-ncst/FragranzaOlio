@@ -91,6 +91,18 @@ function handleGetRequests($db, $action) {
         case 'order-reviews':
             getOrderReviewStatus($db, $_GET['order_id'] ?? null);
             break;
+        case 'shop-rating':
+        case 'shop_rating':
+            getShopRating($db, $_GET['order_id'] ?? null);
+            break;
+        case 'shop-ratings':
+        case 'shop_ratings':
+            getShopRatings($db);
+            break;
+        case 'shop-rating-stats':
+        case 'shop_rating_stats':
+            getShopRatingStats($db);
+            break;
         default:
             getDashboardStats($db);
     }
@@ -107,6 +119,10 @@ function handlePostRequests($db, $action) {
             break;
         case 'reviews':
             createReviewsBatch($db, $data);
+            break;
+        case 'shop-rating':
+        case 'shop_rating':
+            createShopRating($db, $data);
             break;
         case 'customer':
             createCustomer($db, $data);
@@ -2403,5 +2419,180 @@ function createReviewsBatch($db, $data) {
         $db->rollBack();
         http_response_code(500);
         echo json_encode(['success' => false, 'message' => 'Failed to submit reviews: ' . $e->getMessage()]);
+    }
+}
+
+// =====================================================
+// SHOP RATINGS
+// =====================================================
+
+function getShopRatingStats($db) {
+    try {
+        $stmt = $db->query("SELECT * FROM shop_rating_stats WHERE id = 1");
+        $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$stats) {
+            $stats = [
+                'total_ratings' => 0,
+                'average_rating' => 0,
+                'average_service' => 0,
+                'average_delivery' => 0,
+                'average_packaging' => 0,
+                'recommend_percentage' => 0,
+                'distribution' => [5 => 0, 4 => 0, 3 => 0, 2 => 0, 1 => 0]
+            ];
+        } else {
+            $stats['distribution'] = [
+                5 => (int)$stats['rating_5_count'],
+                4 => (int)$stats['rating_4_count'],
+                3 => (int)$stats['rating_3_count'],
+                2 => (int)$stats['rating_2_count'],
+                1 => (int)$stats['rating_1_count']
+            ];
+        }
+        
+        echo json_encode(['success' => true, 'data' => $stats]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function getShopRatings($db) {
+    try {
+        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+        $limit = isset($_GET['limit']) ? min(50, max(1, (int)$_GET['limit'])) : 10;
+        $offset = ($page - 1) * $limit;
+        
+        $stmt = $db->prepare("
+            SELECT sr.*, o.order_number 
+            FROM shop_ratings sr
+            LEFT JOIN orders o ON sr.order_id = o.id
+            ORDER BY sr.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ");
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $ratings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $countStmt = $db->query("SELECT COUNT(*) FROM shop_ratings");
+        $total = $countStmt->fetchColumn();
+        
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'ratings' => $ratings,
+                'pagination' => [
+                    'page' => $page,
+                    'limit' => $limit,
+                    'total' => (int)$total,
+                    'pages' => ceil($total / $limit)
+                ]
+            ]
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function getShopRating($db, $orderId) {
+    try {
+        if (!$orderId) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Order ID required']);
+            return;
+        }
+        
+        $stmt = $db->prepare("SELECT * FROM shop_ratings WHERE order_id = :order_id");
+        $stmt->execute([':order_id' => $orderId]);
+        $rating = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        echo json_encode([
+            'success' => true,
+            'data' => $rating,
+            'has_rating' => $rating ? true : false
+        ]);
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+function createShopRating($db, $data) {
+    try {
+        // Validate required fields
+        if (empty($data['rating'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Rating is required']);
+            return;
+        }
+        
+        $rating = (int)$data['rating'];
+        if ($rating < 1 || $rating > 5) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Rating must be between 1 and 5']);
+            return;
+        }
+        
+        // Check for existing rating for this order
+        if (!empty($data['order_id'])) {
+            $checkStmt = $db->prepare("SELECT id FROM shop_ratings WHERE order_id = :order_id");
+            $checkStmt->execute([':order_id' => $data['order_id']]);
+            if ($checkStmt->fetch()) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'You have already rated this order']);
+                return;
+            }
+            
+            // Verify order exists and is completed
+            $orderStmt = $db->prepare("SELECT status FROM orders WHERE id = :id");
+            $orderStmt->execute([':id' => $data['order_id']]);
+            $order = $orderStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$order || !in_array($order['status'], ['delivered', 'picked_up', 'completed'])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Order must be completed before rating']);
+                return;
+            }
+        }
+        
+        $stmt = $db->prepare("
+            INSERT INTO shop_ratings (
+                order_id, user_id, customer_name, customer_email,
+                rating, service_rating, delivery_rating, packaging_rating,
+                feedback, would_recommend
+            ) VALUES (
+                :order_id, :user_id, :customer_name, :customer_email,
+                :rating, :service_rating, :delivery_rating, :packaging_rating,
+                :feedback, :would_recommend
+            )
+        ");
+        
+        $stmt->execute([
+            ':order_id' => $data['order_id'] ?? null,
+            ':user_id' => $data['user_id'] ?? null,
+            ':customer_name' => $data['customer_name'] ?? null,
+            ':customer_email' => $data['customer_email'] ?? null,
+            ':rating' => $rating,
+            ':service_rating' => $data['service_rating'] ?? null,
+            ':delivery_rating' => $data['delivery_rating'] ?? null,
+            ':packaging_rating' => $data['packaging_rating'] ?? null,
+            ':feedback' => $data['feedback'] ?? null,
+            ':would_recommend' => isset($data['would_recommend']) ? ($data['would_recommend'] ? 1 : 0) : 1
+        ]);
+        
+        $ratingId = $db->lastInsertId();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Thank you for your feedback!',
+            'rating_id' => $ratingId
+        ]);
+        
+    } catch (PDOException $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
     }
 }

@@ -634,6 +634,75 @@ const orderService = {
         message: getApiErrorMessage(error) || 'Failed to verify order'
       };
     }
+  },
+
+  /**
+   * Submit shop/service rating for an order
+   */
+  async submitShopRating(shopRating: {
+    order_id: number;
+    rating: number;
+    service_rating?: number;
+    delivery_rating?: number;
+    packaging_rating?: number;
+    feedback?: string;
+    would_recommend?: boolean;
+    user_id?: number;
+    customer_name?: string;
+    customer_email?: string;
+  }): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await api.post<never, ApiResponse>('/sales.php?action=shop-rating', shopRating);
+      
+      return {
+        success: response.success ?? true,
+        message: response.message || 'Shop rating submitted successfully'
+      };
+    } catch (error: unknown) {
+      console.error('Failed to submit shop rating:', error);
+      return {
+        success: false,
+        message: getApiErrorMessage(error) || 'Failed to submit shop rating'
+      };
+    }
+  },
+
+  /**
+   * Get shop rating stats
+   */
+  async getShopRatingStats(): Promise<{ 
+    success: boolean; 
+    data?: {
+      total_ratings: number;
+      average_rating: number;
+      average_service: number;
+      average_delivery: number;
+      average_packaging: number;
+      recommend_percentage: number;
+      distribution: Record<number, number>;
+    };
+  }> {
+    try {
+      const response = await api.get<never, ApiResponse<{
+        total_ratings: number;
+        average_rating: number;
+        average_service: number;
+        average_delivery: number;
+        average_packaging: number;
+        recommend_percentage: number;
+        distribution: Record<number, number>;
+      }>>('/sales.php', {
+        params: { action: 'shop-rating-stats' }
+      });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get shop rating stats:', error);
+      return { success: false };
+    }
   }
 };
 

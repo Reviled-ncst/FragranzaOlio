@@ -9,7 +9,13 @@ import {
   CheckCircle,
   ImagePlus,
   Trash2,
-  Sparkles
+  Sparkles,
+  Store,
+  ThumbsUp,
+  ThumbsDown,
+  Truck,
+  Gift,
+  HeadphonesIcon
 } from 'lucide-react';
 import { Order, OrderItem } from '../services/orderService';
 
@@ -17,7 +23,7 @@ interface RatingModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order | null;
-  onSubmit: (reviews: ReviewData[]) => Promise<boolean>;
+  onSubmit: (reviews: ReviewData[], shopRating?: ShopRatingData) => Promise<boolean>;
 }
 
 export interface ReviewData {
@@ -28,6 +34,16 @@ export interface ReviewData {
   title?: string;
   review?: string;
   images?: string[];
+}
+
+export interface ShopRatingData {
+  order_id: number;
+  rating: number;
+  service_rating?: number;
+  delivery_rating?: number;
+  packaging_rating?: number;
+  feedback?: string;
+  would_recommend?: boolean;
 }
 
 // Interactive Star Rating Component
@@ -215,8 +231,10 @@ const ProductReviewCard = ({
 // Main Rating Modal
 const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => {
   const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [shopRating, setShopRating] = useState<ShopRatingData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [showShopRating, setShowShopRating] = useState(false);
 
   // Initialize reviews when order changes
   useEffect(() => {
@@ -231,7 +249,17 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
           review: ''
         }))
       );
+      setShopRating({
+        order_id: order.id,
+        rating: 0,
+        service_rating: 0,
+        delivery_rating: 0,
+        packaging_rating: 0,
+        feedback: '',
+        would_recommend: true
+      });
       setSubmitSuccess(false);
+      setShowShopRating(false);
     }
   }, [order]);
 
@@ -243,17 +271,19 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
     });
   };
 
-  const hasAnyRating = reviews.some(r => r.rating > 0);
+  const hasAnyRating = reviews.some(r => r.rating > 0) || (shopRating?.rating || 0) > 0;
   const allRated = reviews.every(r => r.rating > 0);
   const ratedCount = reviews.filter(r => r.rating > 0).length;
 
   const handleSubmit = async () => {
     const validReviews = reviews.filter(r => r.rating > 0);
-    if (validReviews.length === 0) return;
+    const validShopRating = shopRating && shopRating.rating > 0 ? shopRating : undefined;
+    
+    if (validReviews.length === 0 && !validShopRating) return;
 
     setIsSubmitting(true);
     try {
-      const success = await onSubmit(validReviews);
+      const success = await onSubmit(validReviews, validShopRating);
       if (success) {
         setSubmitSuccess(true);
         // Auto-close after success animation
@@ -376,6 +406,146 @@ const RatingModal = ({ isOpen, onClose, order, onSubmit }: RatingModalProps) => 
                         onReviewChange={(data) => updateReview(index, data)}
                       />
                     ))}
+
+                    {/* Shop/Service Rating Section */}
+                    <motion.div 
+                      className="mt-6 border-t border-gold-500/20 pt-6"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setShowShopRating(!showShopRating)}
+                        className="w-full flex items-center justify-between p-4 bg-gradient-to-br from-gold-500/10 to-amber-500/5 border border-gold-500/20 rounded-xl hover:border-gold-500/40 transition-all"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gold-500/20 rounded-full flex items-center justify-center">
+                            <Store className="w-5 h-5 text-gold-400" />
+                          </div>
+                          <div className="text-left">
+                            <h3 className="text-white font-medium">Rate Our Service</h3>
+                            <p className="text-gray-500 text-sm">How was your overall experience?</p>
+                          </div>
+                        </div>
+                        {shopRating && shopRating.rating > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gold-400 font-semibold">{shopRating.rating}</span>
+                            <Star className="w-5 h-5 fill-gold-500 text-gold-500" />
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-sm">Tap to rate →</span>
+                        )}
+                      </button>
+
+                      <AnimatePresence>
+                        {showShopRating && shopRating && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-4 space-y-4 p-4 bg-black-800/50 rounded-xl border border-gray-800">
+                              {/* Overall Shop Rating */}
+                              <div className="text-center">
+                                <p className="text-gray-400 text-sm mb-3">Overall Experience</p>
+                                <StarRating
+                                  rating={shopRating.rating}
+                                  onRatingChange={(rating) => setShopRating({ ...shopRating, rating })}
+                                  size="lg"
+                                />
+                              </div>
+
+                              {/* Detailed Ratings */}
+                              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-gray-800">
+                                {/* Service */}
+                                <div className="text-center">
+                                  <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <HeadphonesIcon className="w-5 h-5 text-blue-400" />
+                                  </div>
+                                  <p className="text-gray-500 text-xs mb-2">Service</p>
+                                  <StarRating
+                                    rating={shopRating.service_rating || 0}
+                                    onRatingChange={(rating) => setShopRating({ ...shopRating, service_rating: rating })}
+                                    size="sm"
+                                  />
+                                </div>
+                                
+                                {/* Delivery */}
+                                <div className="text-center">
+                                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <Truck className="w-5 h-5 text-green-400" />
+                                  </div>
+                                  <p className="text-gray-500 text-xs mb-2">Delivery</p>
+                                  <StarRating
+                                    rating={shopRating.delivery_rating || 0}
+                                    onRatingChange={(rating) => setShopRating({ ...shopRating, delivery_rating: rating })}
+                                    size="sm"
+                                  />
+                                </div>
+                                
+                                {/* Packaging */}
+                                <div className="text-center">
+                                  <div className="w-10 h-10 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                    <Gift className="w-5 h-5 text-purple-400" />
+                                  </div>
+                                  <p className="text-gray-500 text-xs mb-2">Packaging</p>
+                                  <StarRating
+                                    rating={shopRating.packaging_rating || 0}
+                                    onRatingChange={(rating) => setShopRating({ ...shopRating, packaging_rating: rating })}
+                                    size="sm"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Would Recommend */}
+                              <div className="pt-4 border-t border-gray-800">
+                                <p className="text-gray-400 text-sm text-center mb-3">Would you recommend us?</p>
+                                <div className="flex justify-center gap-4">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShopRating({ ...shopRating, would_recommend: true })}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg border transition-all ${
+                                      shopRating.would_recommend 
+                                        ? 'bg-green-500/20 border-green-500/50 text-green-400' 
+                                        : 'border-gray-700 text-gray-500 hover:border-gray-600'
+                                    }`}
+                                  >
+                                    <ThumbsUp className="w-5 h-5" />
+                                    Yes
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShopRating({ ...shopRating, would_recommend: false })}
+                                    className={`flex items-center gap-2 px-6 py-2 rounded-lg border transition-all ${
+                                      shopRating.would_recommend === false 
+                                        ? 'bg-red-500/20 border-red-500/50 text-red-400' 
+                                        : 'border-gray-700 text-gray-500 hover:border-gray-600'
+                                    }`}
+                                  >
+                                    <ThumbsDown className="w-5 h-5" />
+                                    No
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Feedback */}
+                              <div className="pt-4 border-t border-gray-800">
+                                <label className="text-gray-400 text-sm mb-2 block">Additional Feedback (optional)</label>
+                                <textarea
+                                  value={shopRating.feedback || ''}
+                                  onChange={(e) => setShopRating({ ...shopRating, feedback: e.target.value })}
+                                  placeholder="Tell us how we can improve..."
+                                  className="w-full bg-black-900 border border-gray-800 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:border-gold-500/50 focus:outline-none resize-none"
+                                  rows={3}
+                                />
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
                   </div>
 
                   {/* Footer */}

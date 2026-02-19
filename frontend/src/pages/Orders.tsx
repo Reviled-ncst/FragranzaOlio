@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import orderService, { Order, OrderStatus, Invoice } from '../services/orderService';
-import RatingModal, { ReviewData } from '../components/RatingModal';
+import RatingModal, { ReviewData, ShopRatingData } from '../components/RatingModal';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 const statusConfig: Record<OrderStatus, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
@@ -201,10 +201,27 @@ const Orders = () => {
   };
 
   // Handle review submission
-  const handleSubmitReviews = async (reviews: ReviewData[]): Promise<boolean> => {
+  const handleSubmitReviews = async (reviews: ReviewData[], shopRating?: ShopRatingData): Promise<boolean> => {
     try {
-      const result = await orderService.submitReviews(reviews);
-      if (result.success) {
+      // Submit product reviews
+      let reviewSuccess = true;
+      if (reviews.length > 0) {
+        const result = await orderService.submitReviews(reviews);
+        reviewSuccess = result.success;
+      }
+      
+      // Submit shop rating if provided
+      let shopRatingSuccess = true;
+      if (shopRating && shopRating.rating > 0) {
+        const shopResult = await orderService.submitShopRating({
+          ...shopRating,
+          customer_email: user?.email,
+          customer_name: user?.email?.split('@')[0] || 'Customer'
+        });
+        shopRatingSuccess = shopResult.success;
+      }
+      
+      if (reviewSuccess || shopRatingSuccess) {
         refreshOrders();
         return true;
       }
