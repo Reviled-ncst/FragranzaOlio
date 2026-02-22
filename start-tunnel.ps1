@@ -17,6 +17,7 @@ function Write-Err { param($msg) Write-Host $msg -ForegroundColor Red }
 # Files that contain the tunnel URL
 $proxyFile = "$PSScriptRoot\api\proxy.ts"
 $imageFile = "$PSScriptRoot\api\image.ts"
+$frontendApiFile = "$PSScriptRoot\frontend\src\services\api.ts"
 $tunnelUrlFile = "$PSScriptRoot\tunnel-url.txt"
 
 # Current URL pattern to find
@@ -66,6 +67,14 @@ function Update-TunnelUrl {
         Write-Success "  Updated: api/image.ts"
     }
     
+    # Update DIRECT_BACKEND_URL in frontend api.ts
+    if (Test-Path $frontendApiFile) {
+        $content = Get-Content $frontendApiFile -Raw
+        $content = $content -replace "(DIRECT_BACKEND_URL\s*=\s*')$urlPattern", "`${1}$NewUrl"
+        Set-Content $frontendApiFile -Value $content -NoNewline
+        Write-Success "  Updated: frontend/src/services/api.ts (DIRECT_BACKEND_URL)"
+    }
+    
     # Save to tunnel-url.txt for reference
     Set-Content $tunnelUrlFile -Value $NewUrl
     
@@ -76,7 +85,7 @@ function Push-Changes {
     Write-Info "Committing and pushing changes..."
     
     Set-Location $PSScriptRoot
-    git add api/proxy.ts api/image.ts tunnel-url.txt 2>$null
+    git add api/proxy.ts api/image.ts tunnel-url.txt frontend/src/services/api.ts 2>$null
     $commitResult = git commit -m "Auto-update tunnel URL to $(Get-Content $tunnelUrlFile)" 2>&1
     
     if ($LASTEXITCODE -eq 0) {

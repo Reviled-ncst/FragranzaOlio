@@ -1,14 +1,19 @@
 import axios from 'axios';
 
-// Detect if we're on Vercel (production)
-const isProduction = typeof window !== 'undefined' && 
-  window.location.hostname.includes('vercel.app');
+// Detect if we're on a deployed environment (Vercel or custom domain)
+const isProduction = typeof window !== 'undefined' && (
+  window.location.hostname.includes('vercel.app') ||
+  window.location.hostname.includes('fragranza-olio.com') ||
+  window.location.hostname.includes('fragranza-web') ||
+  !window.location.hostname.includes('localhost')
+);
 
 // For development only - never use in production
 const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
 // Direct backend URL for file uploads (bypasses Vercel proxy size limits)
-const DIRECT_BACKEND_URL = 'https://conditions-contribute-room-sim.trycloudflare.com/backend/api';
+// This gets updated automatically by the tunnel script
+const DIRECT_BACKEND_URL = 'https://liable-cross-sept-conferences.trycloudflare.com/backend/api';
 
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;
