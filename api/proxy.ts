@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Backend URL - Use environment variable or default to Cloudflare tunnel
-const BACKEND_URL = process.env.BACKEND_URL || 'https://passed-forge-reaching-reflections.trycloudflare.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://liable-cross-sept-conferences.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers for all responses
