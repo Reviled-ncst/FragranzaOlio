@@ -482,6 +482,7 @@ const Dashboard = () => {
                                 <img
                                   src={item.product?.image}
                                   alt={item.product?.name}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                 />
                               </div>
@@ -572,6 +573,7 @@ const Dashboard = () => {
                                 <img
                                   src={item.productImage}
                                   alt={item.productName}
+                                  loading="lazy"
                                   className="w-16 h-16 object-cover rounded-lg"
                                 />
                                 <div className="flex-1">
@@ -655,6 +657,7 @@ const Dashboard = () => {
                                         key={item.id}
                                         src={item.productImage}
                                         alt={item.productName}
+                                        loading="lazy"
                                         className="w-12 h-12 rounded-lg border-2 border-black-900 object-cover"
                                         style={{ zIndex: 3 - idx }}
                                       />
@@ -714,6 +717,7 @@ const Dashboard = () => {
                                 <img
                                   src={item.product?.image}
                                   alt={item.product?.name}
+                                  loading="lazy"
                                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 />
                               </div>

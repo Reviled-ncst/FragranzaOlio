@@ -24,7 +24,9 @@ import {
   Copy,
   CheckCheck,
   Camera,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../context/AuthContext';
@@ -110,6 +112,11 @@ const SalesOrders = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  // Pagination
+  const [orderPage, setOrderPage] = useState(1);
+  const [orderTotalPages, setOrderTotalPages] = useState(1);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const ORDERS_PER_PAGE = 20;
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{
     orderNumber: string;
@@ -187,7 +194,7 @@ const SalesOrders = () => {
     if (isAuthenticated) {
       fetchOrders();
     }
-  }, [isAuthenticated, statusFilter]);
+  }, [isAuthenticated, statusFilter, orderPage]);
 
   const fetchOrders = async () => {
     setIsLoading(true);
@@ -200,6 +207,8 @@ const SalesOrders = () => {
       if (searchQuery) {
         params.append('search', searchQuery);
       }
+      params.append('limit', ORDERS_PER_PAGE.toString());
+      params.append('offset', ((orderPage - 1) * ORDERS_PER_PAGE).toString());
       
       const response = await apiFetch(`${API_BASE_URL}/sales.php?${params}`);
       const data = await response.json();
@@ -207,6 +216,10 @@ const SalesOrders = () => {
       if (data.success) {
         setOrders(data.data || []);
         setStats(data.stats || { total: 0, pending: 0, processing: 0, shipped: 0, delivered: 0, cancelled: 0 });
+        if (data.pagination) {
+          setOrderTotal(data.pagination.total || 0);
+          setOrderTotalPages(Math.ceil((data.pagination.total || 0) / ORDERS_PER_PAGE));
+        }
       } else {
         setError(data.message || 'Failed to fetch orders');
       }
@@ -220,6 +233,7 @@ const SalesOrders = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setOrderPage(1);
     // Check if search query looks like a QR code scan (contains pipe separators)
     // or a barcode scan (starts with ORD- or INV-)
     if (searchQuery.includes('|') || searchQuery.startsWith('ORD-') || searchQuery.startsWith('INV-')) {
@@ -1015,7 +1029,7 @@ const SalesOrders = () => {
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => { setStatusFilter(e.target.value); setOrderPage(1); }}
               className="flex-1 sm:flex-none min-w-[120px] px-3 py-2 bg-black-800 border border-gold-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-gold-500"
             >
               <option value="all">All Status</option>
@@ -1496,6 +1510,56 @@ const SalesOrders = () => {
                 </table>
               </div>
             </div>
+
+            {/* Pagination */}
+            {orderTotalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-6">
+                <p className="text-gray-400 text-sm">
+                  Showing {((orderPage - 1) * ORDERS_PER_PAGE) + 1}–{Math.min(orderPage * ORDERS_PER_PAGE, orderTotal)} of {orderTotal} orders
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => { setOrderPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    disabled={orderPage === 1}
+                    className="p-2 rounded-lg border border-gold-500/30 text-gray-400 hover:text-gold-400 hover:border-gold-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  {Array.from({ length: Math.min(orderTotalPages, 7) }, (_, i) => {
+                    let page: number;
+                    if (orderTotalPages <= 7) {
+                      page = i + 1;
+                    } else if (orderPage <= 4) {
+                      page = i + 1;
+                    } else if (orderPage >= orderTotalPages - 3) {
+                      page = orderTotalPages - 6 + i;
+                    } else {
+                      page = orderPage - 3 + i;
+                    }
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => { setOrderPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                        className={`w-9 h-9 rounded-lg text-sm font-medium ${
+                          page === orderPage
+                            ? 'bg-gold-500 text-black'
+                            : 'border border-gold-500/30 text-gray-400 hover:text-gold-400 hover:border-gold-500'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => { setOrderPage(p => Math.min(orderTotalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    disabled={orderPage === orderTotalPages}
+                    className="p-2 rounded-lg border border-gold-500/30 text-gray-400 hover:text-gold-400 hover:border-gold-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 

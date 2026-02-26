@@ -94,6 +94,7 @@ const About = () => {
           <img
             src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=1920"
             alt="Background"
+            loading="lazy"
             className="w-full h-full object-cover"
           />
         </div>
@@ -185,6 +186,7 @@ const About = () => {
               <img
                 src="https://images.unsplash.com/photo-1585652757141-8837d676054c?w=600"
                 alt="Our Workshop"
+                loading="lazy"
                 className="rounded-sm shadow-gold w-full"
               />
               <div className="absolute -bottom-4 sm:-bottom-8 -left-2 sm:-left-8 bg-black-800 border border-gold-500/30 p-4 sm:p-6 rounded-sm max-w-[260px] sm:max-w-xs">
@@ -300,6 +302,7 @@ const About = () => {
                   <img
                     src={member.image}
                     alt={member.name}
+                    loading="lazy"
                     className="w-full aspect-[3/4] object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

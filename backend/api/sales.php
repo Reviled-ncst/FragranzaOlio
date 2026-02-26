@@ -1977,25 +1977,35 @@ function changePassword($db, $data) {
 function getAnalytics($db) {
     $period = $_GET['period'] ?? '30days';
     
-    // Determine date range
+    // Determine date range and previous period for comparison
     switch ($period) {
         case '7days':
             $startDate = date('Y-m-d', strtotime('-7 days'));
+            $prevStartDate = date('Y-m-d', strtotime('-14 days'));
+            $prevEndDate = date('Y-m-d', strtotime('-7 days'));
             break;
         case '30days':
             $startDate = date('Y-m-d', strtotime('-30 days'));
+            $prevStartDate = date('Y-m-d', strtotime('-60 days'));
+            $prevEndDate = date('Y-m-d', strtotime('-30 days'));
             break;
         case '90days':
             $startDate = date('Y-m-d', strtotime('-90 days'));
+            $prevStartDate = date('Y-m-d', strtotime('-180 days'));
+            $prevEndDate = date('Y-m-d', strtotime('-90 days'));
             break;
         case 'year':
             $startDate = date('Y-m-d', strtotime('-1 year'));
+            $prevStartDate = date('Y-m-d', strtotime('-2 years'));
+            $prevEndDate = date('Y-m-d', strtotime('-1 year'));
             break;
         default:
             $startDate = date('Y-m-d', strtotime('-30 days'));
+            $prevStartDate = date('Y-m-d', strtotime('-60 days'));
+            $prevEndDate = date('Y-m-d', strtotime('-30 days'));
     }
     
-    // Revenue stats
+    // Revenue stats - current period
     $revenueStmt = $db->prepare("
         SELECT 
             COALESCE(SUM(total_amount), 0) as total_revenue,
@@ -2006,6 +2016,34 @@ function getAnalytics($db) {
     ");
     $revenueStmt->execute([':start_date' => $startDate]);
     $revenue = $revenueStmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Revenue stats - previous period for comparison
+    $prevRevenueStmt = $db->prepare("
+        SELECT 
+            COALESCE(SUM(total_amount), 0) as total_revenue,
+            COUNT(*) as total_orders,
+            COALESCE(AVG(total_amount), 0) as avg_order_value
+        FROM orders 
+        WHERE created_at >= :prev_start AND created_at < :prev_end AND payment_status = 'paid'
+    ");
+    $prevRevenueStmt->execute([':prev_start' => $prevStartDate, ':prev_end' => $prevEndDate]);
+    $prevRevenue = $prevRevenueStmt->fetch(PDO::FETCH_ASSOC);
+    
+    // Previous period new customers
+    $prevCustomersStmt = $db->prepare("SELECT COUNT(*) FROM customers WHERE created_at >= :prev_start AND created_at < :prev_end");
+    $prevCustomersStmt->execute([':prev_start' => $prevStartDate, ':prev_end' => $prevEndDate]);
+    $prevNewCustomers = (int)$prevCustomersStmt->fetchColumn();
+    
+    // Calculate percentage changes
+    $revenueChange = $prevRevenue['total_revenue'] > 0 
+        ? round((($revenue['total_revenue'] - $prevRevenue['total_revenue']) / $prevRevenue['total_revenue']) * 100, 1)
+        : ($revenue['total_revenue'] > 0 ? 100 : 0);
+    $ordersChange = $prevRevenue['total_orders'] > 0 
+        ? round((($revenue['total_orders'] - $prevRevenue['total_orders']) / $prevRevenue['total_orders']) * 100, 1)
+        : ($revenue['total_orders'] > 0 ? 100 : 0);
+    $avgOrderChange = $prevRevenue['avg_order_value'] > 0 
+        ? round((($revenue['avg_order_value'] - $prevRevenue['avg_order_value']) / $prevRevenue['avg_order_value']) * 100, 1)
+        : ($revenue['avg_order_value'] > 0 ? 100 : 0);
     
     // Daily revenue for chart
     $dailyStmt = $db->prepare("
@@ -2057,15 +2095,43 @@ function getAnalytics($db) {
     // Customer stats
     $newCustomers = $db->prepare("SELECT COUNT(*) FROM customers WHERE created_at >= :start_date");
     $newCustomers->execute([':start_date' => $startDate]);
+    $newCustomersCount = (int)$newCustomers->fetchColumn();
+    
+    $customersChange = $prevNewCustomers > 0 
+        ? round((($newCustomersCount - $prevNewCustomers) / $prevNewCustomers) * 100, 1)
+        : ($newCustomersCount > 0 ? 100 : 0);
+    
+    // Hourly distribution for heatmap (orders by hour of day and day of week)
+    $hourlyStmt = $db->prepare("
+        SELECT 
+            DAYOFWEEK(created_at) as day_of_week,
+            HOUR(created_at) as hour,
+            COUNT(*) as order_count,
+            COALESCE(SUM(total_amount), 0) as revenue
+        FROM orders 
+        WHERE created_at >= :start_date AND payment_status = 'paid'
+        GROUP BY DAYOFWEEK(created_at), HOUR(created_at)
+        ORDER BY day_of_week, hour
+    ");
+    $hourlyStmt->execute([':start_date' => $startDate]);
+    $hourlyData = $hourlyStmt->fetchAll(PDO::FETCH_ASSOC);
     
     echo json_encode([
         'success' => true,
         'data' => [
             'revenue' => $revenue,
+            'previousRevenue' => $prevRevenue,
+            'changes' => [
+                'revenue' => $revenueChange,
+                'orders' => $ordersChange,
+                'avgOrder' => $avgOrderChange,
+                'customers' => $customersChange
+            ],
             'daily' => $dailyData,
+            'hourly' => $hourlyData,
             'topProducts' => $topProducts,
             'categories' => $categoryData,
-            'newCustomers' => $newCustomers->fetchColumn()
+            'newCustomers' => $newCustomersCount
         ]
     ]);
 }

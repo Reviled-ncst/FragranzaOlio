@@ -5,6 +5,7 @@
 
 import { API_BASE_URL, apiFetch } from './api';
 import { getErrorMessage } from '../types/api';
+import { apiCache, CACHE_TTL, cacheKeys } from './apiCache';
 
 // Detect if we're on Vercel (production)
 const isProduction = typeof window !== 'undefined' && 
@@ -113,11 +114,18 @@ export const productService = {
    * Get all categories
    */
   getCategories: async (): Promise<{ success: boolean; data: Category[]; error?: string }> => {
+    const cacheKey = cacheKeys.categories();
+    const cached = apiCache.get<{ success: boolean; data: Category[]; error?: string }>(cacheKey);
+    if (cached) return cached;
+
     try {
       const response = await apiFetch(`${API_BASE_URL}/categories.php`, {
         credentials: 'include',
       });
       const result = await response.json();
+      if (result.success) {
+        apiCache.set(cacheKey, result, CACHE_TTL.LONG);
+      }
       return result;
     } catch (error: unknown) {
       console.error('Categories error:', error);
@@ -129,22 +137,26 @@ export const productService = {
    * Get all products with filters
    */
   getProducts: async (filters?: ProductFilters): Promise<ProductsResponse> => {
-    try {
-      const params = new URLSearchParams();
-      
-      if (filters?.categoryId) params.append('category_id', filters.categoryId.toString());
-      if (filters?.category) params.append('category', filters.category);
-      if (filters?.featured) params.append('featured', 'true');
-      if (filters?.isNew) params.append('is_new', 'true');
-      if (filters?.onSale) params.append('on_sale', 'true');
-      if (filters?.stockStatus) params.append('stock_status', filters.stockStatus);
-      if (filters?.search) params.append('search', filters.search);
-      if (filters?.minPrice) params.append('min_price', filters.minPrice.toString());
-      if (filters?.maxPrice) params.append('max_price', filters.maxPrice.toString());
-      if (filters?.sort) params.append('sort', filters.sort);
-      if (filters?.page) params.append('page', filters.page.toString());
-      if (filters?.limit) params.append('limit', filters.limit.toString());
+    const params = new URLSearchParams();
+    
+    if (filters?.categoryId) params.append('category_id', filters.categoryId.toString());
+    if (filters?.category) params.append('category', filters.category);
+    if (filters?.featured) params.append('featured', 'true');
+    if (filters?.isNew) params.append('is_new', 'true');
+    if (filters?.onSale) params.append('on_sale', 'true');
+    if (filters?.stockStatus) params.append('stock_status', filters.stockStatus);
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.minPrice) params.append('min_price', filters.minPrice.toString());
+    if (filters?.maxPrice) params.append('max_price', filters.maxPrice.toString());
+    if (filters?.sort) params.append('sort', filters.sort);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.limit) params.append('limit', filters.limit.toString());
 
+    const cacheKey = cacheKeys.products(params.toString());
+    const cached = apiCache.get<ProductsResponse>(cacheKey);
+    if (cached) return cached;
+
+    try {
       const url = `${API_BASE_URL}/products.php${params.toString() ? '?' + params.toString() : ''}`;
       const response = await apiFetch(url, {
         credentials: 'include',
@@ -162,6 +174,7 @@ export const productService = {
             slug: product.category_slug || 'uncategorized',
           } : null,
         }));
+        apiCache.set(cacheKey, result, CACHE_TTL.MEDIUM);
       }
       
       return result;
@@ -181,6 +194,10 @@ export const productService = {
    * Get single product by ID
    */
   getProduct: async (id: number): Promise<ProductResponse> => {
+    const cacheKey = cacheKeys.product(id);
+    const cached = apiCache.get<ProductResponse>(cacheKey);
+    if (cached) return cached;
+
     try {
       const response = await apiFetch(`${API_BASE_URL}/products.php?id=${id}`, {
         credentials: 'include',
@@ -198,6 +215,7 @@ export const productService = {
             slug: product.category_slug || 'uncategorized',
           } : null,
         };
+        apiCache.set(cacheKey, result, CACHE_TTL.MEDIUM);
       }
       
       return result;

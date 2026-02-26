@@ -373,6 +373,7 @@ const ProductDetail = () => {
                         <img 
                           src={image} 
                           alt={`${product.name} thumbnail ${index + 1}`}
+                          loading="lazy"
                           className="w-full h-full object-contain p-2"
                         />
                       </div>
@@ -463,6 +464,7 @@ const ProductDetail = () => {
                             <img 
                               src={getImageUrl(variation.image)} 
                               alt={variation.volume}
+                              loading="lazy"
                               className="w-8 h-8 object-contain rounded"
                             />
                           )}
@@ -822,6 +824,7 @@ const ProductDetail = () => {
                                 <img
                                   src={getImageUrl(img)}
                                   alt={`Review photo ${idx + 1}`}
+                                  loading="lazy"
                                   className="w-full h-full object-cover"
                                 />
                               </button>

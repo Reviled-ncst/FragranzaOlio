@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, SlidersHorizontal, Grid3X3, List, X } from 'lucide-react';
+import { Search, SlidersHorizontal, Grid3X3, List, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import ProductCard from '../components/ui/ProductCard';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -9,7 +9,6 @@ import { ProductGridSkeleton } from '../components/ui/Skeleton';
 import Button from '../components/ui/Button';
 import { productService, Product as APIProduct, Category } from '../services/productServicePHP';
 import { getImageUrl } from '../services/api';
-import { getErrorMessage } from '../types/api';
 
 // Transform API product to ProductCard format
 interface ProductCardData {
@@ -957,16 +956,26 @@ const sortOptions = [
   { value: 'name', label: 'Name: A-Z' },
 ];
 
+const PRODUCTS_PER_PAGE = 20;
+
 const Products = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [allProducts, setAllProducts] = useState<ProductCardData[]>(defaultProducts);
   const [products, setProducts] = useState<ProductCardData[]>([]);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(() => {
+    const page = searchParams.get('page');
+    return page ? parseInt(page, 10) : 1;
+  });
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  
   // Initialize search from URL param
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
   
   // Initialize category from URL param, matching with categories array (case-insensitive)
   const getCategoryFromParam = useCallback((params: URLSearchParams) => {
@@ -981,102 +990,118 @@ const Products = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // Fetch products from API on mount
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1); // Reset to page 1 on search change
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch products from API with server-side pagination
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
       setError(null);
       
       try {
-        console.log('Products.tsx: Fetching products from API...');
-        const response = await productService.getProducts({ limit: 100 });
-        console.log('Products.tsx: API Response:', response);
+        const filters: Record<string, unknown> = {
+          page: currentPage,
+          limit: PRODUCTS_PER_PAGE,
+          sort: sortBy,
+        };
         
-        if (response.success && response.data.length > 0) {
+        if (selectedCategory !== 'All') {
+          filters.category = selectedCategory;
+        }
+        if (debouncedSearch) {
+          filters.search = debouncedSearch;
+        }
+        
+        const response = await productService.getProducts(filters as Parameters<typeof productService.getProducts>[0]);
+        
+        if (response.success) {
           const transformed = response.data.map(transformProduct);
-          console.log('Products.tsx: Transformed products:', transformed.slice(0, 3));
-          setAllProducts(transformed);
+          setProducts(transformed);
           
-          // Extract categories from API response
+          // Update pagination from backend response
+          if (response.pagination) {
+            setTotalPages(response.pagination.totalPages || 1);
+            setTotalProducts(response.pagination.total || 0);
+          }
+          
+          // Extract categories from API response (first load only)
           if (response.categories && response.categories.length > 0) {
             const categoryNames = ['All', ...response.categories.map((c: Category) => c.name)];
             setCategories(categoryNames);
           }
-        } else if (!response.success) {
-          console.warn('Products.tsx: API returned error, using fallback data:', response.error);
+        } else {
           setError(response.error || 'Failed to load products');
+          setProducts([]);
         }
-      } catch (err: unknown) {
+      } catch (err) {
         console.error('Products.tsx: Fetch error:', err);
-        setError(getErrorMessage(err));
+        setError('Failed to load products');
+        setProducts([]);
       } finally {
         setIsLoading(false);
       }
     };
     
     fetchProducts();
-  }, []);
+  }, [currentPage, sortBy, selectedCategory, debouncedSearch]);
 
-  // Update category and search when URL changes
+  // Sync URL params
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedCategory !== 'All') params.set('category', selectedCategory.toLowerCase());
+    if (searchQuery) params.set('search', searchQuery);
+    if (currentPage > 1) params.set('page', currentPage.toString());
+    setSearchParams(params, { replace: true });
+  }, [selectedCategory, searchQuery, currentPage, setSearchParams]);
+
+  // Update category and search when URL changes externally
   useEffect(() => {
     const newCategory = getCategoryFromParam(searchParams);
     if (newCategory !== selectedCategory) {
       setSelectedCategory(newCategory);
+      setCurrentPage(1);
     }
-    
-    // Update search from URL
-    const urlSearch = searchParams.get('search') || '';
-    if (urlSearch !== searchQuery) {
-      setSearchQuery(urlSearch);
-    }
-  }, [searchParams, selectedCategory, searchQuery, getCategoryFromParam]);
-
-  // Filter and sort products (client-side for smooth UX)
-  useEffect(() => {
-    let filtered = [...allProducts];
-
-    // Filter by category
-    if (selectedCategory !== 'All') {
-      filtered = filtered.filter((p) => p.category === selectedCategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      filtered = filtered.filter((p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Sort products
-    switch (sortBy) {
-      case 'newest':
-        filtered = filtered.filter((p) => p.isNew).concat(filtered.filter((p) => !p.isNew));
-        break;
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'name':
-        filtered.sort((a, b) => a.name.localeCompare(b.name));
-        break;
-      case 'featured':
-      default:
-        filtered = filtered.filter((p) => p.isFeatured).concat(filtered.filter((p) => !p.isFeatured));
-    }
-
-    setProducts(filtered);
-  }, [allProducts, selectedCategory, sortBy, searchQuery]);
+  }, [searchParams, getCategoryFromParam]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    if (category === 'All') {
-      searchParams.delete('category');
+    setCurrentPage(1);
+  };
+
+  const handleSortChange = (newSort: string) => {
+    setSortBy(newSort);
+    setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = (): (number | 'ellipsis')[] => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
     } else {
-      searchParams.set('category', category.toLowerCase());
+      pages.push(1);
+      if (currentPage > 3) pages.push('ellipsis');
+      
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      
+      if (currentPage < totalPages - 2) pages.push('ellipsis');
+      pages.push(totalPages);
     }
-    setSearchParams(searchParams);
+    return pages;
   };
 
   return (
@@ -1132,7 +1157,7 @@ const Products = () => {
               {/* Sort Dropdown */}
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(e) => handleSortChange(e.target.value)}
                 className="px-3 sm:px-4 py-2 sm:py-2.5 bg-black-800 border border-gold-500/30 rounded-lg text-white text-sm focus:outline-none focus:border-gold-500 cursor-pointer min-w-0"
               >
                 {sortOptions.map((option) => (
@@ -1215,8 +1240,9 @@ const Products = () => {
         <div className="container-custom px-4 sm:px-6">
           {/* Results Count */}
           <p className="text-gray-400 text-xs sm:text-sm mb-4 sm:mb-6">
-            Showing {products.length} {products.length === 1 ? 'product' : 'products'}
+            Showing {products.length} of {totalProducts} {totalProducts === 1 ? 'product' : 'products'}
             {selectedCategory !== 'All' && ` in ${selectedCategory}`}
+            {totalPages > 1 && ` · Page ${currentPage} of ${totalPages}`}
           </p>
 
           {isLoading ? (
@@ -1227,20 +1253,75 @@ const Products = () => {
               <Button onClick={() => {
                 setSelectedCategory('All');
                 setSearchQuery('');
+                setCurrentPage(1);
               }}>
                 Clear Filters
               </Button>
             </div>
           ) : (
-            <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${
-              viewMode === 'grid' 
-                ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' 
-                : 'grid-cols-1'
-            }`}>
-              {products.map((product) => (
-                <ProductCard key={product.id} {...product} />
-              ))}
-            </div>
+            <>
+              <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${
+                viewMode === 'grid' 
+                  ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' 
+                  : 'grid-cols-1'
+              }`}>
+                {products.map((product) => (
+                  <ProductCard key={product.id} {...product} />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8 sm:mt-12">
+                  {/* Previous */}
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage <= 1
+                        ? 'text-gray-600 cursor-not-allowed'
+                        : 'text-gray-300 hover:text-white hover:bg-black-800 border border-gold-500/30'
+                    }`}
+                  >
+                    <ChevronLeft size={16} />
+                    <span className="hidden sm:inline">Prev</span>
+                  </button>
+
+                  {/* Page Numbers */}
+                  {getPageNumbers().map((page, idx) => (
+                    page === 'ellipsis' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => handlePageChange(page)}
+                        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-gold-500 text-black'
+                            : 'text-gray-300 hover:text-white hover:bg-black-800 border border-gold-500/30'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ))}
+
+                  {/* Next */}
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage >= totalPages
+                        ? 'text-gray-600 cursor-not-allowed'
+                        : 'text-gray-300 hover:text-white hover:bg-black-800 border border-gold-500/30'
+                    }`}
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

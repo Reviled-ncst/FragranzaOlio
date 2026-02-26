@@ -447,6 +447,7 @@ const Home = () => {
               <img
                 src="https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=600"
                 alt="Fragranza Manufacturing"
+                loading="lazy"
                 className="rounded-sm shadow-2xl"
               />
               <div className="absolute -bottom-6 -left-6 bg-gold-500 text-white p-6 rounded-sm">

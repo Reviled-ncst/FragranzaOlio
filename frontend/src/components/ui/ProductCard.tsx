@@ -123,6 +123,7 @@ const ProductCard = ({
           <img
             src={resolvedImage}
             alt={name}
+            loading="lazy"
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={() => setImageError(true)}
           />
@@ -270,7 +271,7 @@ const ProductCard = ({
               <div className="flex gap-4 mb-6">
                 <div className="w-20 h-20 bg-black-800 rounded-lg overflow-hidden flex-shrink-0">
                   {hasValidImage ? (
-                    <img src={resolvedImage} alt={name} className="w-full h-full object-cover" />
+                    <img src={resolvedImage} alt={name} loading="lazy" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
                       <ImageOff size={24} className="text-gray-600" />

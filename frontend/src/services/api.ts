@@ -13,7 +13,7 @@ const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
 // Direct backend URL for file uploads (bypasses Vercel proxy size limits)
 // This gets updated automatically by the tunnel script
-const DIRECT_BACKEND_URL = 'https://liable-cross-sept-conferences.trycloudflare.com/backend/api';
+const DIRECT_BACKEND_URL = 'https://gmt-stomach-off-blowing.trycloudflare.com/backend/api';
 
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;

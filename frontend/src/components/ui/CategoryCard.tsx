@@ -25,6 +25,7 @@ const CategoryCard = ({ name, slug, image, productCount }: CategoryCardProps) =>
         <img
           src={image}
           alt={name}
+          loading="lazy"
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
         

@@ -1,5 +1,5 @@
 # FragranzaWeb Development Documentation
-**Last Updated:** February 19, 2026
+**Last Updated:** February 20, 2026
 
 ---
 
@@ -91,11 +91,16 @@
 - **Password complexity** - Uppercase + lowercase + number + special char required
 - **Debug lockdown** - debug.php restricted to localhost only
 
-### Phase 7: Planned Features 📋
+### Phase 7: Analytics & Performance ✅
+- **Analytics dashboard enhanced** - Real period-over-period comparison, revenue/orders chart toggle, order activity heatmap, CSV export
+- **Lazy loading** - `loading="lazy"` on all below-fold images (15+ img tags across 11 files)
+- **API caching** - In-memory TTL cache (`apiCache.ts`) for products, categories, product detail
+- **Server-side pagination** - Products catalog (20/page) and SalesOrders (20/page) with smart page controls
+
+### Phase 8: Planned Features 📋
 - Real-time Lalamove tracking integration
 - Push/SMS notifications
 - Customer ratings & reviews (partially done)
-- Analytics dashboard enhancements
 - Multi-language support
 
 ---
@@ -243,6 +248,56 @@ C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE path/to/script.sql"
 ---
 
 ## 📝 Session Logs
+
+### February 20, 2026 - Analytics Enhancement & Performance Optimization
+**Focus:** Analytics dashboard rewrite, lazy loading, API caching, server-side pagination
+
+#### Completed:
+1. **Analytics Dashboard Enhancement**
+   - Backend `getAnalytics()` in sales.php now computes previous-period revenue, orders, avg order, and customer counts
+   - Returns percentage changes and hourly order heatmap data (day-of-week × hour)
+   - Frontend `SalesAnalytics.tsx` fully rewritten with real period-over-period comparison indicators
+   - Added Revenue/Orders bar chart toggle, Order Activity Heatmap visualization
+   - Added CSV export for revenue, daily, product, and category data
+   - Revenue share % column with mini progress bars in top products table
+
+2. **Lazy Loading Images**
+   - Added `loading="lazy"` to all below-fold `<img>` tags across 11 files (15+ images)
+   - Files: ProductCard, CategoryCard, Home, About, Services, Dashboard, Cart, Wishlist, ProductDetail
+   - Hero carousel images excluded (above the fold)
+
+3. **API Response Caching**
+   - Created `frontend/src/services/apiCache.ts` — in-memory Map-based cache with TTL
+   - TTL presets: SHORT (1min), MEDIUM (5min), LONG (15min), VERY_LONG (1hr)
+   - Max 100 entries with automatic eviction of oldest on overflow
+   - Integrated into `productServicePHP.ts`: categories (15min), products (5min), product detail (5min)
+
+4. **Server-Side Pagination**
+   - `Products.tsx`: Removed ~900-line hardcoded `defaultProducts` array, replaced with server-side pagination (20/page)
+   - Debounced search (400ms), URL param sync (`?category=&search=&page=`), smart page number display with ellipsis
+   - `SalesOrders.tsx`: Added limit/offset to `fetchOrders()`, pagination UI with page controls
+   - Page resets on filter/search changes, scroll-to-top on page change
+
+#### New Files:
+- `frontend/src/services/apiCache.ts` — API response cache utility
+
+#### Files Modified:
+- `backend/api/sales.php` — getAnalytics() with period comparison + hourly heatmap
+- `frontend/src/pages/SalesAnalytics.tsx` — Complete rewrite
+- `frontend/src/pages/Products.tsx` — Server-side pagination rewrite
+- `frontend/src/pages/SalesOrders.tsx` — Added pagination
+- `frontend/src/services/productServicePHP.ts` — Cache integration
+- `frontend/src/components/ui/ProductCard.tsx` — Lazy loading
+- `frontend/src/components/ui/CategoryCard.tsx` — Lazy loading
+- `frontend/src/pages/Home.tsx` — Lazy loading
+- `frontend/src/pages/About.tsx` — Lazy loading
+- `frontend/src/pages/Services.tsx` — Lazy loading
+- `frontend/src/pages/Dashboard.tsx` — Lazy loading
+- `frontend/src/pages/Cart.tsx` — Lazy loading
+- `frontend/src/pages/Wishlist.tsx` — Lazy loading
+- `frontend/src/pages/ProductDetail.tsx` — Lazy loading
+
+---
 
 ### February 19, 2026 - Sales POS & Customer Verification
 **Focus:** Order pickup flow and customer verification
@@ -548,10 +603,10 @@ C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE database/your_migra
 - **Password complexity enforced** - Uppercase + lowercase + number + special character ✅
 - **No admin bypass** - All admin actions require valid Bearer token session ✅
 
-### Performance
-- **Lazy load images** using loading="lazy"
-- **Cache API responses** where appropriate
-- **Use pagination** for large lists (orders, products)
+### Performance ✅ (Implemented)
+- **Lazy load images** using `loading="lazy"` — Applied to 15+ images across 11 files ✅
+- **API response caching** — In-memory TTL cache via `apiCache.ts`, integrated into product service ✅
+- **Server-side pagination** — Products (20/page) and SalesOrders (20/page) with smart controls ✅
 
 ### Debugging
 - **Check browser console** first for frontend errors

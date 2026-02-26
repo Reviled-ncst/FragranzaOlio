@@ -227,6 +227,7 @@ const Services = () => {
               <img
                 src="https://images.unsplash.com/photo-1566958769312-82cef41d19ef?w=600"
                 alt="Distribution Services"
+                loading="lazy"
                 className="rounded-sm shadow-2xl w-full"
               />
             </motion.div>
@@ -289,6 +290,7 @@ const Services = () => {
               <img
                 src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600"
                 alt="Why Choose Us"
+                loading="lazy"
                 className="rounded-sm shadow-gold w-full"
               />
             </motion.div>
