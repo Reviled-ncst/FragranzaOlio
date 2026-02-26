@@ -40,6 +40,9 @@ try {
     http_response_code(500);
     error_log('Sales API error: ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'An internal error occurred']);
+}
+
+function handleGetRequests($db, $action) {
     switch ($action) {
         case 'orders':
             getOrders($db);

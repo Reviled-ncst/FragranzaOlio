@@ -37,13 +37,13 @@ class AdminLogsAPI {
             $stmt->execute([$token]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($user && in_array($user['role'], ['admin', 'ojt_supervisor', 'sales_representative'])) {
+            if ($user && in_array($user['role'], ['admin', 'ojt_supervisor', 'sales'])) {
                 $this->currentAdmin = $user;
                 return true;
             }
         }
         
-        // Method 2: Try email from query param or header (for Supabase auth)
+        // Method 2: Try email from query param or header (fallback auth)
         $email = $_GET['admin_email'] ?? $headers['X-Admin-Email'] ?? null;
         if ($email) {
             $query = "SELECT id, email, first_name, last_name, role 
@@ -54,7 +54,7 @@ class AdminLogsAPI {
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($user && in_array($user['role'], ['admin', 'ojt_supervisor', 'sales_representative'])) {
+            if ($user && in_array($user['role'], ['admin', 'ojt_supervisor', 'sales'])) {
                 $this->currentAdmin = $user;
                 return true;
             }

@@ -5,28 +5,9 @@
 
 import { API_BASE_URL, apiFetch } from './api';
 
-// Get token from localStorage - check multiple possible keys
+// Get token from localStorage
 const getToken = (): string | null => {
-  // Try Supabase token first
-  const sbToken = localStorage.getItem('sb-access-token');
-  if (sbToken) return sbToken;
-  
-  // Try auth_token as fallback
-  const authToken = localStorage.getItem('auth_token');
-  if (authToken) return authToken;
-  
-  // Try to get from Supabase storage format
-  const sbStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('sb-') && key.includes('auth-token'));
-  for (const key of sbStorageKeys) {
-    try {
-      const data = JSON.parse(localStorage.getItem(key) || '{}');
-      if (data.access_token) return data.access_token;
-    } catch (e) {
-      // Continue to next key
-    }
-  }
-  
-  return null;
+  return localStorage.getItem('fragranza_session');
 };
 
 export interface AdminLog {

@@ -78,9 +78,7 @@ export default function AdminLoginAttempts() {
       if (dateRange.start) params.append('start_date', dateRange.start);
       if (dateRange.end) params.append('end_date', dateRange.end);
 
-      const res = await apiFetch(`${API_BASE_URL}/admin_logs.php/login-attempts?${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      const res = await apiFetch(`${API_BASE_URL}/admin_logs.php/login-attempts?${params}`);
       const data = await res.json();
       
       if (data.success) {
@@ -96,9 +94,7 @@ export default function AdminLoginAttempts() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await apiFetch(`${API_BASE_URL}/admin_logs.php/login-attempts/stats?days=7`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      const res = await apiFetch(`${API_BASE_URL}/admin_logs.php/login-attempts/stats?days=7`);
       const data = await res.json();
       
       if (data.success) {

@@ -50,10 +50,39 @@ export const buildApiUrl = (endpoint: string, params?: Record<string, string | n
 
 /**
  * Fetch wrapper that automatically uses proxy in production
+ * and auto-injects auth headers from stored session.
  * @param url - URL like "${API_BASE_URL}/auth.php?action=login"
  * @param options - Fetch options
  */
 export const apiFetch = async (url: string, options?: RequestInit): Promise<Response> => {
+  // Auto-inject auth headers if not already present
+  const mergedOptions = { ...options };
+  const existingHeaders = new Headers(mergedOptions.headers || {});
+  
+  if (!existingHeaders.has('Authorization')) {
+    try {
+      const token = localStorage.getItem('fragranza_session');
+      if (token) {
+        existingHeaders.set('Authorization', `Bearer ${token}`);
+      }
+    } catch { /* ignore */ }
+  }
+  if (!existingHeaders.has('X-Admin-Email')) {
+    try {
+      const userStr = localStorage.getItem('fragranza_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user?.email) {
+          existingHeaders.set('X-Admin-Email', user.email);
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  if (!existingHeaders.has('Content-Type')) {
+    existingHeaders.set('Content-Type', 'application/json');
+  }
+  mergedOptions.headers = existingHeaders;
+
   if (isProduction) {
     // Parse the URL and extract path and query params
     const urlObj = new URL(url, window.location.origin);
@@ -78,9 +107,9 @@ export const apiFetch = async (url: string, options?: RequestInit): Promise<Resp
       proxyUrl.searchParams.set(key, value);
     });
     
-    return fetch(proxyUrl.toString(), options);
+    return fetch(proxyUrl.toString(), mergedOptions);
   }
-  return fetch(url, options);
+  return fetch(url, mergedOptions);
 };
 
 // Helper function to get full image URL

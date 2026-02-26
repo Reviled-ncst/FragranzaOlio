@@ -87,9 +87,7 @@ export default function AdminOJT() {
     setIsLoading(true);
     try {
       // Fetch trainees - only active ones
-      const traineesRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt&status=active`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      const traineesRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt&status=active`);
       const traineesData = await traineesRes.json();
       
       if (traineesData.success && traineesData.data?.users) {
@@ -113,9 +111,7 @@ export default function AdminOJT() {
       }
 
       // Fetch supervisors
-      const supervisorsRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt_supervisor`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` }
-      });
+      const supervisorsRes = await apiFetch(`${API_BASE_URL}/admin_users.php?role=ojt_supervisor`);
       const supervisorsData = await supervisorsRes.json();
       
       if (supervisorsData.success && supervisorsData.data?.users) {
