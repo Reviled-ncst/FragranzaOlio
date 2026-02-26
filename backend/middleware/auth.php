@@ -12,10 +12,34 @@
 
 /**
  * Extract Bearer token from Authorization header
+ * Checks multiple sources since Apache/reverse proxies may move the header
  */
 function extractBearerToken(): ?string {
+    $authHeader = '';
+    
+    // Method 1: getallheaders() - standard way
     $headers = getallheaders();
-    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    if (!empty($headers)) {
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+    }
+    
+    // Method 2: $_SERVER['HTTP_AUTHORIZATION'] - set by some Apache configs
+    if (empty($authHeader) && !empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+    }
+    
+    // Method 3: $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] - set after Apache rewrites
+    if (empty($authHeader) && !empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+    
+    // Method 4: apache_request_headers() fallback
+    if (empty($authHeader) && function_exists('apache_request_headers')) {
+        $apacheHeaders = apache_request_headers();
+        if ($apacheHeaders) {
+            $authHeader = $apacheHeaders['Authorization'] ?? $apacheHeaders['authorization'] ?? '';
+        }
+    }
     
     if (!empty($authHeader) && str_starts_with($authHeader, 'Bearer ')) {
         $token = substr($authHeader, 7);

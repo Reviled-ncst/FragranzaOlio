@@ -12,6 +12,11 @@ RewriteEngine On
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^(.*)$ - [R=200,L]
 
+# IMPORTANT: Preserve Authorization header through Apache rewrites
+# Without this, reverse proxies (Cloudflare tunnel) may lose the auth header
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
 # Auto-detect base path
 # For InfinityFree: use /
 # For XAMPP: use /FragranzaWeb/backend/

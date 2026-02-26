@@ -14,8 +14,8 @@ $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// SECURITY: All inventory operations require admin or supervisor role
-requireRole($db, ['admin', 'ojt_supervisor']);
+// SECURITY: Inventory operations require admin, supervisor, or sales role
+requireRole($db, ['admin', 'ojt_supervisor', 'sales']);
 
 try {
     switch ($method) {
