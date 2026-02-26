@@ -41,19 +41,33 @@ function loadEnvFile(): void {
 // Load .env file
 loadEnvFile();
 
-// Check if we're in production (InfinityFree) or local (XAMPP/ngrok/Cloudflare tunnel)
+// Detect environment: Railway (MYSQL_URL set), InfinityFree (PROD_DB_HOST set), or local (XAMPP)
+$isRailway = !empty(getenv('MYSQL_HOST')) || !empty(getenv('MYSQLHOST')) || !empty(getenv('RAILWAY_ENVIRONMENT'));
 $serverName = $_SERVER['SERVER_NAME'] ?? '';
-$isLocal = in_array($serverName, ['localhost', '127.0.0.1']) || 
-           strpos($serverName, 'ngrok') !== false ||
-           strpos($serverName, 'ngrok-free.app') !== false ||
-           strpos($serverName, 'trycloudflare.com') !== false;
-$isProduction = !$isLocal;
+$isLocal = !$isRailway && (
+    in_array($serverName, ['localhost', '127.0.0.1']) || 
+    strpos($serverName, 'ngrok') !== false ||
+    strpos($serverName, 'ngrok-free.app') !== false ||
+    strpos($serverName, 'trycloudflare.com') !== false
+);
+$isProduction = !$isLocal && !$isRailway;
 
-if ($isProduction) {
+if ($isRailway) {
     // ============================================
-    // INFINITYFREE PRODUCTION SETTINGS
+    // RAILWAY PRODUCTION SETTINGS
+    // ============================================
+    // Railway MySQL plugin provides these environment variables
+    define('DB_HOST', getenv('MYSQLHOST') ?: getenv('MYSQL_HOST') ?: 'localhost');
+    define('DB_PORT', getenv('MYSQLPORT') ?: getenv('MYSQL_PORT') ?: '3306');
+    define('DB_NAME', getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE') ?: 'railway');
+    define('DB_USER', getenv('MYSQLUSER') ?: getenv('MYSQL_USER') ?: 'root');
+    define('DB_PASS', getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: '');
+} elseif ($isProduction) {
+    // ============================================
+    // INFINITYFREE PRODUCTION SETTINGS (legacy)
     // ============================================
     define('DB_HOST', getenv('PROD_DB_HOST') ?: 'localhost');
+    define('DB_PORT', '3306');
     define('DB_NAME', getenv('PROD_DB_NAME') ?: 'fragranza_db');
     define('DB_USER', getenv('PROD_DB_USER') ?: 'root');
     define('DB_PASS', getenv('PROD_DB_PASS') ?: '');
@@ -62,12 +76,14 @@ if ($isProduction) {
     // LOCAL DEVELOPMENT (XAMPP)
     // ============================================
     define('DB_HOST', getenv('LOCAL_DB_HOST') ?: 'localhost');
+    define('DB_PORT', '3306');
     define('DB_NAME', getenv('LOCAL_DB_NAME') ?: 'fragranza_db');
     define('DB_USER', getenv('LOCAL_DB_USER') ?: 'root');
     define('DB_PASS', getenv('LOCAL_DB_PASS') ?: '');
 }
 
 define('DB_CHARSET', 'utf8mb4');
+define('RAILWAY_ENV', $isRailway);
 
 class Database {
     private static $instance = null;
@@ -76,12 +92,18 @@ class Database {
     private function __construct() {
         try {
             // First, connect without database to check/create it
-            $dsnNoDB = "mysql:host=" . DB_HOST . ";charset=" . DB_CHARSET;
+            $dsnNoDB = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";charset=" . DB_CHARSET;
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ];
+
+            // Railway MySQL public proxy may need SSL and extended timeout
+            if (defined('RAILWAY_ENV') && RAILWAY_ENV) {
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+                $options[PDO::ATTR_TIMEOUT] = 10;
+            }
             
             $tempConn = new PDO($dsnNoDB, DB_USER, DB_PASS, $options);
             
@@ -91,7 +113,7 @@ class Database {
                             COLLATE utf8mb4_unicode_ci");
             
             // Now connect to the database
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
             $this->connection = new PDO($dsn, DB_USER, DB_PASS, $options);
             
             // Create tables if they don't exist
