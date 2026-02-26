@@ -249,6 +249,174 @@ class AdminLogsAPI {
     }
 
     /**
+     * Get login attempts with filters
+     */
+    public function getLoginAttempts($filters = []) {
+        $page = isset($filters['page']) ? max(1, intval($filters['page'])) : 1;
+        $limit = isset($filters['limit']) ? min(100, max(1, intval($filters['limit']))) : 50;
+        $offset = ($page - 1) * $limit;
+
+        $whereConditions = [];
+        $params = [];
+
+        // Filter by success/failed
+        if (isset($filters['success']) && $filters['success'] !== '') {
+            $whereConditions[] = "la.success = ?";
+            $params[] = $filters['success'] === 'true' || $filters['success'] === '1' ? 1 : 0;
+        }
+
+        // Filter by email
+        if (!empty($filters['email'])) {
+            $whereConditions[] = "la.email LIKE ?";
+            $params[] = '%' . $filters['email'] . '%';
+        }
+
+        // Filter by IP address
+        if (!empty($filters['ip_address'])) {
+            $whereConditions[] = "la.ip_address LIKE ?";
+            $params[] = '%' . $filters['ip_address'] . '%';
+        }
+
+        // Filter by failure reason
+        if (!empty($filters['failure_reason'])) {
+            $whereConditions[] = "la.failure_reason = ?";
+            $params[] = $filters['failure_reason'];
+        }
+
+        // Filter by date range
+        if (!empty($filters['start_date'])) {
+            $whereConditions[] = "DATE(la.created_at) >= ?";
+            $params[] = $filters['start_date'];
+        }
+        if (!empty($filters['end_date'])) {
+            $whereConditions[] = "DATE(la.created_at) <= ?";
+            $params[] = $filters['end_date'];
+        }
+
+        // Search (email or IP)
+        if (!empty($filters['search'])) {
+            $searchTerm = "%" . $filters['search'] . "%";
+            $whereConditions[] = "(la.email LIKE ? OR la.ip_address LIKE ?)";
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+        }
+
+        $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+
+        // Get total count
+        $countQuery = "SELECT COUNT(*) as total FROM login_attempts la $whereClause";
+        $stmt = $this->conn->prepare($countQuery);
+        $stmt->execute($params);
+        $total = intval($stmt->fetch(PDO::FETCH_ASSOC)['total']);
+
+        // Get login attempts with user info
+        $query = "SELECT la.*, u.first_name, u.last_name, u.role
+                  FROM login_attempts la
+                  LEFT JOIN users u ON la.user_id = u.id
+                  $whereClause
+                  ORDER BY la.created_at DESC
+                  LIMIT $limit OFFSET $offset";
+        
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute($params);
+        $attempts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'attempts' => $attempts,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'totalPages' => ceil($total / $limit)
+            ]
+        ];
+    }
+
+    /**
+     * Get login attempts statistics
+     */
+    public function getLoginAttemptsStats($days = 7) {
+        $stats = [];
+
+        // Total attempts (success vs failed)
+        $query = "SELECT success, COUNT(*) as count 
+                  FROM login_attempts 
+                  WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                  GROUP BY success";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$days]);
+        $stats['bySuccess'] = ['success' => 0, 'failed' => 0];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if ($row['success']) {
+                $stats['bySuccess']['success'] = intval($row['count']);
+            } else {
+                $stats['bySuccess']['failed'] = intval($row['count']);
+            }
+        }
+
+        // By failure reason
+        $query = "SELECT failure_reason, COUNT(*) as count 
+                  FROM login_attempts 
+                  WHERE success = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                  GROUP BY failure_reason";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$days]);
+        $stats['byFailureReason'] = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $reason = $row['failure_reason'] ?? 'unknown';
+            $stats['byFailureReason'][$reason] = intval($row['count']);
+        }
+
+        // Top failed IPs (potential brute force)
+        $query = "SELECT ip_address, COUNT(*) as attempt_count, MAX(created_at) as last_attempt
+                  FROM login_attempts 
+                  WHERE success = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                  GROUP BY ip_address
+                  HAVING COUNT(*) >= 3
+                  ORDER BY attempt_count DESC
+                  LIMIT 10";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$days]);
+        $stats['suspiciousIPs'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Top failed emails
+        $query = "SELECT email, COUNT(*) as attempt_count, MAX(created_at) as last_attempt
+                  FROM login_attempts 
+                  WHERE success = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                  GROUP BY email
+                  HAVING COUNT(*) >= 3
+                  ORDER BY attempt_count DESC
+                  LIMIT 10";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$days]);
+        $stats['suspiciousEmails'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Daily breakdown
+        $query = "SELECT DATE(created_at) as date, success, COUNT(*) as count 
+                  FROM login_attempts 
+                  WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+                  GROUP BY DATE(created_at), success
+                  ORDER BY date ASC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([$days]);
+        $dailyData = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $date = $row['date'];
+            if (!isset($dailyData[$date])) {
+                $dailyData[$date] = ['date' => $date, 'success' => 0, 'failed' => 0];
+            }
+            if ($row['success']) {
+                $dailyData[$date]['success'] = intval($row['count']);
+            } else {
+                $dailyData[$date]['failed'] = intval($row['count']);
+            }
+        }
+        $stats['dailyActivity'] = array_values($dailyData);
+
+        return $stats;
+    }
+
+    /**
      * Handle GET request
      */
     public function handleGet() {
@@ -263,6 +431,30 @@ class AdminLogsAPI {
         if ($path === '/stats') {
             $days = isset($_GET['days']) ? intval($_GET['days']) : 30;
             $stats = $this->getStats($days);
+            return ['success' => true, 'data' => $stats];
+        }
+
+        // Get login attempts
+        if ($path === '/login-attempts') {
+            $filters = [
+                'page' => $_GET['page'] ?? 1,
+                'limit' => $_GET['limit'] ?? 50,
+                'success' => $_GET['success'] ?? null,
+                'email' => $_GET['email'] ?? null,
+                'ip_address' => $_GET['ip_address'] ?? null,
+                'failure_reason' => $_GET['failure_reason'] ?? null,
+                'start_date' => $_GET['start_date'] ?? null,
+                'end_date' => $_GET['end_date'] ?? null,
+                'search' => $_GET['search'] ?? null,
+            ];
+            $result = $this->getLoginAttempts($filters);
+            return ['success' => true, 'data' => $result];
+        }
+
+        // Get login attempts stats
+        if ($path === '/login-attempts/stats') {
+            $days = isset($_GET['days']) ? intval($_GET['days']) : 7;
+            $stats = $this->getLoginAttemptsStats($days);
             return ['success' => true, 'data' => $stats];
         }
 

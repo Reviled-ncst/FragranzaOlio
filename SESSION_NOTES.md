@@ -249,22 +249,52 @@ C:\xampp\mysql\bin\mysql.exe -u root fragranza_db -e "SOURCE path/to/script.sql"
 
 ## 📝 Session Logs
 
-### February 26, 2026 - Tunnel & Services Restart
-**Focus:** Infrastructure restart and deployment
+### February 26, 2026 - Login Attempts Tracking & Infrastructure
+**Focus:** Security monitoring, login tracking, infrastructure restart
 
 #### Completed:
 1. **Services Restart**
    - Restarted XAMPP (Apache + MySQL)
    - Restarted Cloudflare tunnel with new URL: `gmt-stomach-off-blowing.trycloudflare.com`
 
-2. **Deployment**
-   - Auto-updated tunnel URL in `api/proxy.ts`, `api/image.ts`, `api.ts`
-   - Committed and pushed all pending changes including:
-     - Analytics dashboard enhancement (period comparison, heatmap, CSV export)
-     - Lazy loading images (15+ img tags across 11 files)
-     - API response caching (`apiCache.ts`)
-     - Server-side pagination for Products and SalesOrders
+2. **Login Attempts Tracking System**
+   - Created `login_attempts` table schema with indexes for email, IP, created_at
+   - Modified `auth.php` to log all login attempts (success and failures)
+   - Tracks: email, user_id, success status, failure_reason, IP address, user_agent
+   - Failure reasons: `invalid_email`, `invalid_password`, `account_suspended`, `account_inactive`
+
+3. **Backend Login Attempts API**
+   - Added `getLoginAttempts()` endpoint in `admin_logs.php`
+   - Supports filtering by success/failed, email, IP, failure_reason, date range
+   - Returns paginated results with user info (name, role)
+   - Added `getLoginAttemptsStats()` for security analytics:
+     - Success vs failed counts
+     - Breakdown by failure reason
+     - Suspicious IPs (3+ failed attempts)
+     - Targeted emails (brute force detection)
+     - Daily activity breakdown
+
+4. **Admin Login Attempts Page**
+   - Created `AdminLoginAttempts.tsx` with 3 tabs:
+     - **Overview**: Stats cards (total, success, failed, failure rate), daily activity chart, failure reasons breakdown
+     - **Attempts**: Searchable/filterable table of all login attempts with pagination
+     - **Suspicious**: Lists IPs and emails with multiple failed attempts
+   - Added route `/admin/login-attempts` in App.tsx
+   - Added "Login Attempts" navigation in AdminLayout with Shield icon
+
+5. **Deployment**
+   - Committed and pushed all pending changes
    - Commit: `485a8e8` — 20 files changed, 847 insertions
+
+#### New Files:
+- `database/login_attempts_schema.sql` — Login attempts table schema
+- `frontend/src/pages/AdminLoginAttempts.tsx` — Admin security monitoring page
+
+#### Files Modified:
+- `backend/api/auth.php` — Added `logLoginAttempt()` method, tracking on all login outcomes
+- `backend/api/admin_logs.php` — Added login attempts endpoints
+- `frontend/src/App.tsx` — Added AdminLoginAttempts route
+- `frontend/src/components/layout/AdminLayout.tsx` — Added Login Attempts nav item
 
 #### Current Tunnel URL:
 `https://gmt-stomach-off-blowing.trycloudflare.com`

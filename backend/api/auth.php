@@ -26,6 +26,28 @@ class AuthController {
     }
     
     /**
+     * Log a login attempt (success or failure)
+     */
+    private function logLoginAttempt($email, $userId, $success, $failureReason = null) {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO login_attempts (email, user_id, success, failure_reason, ip_address, user_agent)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                strtolower(trim($email)),
+                $userId,
+                $success ? 1 : 0,
+                $failureReason,
+                $_SERVER['REMOTE_ADDR'] ?? null,
+                $_SERVER['HTTP_USER_AGENT'] ?? null
+            ]);
+        } catch (PDOException $e) {
+            error_log("Failed to log login attempt: " . $e->getMessage());
+        }
+    }
+    
+    /**
      * Register a new user
      */
     public function register($data) {
@@ -210,20 +232,24 @@ class AuthController {
             $user = $stmt->fetch();
             
             if (!$user) {
+                $this->logLoginAttempt($data['email'], null, false, 'invalid_email');
                 return $this->response(false, 'Invalid email or password', null, 401);
             }
             
             // Verify password
             if (!password_verify($data['password'], $user['password_hash'])) {
+                $this->logLoginAttempt($data['email'], $user['id'], false, 'invalid_password');
                 return $this->response(false, 'Invalid email or password', null, 401);
             }
             
             // Check account status
             if ($user['status'] === 'suspended') {
+                $this->logLoginAttempt($data['email'], $user['id'], false, 'account_suspended');
                 return $this->response(false, 'Your account has been suspended. Please contact support.', null, 403);
             }
             
             if ($user['status'] === 'inactive') {
+                $this->logLoginAttempt($data['email'], $user['id'], false, 'account_inactive');
                 return $this->response(false, 'Your account is inactive. Please contact support.', null, 403);
             }
             
@@ -252,6 +278,9 @@ class AuthController {
             
             // Log activity
             $this->logActivity($user['id'], 'login', ['ip' => $_SERVER['REMOTE_ADDR'] ?? null]);
+            
+            // Log successful login attempt
+            $this->logLoginAttempt($data['email'], $user['id'], true);
             
             return $this->response(true, 'Login successful', [
                 'user' => [

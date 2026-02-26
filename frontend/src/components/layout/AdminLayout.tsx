@@ -16,7 +16,8 @@ import {
   FileText,
   Bell,
   MessageSquare,
-  GraduationCap
+  GraduationCap,
+  Shield
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -69,6 +70,7 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }: AdminLayoutProps) 
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin' },
     { label: 'User Management', icon: Users, path: '/admin/users' },
     { label: 'OJT Management', icon: GraduationCap, path: '/admin/ojt' },
+    { label: 'Login Attempts', icon: Shield, path: '/admin/login-attempts' },
     { label: 'Products', icon: Package, path: '/admin/products' },
     { label: 'Inventory', icon: Boxes, path: '/admin/inventory' },
     { label: 'Orders', icon: ShoppingCart, path: '/admin/orders' },

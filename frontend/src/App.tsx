@@ -63,6 +63,7 @@ import Addresses from './pages/Addresses';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminOJT from './pages/AdminOJT';
+import AdminLoginAttempts from './pages/AdminLoginAttempts';
 import HRDashboard from './pages/HRDashboard';
 import HREmployees from './pages/HREmployees';
 import HRInterns from './pages/HRInterns';
@@ -176,6 +177,7 @@ const AppContent = () => {
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/users" element={<AdminRoute><AdminUsers /></AdminRoute>} />
             <Route path="/admin/ojt" element={<AdminRoute><AdminOJT /></AdminRoute>} />
+            <Route path="/admin/login-attempts" element={<AdminRoute><AdminLoginAttempts /></AdminRoute>} />
             <Route path="/admin/products" element={<AdminRoute><SalesProducts /></AdminRoute>} />
             <Route path="/admin/inventory" element={<AdminRoute><SalesInventory /></AdminRoute>} />
             <Route path="/admin/orders" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
