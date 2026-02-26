@@ -41,49 +41,48 @@ function loadEnvFile(): void {
 // Load .env file
 loadEnvFile();
 
-// Detect environment: Railway (MYSQL_URL set), InfinityFree (PROD_DB_HOST set), or local (XAMPP)
-$isRailway = !empty(getenv('MYSQL_HOST')) || !empty(getenv('MYSQLHOST')) || !empty(getenv('RAILWAY_ENVIRONMENT'));
+// Detect environment: Railway > InfinityFree > Local XAMPP
 $serverName = $_SERVER['SERVER_NAME'] ?? '';
-$isLocal = !$isRailway && (
-    in_array($serverName, ['localhost', '127.0.0.1']) || 
-    strpos($serverName, 'ngrok') !== false ||
-    strpos($serverName, 'ngrok-free.app') !== false ||
-    strpos($serverName, 'trycloudflare.com') !== false
-);
-$isProduction = !$isLocal && !$isRailway;
+$isLocal = in_array($serverName, ['localhost', '127.0.0.1']) || 
+           strpos($serverName, 'ngrok') !== false ||
+           strpos($serverName, 'ngrok-free.app') !== false ||
+           strpos($serverName, 'trycloudflare.com') !== false;
+
+// Railway sets RAILWAY_ENVIRONMENT and MYSQL* env vars automatically
+$isRailway = !empty(getenv('RAILWAY_ENVIRONMENT')) || !empty(getenv('MYSQLHOST'));
+$isProduction = !$isLocal;
 
 if ($isRailway) {
     // ============================================
     // RAILWAY PRODUCTION SETTINGS
+    // Railway auto-injects these env vars when MySQL service is linked
     // ============================================
-    // Railway MySQL plugin provides these environment variables
-    define('DB_HOST', getenv('MYSQLHOST') ?: getenv('MYSQL_HOST') ?: 'localhost');
-    define('DB_PORT', getenv('MYSQLPORT') ?: getenv('MYSQL_PORT') ?: '3306');
-    define('DB_NAME', getenv('MYSQLDATABASE') ?: getenv('MYSQL_DATABASE') ?: 'railway');
-    define('DB_USER', getenv('MYSQLUSER') ?: getenv('MYSQL_USER') ?: 'root');
-    define('DB_PASS', getenv('MYSQLPASSWORD') ?: getenv('MYSQL_PASSWORD') ?: '');
+    define('DB_HOST', getenv('MYSQLHOST') ?: getenv('DB_HOST') ?: 'localhost');
+    define('DB_NAME', getenv('MYSQLDATABASE') ?: getenv('DB_NAME') ?: 'railway');
+    define('DB_USER', getenv('MYSQLUSER') ?: getenv('DB_USER') ?: 'root');
+    define('DB_PASS', getenv('MYSQLPASSWORD') ?: getenv('DB_PASS') ?: '');
+    define('DB_PORT', getenv('MYSQLPORT') ?: '3306');
 } elseif ($isProduction) {
     // ============================================
     // INFINITYFREE PRODUCTION SETTINGS (legacy)
     // ============================================
     define('DB_HOST', getenv('PROD_DB_HOST') ?: 'localhost');
-    define('DB_PORT', '3306');
     define('DB_NAME', getenv('PROD_DB_NAME') ?: 'fragranza_db');
     define('DB_USER', getenv('PROD_DB_USER') ?: 'root');
     define('DB_PASS', getenv('PROD_DB_PASS') ?: '');
+    define('DB_PORT', '3306');
 } else {
     // ============================================
     // LOCAL DEVELOPMENT (XAMPP)
     // ============================================
     define('DB_HOST', getenv('LOCAL_DB_HOST') ?: 'localhost');
-    define('DB_PORT', '3306');
     define('DB_NAME', getenv('LOCAL_DB_NAME') ?: 'fragranza_db');
     define('DB_USER', getenv('LOCAL_DB_USER') ?: 'root');
     define('DB_PASS', getenv('LOCAL_DB_PASS') ?: '');
+    define('DB_PORT', '3306');
 }
 
 define('DB_CHARSET', 'utf8mb4');
-define('RAILWAY_ENV', $isRailway);
 
 class Database {
     private static $instance = null;
@@ -98,12 +97,6 @@ class Database {
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
             ];
-
-            // Railway MySQL public proxy may need SSL and extended timeout
-            if (defined('RAILWAY_ENV') && RAILWAY_ENV) {
-                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
-                $options[PDO::ATTR_TIMEOUT] = 10;
-            }
             
             $tempConn = new PDO($dsnNoDB, DB_USER, DB_PASS, $options);
             

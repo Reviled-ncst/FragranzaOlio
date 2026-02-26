@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Backend URL - Use environment variable or default to Cloudflare tunnel
+// Backend URL - Use environment variable
+// For Railway: Set BACKEND_URL to your Railway deployment URL (e.g., https://your-app.up.railway.app)
+// For Cloudflare tunnel: Set BACKEND_URL to the tunnel URL
 const BACKEND_URL = process.env.BACKEND_URL || 'https://gmt-stomach-off-blowing.trycloudflare.com';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

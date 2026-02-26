@@ -1,0 +1,17 @@
+# Ignore local development files
+.env
+.env.local
+.htaccess.local
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore IDE files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Ignore documentation
+*.md

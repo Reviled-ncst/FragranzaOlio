@@ -18,7 +18,7 @@ RewriteCond %{HTTP:Authorization} ^(.*)
 RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
 
 # Auto-detect base path
-# For InfinityFree: use /
+# For Railway/Docker/InfinityFree: use /
 # For XAMPP: use /FragranzaWeb/backend/
 RewriteBase /
 
