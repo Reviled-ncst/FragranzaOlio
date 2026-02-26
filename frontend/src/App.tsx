@@ -64,6 +64,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminUsers from './pages/AdminUsers';
 import AdminOJT from './pages/AdminOJT';
 import AdminLoginAttempts from './pages/AdminLoginAttempts';
+import AdminAnalytics from './pages/AdminAnalytics';
 import HRDashboard from './pages/HRDashboard';
 import HREmployees from './pages/HREmployees';
 import HRInterns from './pages/HRInterns';
@@ -181,7 +182,7 @@ const AppContent = () => {
             <Route path="/admin/products" element={<AdminRoute><SalesProducts /></AdminRoute>} />
             <Route path="/admin/inventory" element={<AdminRoute><SalesInventory /></AdminRoute>} />
             <Route path="/admin/orders" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-            <Route path="/admin/reports" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/reports" element={<AdminRoute><AdminAnalytics /></AdminRoute>} />
             <Route path="/admin/logs" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/messages" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
             <Route path="/admin/settings" element={<AdminRoute><AdminDashboard /></AdminRoute>} />

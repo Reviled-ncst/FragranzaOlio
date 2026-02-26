@@ -17,7 +17,8 @@ import {
   Bell,
   MessageSquare,
   GraduationCap,
-  Shield
+  Shield,
+  TrendingUp
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
@@ -74,7 +75,7 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }: AdminLayoutProps) 
     { label: 'Products', icon: Package, path: '/admin/products' },
     { label: 'Inventory', icon: Boxes, path: '/admin/inventory' },
     { label: 'Orders', icon: ShoppingCart, path: '/admin/orders' },
-    { label: 'Reports', icon: BarChart3, path: '/admin/reports' },
+    { label: 'Analytics', icon: TrendingUp, path: '/admin/reports' },
     { label: 'Activity Logs', icon: FileText, path: '/admin/logs' },
     { label: 'Messages', icon: MessageSquare, path: '/admin/messages' },
     { label: 'Settings', icon: Settings, path: '/admin/settings' },

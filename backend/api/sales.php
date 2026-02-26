@@ -2116,6 +2116,25 @@ function getAnalytics($db) {
     $hourlyStmt->execute([':start_date' => $startDate]);
     $hourlyData = $hourlyStmt->fetchAll(PDO::FETCH_ASSOC);
     
+    // Location-based order distribution (frequent order places)
+    $locationStmt = $db->prepare("
+        SELECT 
+            COALESCE(shipping_city, 'Unknown') as city,
+            COALESCE(shipping_province, 'Unknown') as province,
+            COUNT(*) as order_count,
+            COALESCE(SUM(total_amount), 0) as total_revenue
+        FROM orders 
+        WHERE created_at >= :start_date 
+            AND payment_status = 'paid'
+            AND shipping_city IS NOT NULL 
+            AND shipping_city != ''
+        GROUP BY shipping_city, shipping_province
+        ORDER BY order_count DESC, total_revenue DESC
+        LIMIT 15
+    ");
+    $locationStmt->execute([':start_date' => $startDate]);
+    $locationData = $locationStmt->fetchAll(PDO::FETCH_ASSOC);
+    
     echo json_encode([
         'success' => true,
         'data' => [
@@ -2131,7 +2150,8 @@ function getAnalytics($db) {
             'hourly' => $hourlyData,
             'topProducts' => $topProducts,
             'categories' => $categoryData,
-            'newCustomers' => $newCustomersCount
+            'newCustomers' => $newCustomersCount,
+            'locationData' => $locationData
         ]
     ]);
 }
