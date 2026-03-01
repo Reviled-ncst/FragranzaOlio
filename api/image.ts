@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Backend URL for images - Cloudflare tunnel to local XAMPP
-const BACKEND_URL = process.env.BACKEND_URL || 'https://gmt-stomach-off-blowing.trycloudflare.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api-backend-production-8751.up.railway.app';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
