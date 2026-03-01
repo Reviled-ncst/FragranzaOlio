@@ -33,14 +33,14 @@ switch ($method) {
         break;
     
     case 'POST':
-        // SECURITY: Require admin role for product creation
-        requireRole($db, 'admin');
+        // SECURITY: Require admin or sales role for product creation
+        requireRole($db, ['admin', 'sales']);
         createProduct($db);
         break;
     
     case 'PUT':
-        // SECURITY: Require admin role for product updates
-        requireRole($db, 'admin');
+        // SECURITY: Require admin or sales role for product updates
+        requireRole($db, ['admin', 'sales']);
         if ($productId) {
             updateProduct($db, $productId);
         } else {
@@ -50,8 +50,8 @@ switch ($method) {
         break;
     
     case 'DELETE':
-        // SECURITY: Require admin role for product deletion
-        requireRole($db, 'admin');
+        // SECURITY: Require admin or sales role for product deletion
+        requireRole($db, ['admin', 'sales']);
         if ($productId) {
             deleteProduct($db, $productId);
         } else {

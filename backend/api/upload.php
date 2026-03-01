@@ -12,9 +12,10 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
 require_once __DIR__ . '/../services/CloudinaryService.php';
 
-// SECURITY: Require admin role for product image uploads
+// SECURITY: Require admin or sales role for product image uploads
+// SalesProducts component is shared between /admin/products and /sales/products routes
 $db = Database::getInstance()->getConnection();
-requireRole($db, 'admin');
+requireRole($db, ['admin', 'sales']);
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
