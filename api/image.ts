@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Build the full image URL - images are served from backend root
   // Ensure path has leading slash
   const normalizedPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
-  const imageUrl = `${BACKEND_URL}/backend${normalizedPath}`;
+  const imageUrl = `${BACKEND_URL}${normalizedPath}`;
 
   try {
     const controller = new AbortController();

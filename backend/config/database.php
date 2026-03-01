@@ -90,13 +90,22 @@ class Database {
 
     private function __construct() {
         try {
-            // First, connect without database to check/create it
-            $dsnNoDB = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";charset=" . DB_CHARSET;
+            // PDO connection options
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_TIMEOUT => 30,
             ];
+            
+            // Railway MySQL proxy needs specific settings
+            $isRailway = !empty(getenv('RAILWAY_ENVIRONMENT')) || !empty(getenv('MYSQLHOST'));
+            if ($isRailway) {
+                $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            }
+            
+            // First, connect without database to check/create it
+            $dsnNoDB = "mysql:host=" . DB_HOST . ";port=" . DB_PORT . ";charset=" . DB_CHARSET;
             
             $tempConn = new PDO($dsnNoDB, DB_USER, DB_PASS, $options);
             

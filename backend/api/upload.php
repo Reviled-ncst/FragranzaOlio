@@ -3,12 +3,14 @@
  * Upload API
  * Handles file uploads for product images
  * Supports both multipart/form-data and base64 JSON uploads
+ * Uses Cloudinary CDN for storage (Railway has ephemeral filesystem)
  */
 
 // CORS & security headers handled by middleware
 require_once __DIR__ . '/../middleware/cors.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../middleware/auth.php';
+require_once __DIR__ . '/../services/CloudinaryService.php';
 
 // SECURITY: Require admin role for product image uploads
 $db = Database::getInstance()->getConnection();
@@ -22,12 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // Configuration
-$uploadDir = __DIR__ . '/../uploads/products/';
 $allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 $maxFileSize = 5 * 1024 * 1024; // 5MB
 
-// Create upload directory if it doesn't exist
-if (!is_dir($uploadDir)) {
+// Initialize Cloudinary
+$cloudinary = new CloudinaryService();
+$useCloudinary = $cloudinary->isConfigured();
+
+// Local upload directory as fallback
+$uploadDir = __DIR__ . '/../uploads/products/';
+if (!$useCloudinary && !is_dir($uploadDir)) {
     mkdir($uploadDir, 0755, true);
 }
 
@@ -37,81 +43,106 @@ if (strpos($contentType, 'application/json') !== false) {
     $jsonData = json_decode(file_get_contents('php://input'), true);
     
     if (isset($jsonData['image_base64']) && isset($jsonData['filename'])) {
-        // Base64 upload
         $base64Data = $jsonData['image_base64'];
-        $originalFilename = basename($jsonData['filename']); // SECURITY: Strip path components
+        $originalFilename = basename($jsonData['filename']);
         
-        // Remove data URL prefix if present
+        // Remove data URL prefix for validation, keep original for Cloudinary
+        $rawBase64 = $base64Data;
         if (preg_match('/^data:image\/(\w+);base64,/', $base64Data, $matches)) {
-            $base64Data = substr($base64Data, strpos($base64Data, ',') + 1);
+            $rawBase64ForDecode = substr($base64Data, strpos($base64Data, ',') + 1);
+        } else {
+            $rawBase64ForDecode = $base64Data;
         }
         
-        $imageData = base64_decode($base64Data);
+        $imageData = base64_decode($rawBase64ForDecode);
         if ($imageData === false) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid base64 data']);
             exit;
         }
         
-        // SECURITY: Verify actual content type using finfo (not the claimed MIME type)
+        // SECURITY: Verify actual content type
         $tmpFile = tempnam(sys_get_temp_dir(), 'upload_');
         file_put_contents($tmpFile, $imageData);
         $finfo = new finfo(FILEINFO_MIME_TYPE);
         $mimeType = $finfo->file($tmpFile);
-        unlink($tmpFile);
         
-        // Check size
         if (strlen($imageData) > $maxFileSize) {
+            unlink($tmpFile);
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'File size exceeds 5MB limit']);
             exit;
         }
         
-        // Validate mime type from actual content
         if (!in_array($mimeType, $allowedTypes)) {
+            unlink($tmpFile);
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid file type. Detected: ' . $mimeType]);
             exit;
         }
         
-        // SECURITY: Verify it's a valid image
         $imageInfo = @getimagesize('data://application/octet-stream;base64,' . base64_encode($imageData));
         if ($imageInfo === false) {
+            unlink($tmpFile);
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Invalid image file']);
             exit;
         }
         
-        // SECURITY: Derive extension from validated MIME type, not from user input
-        $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
-        $extension = $mimeToExt[$mimeType] ?? 'jpg';
-        $filename = uniqid('product_', true) . '.' . $extension;
-        $destination = $uploadDir . $filename;
-        
-        // Save file
-        if (file_put_contents($destination, $imageData) === false) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Failed to save file']);
-            exit;
+        // Upload to Cloudinary or local
+        if ($useCloudinary) {
+            $result = $cloudinary->uploadBase64($base64Data, 'products');
+            unlink($tmpFile);
+            
+            if ($result['success']) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'File uploaded to Cloudinary',
+                    'data' => [
+                        'filename' => basename($result['url']),
+                        'path' => $result['url'],
+                        'url' => $result['url'],
+                        'public_id' => $result['public_id'],
+                        'size' => strlen($imageData),
+                        'type' => $mimeType
+                    ]
+                ]);
+            } else {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Cloudinary upload failed: ' . ($result['error'] ?? 'Unknown')]);
+            }
+        } else {
+            // Fallback: local filesystem
+            $mimeToExt = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+            $extension = $mimeToExt[$mimeType] ?? 'jpg';
+            $filename = uniqid('product_', true) . '.' . $extension;
+            $destination = $uploadDir . $filename;
+            
+            if (file_put_contents($destination, $imageData) === false) {
+                unlink($tmpFile);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to save file']);
+                exit;
+            }
+            unlink($tmpFile);
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'File uploaded successfully',
+                'data' => [
+                    'filename' => $filename,
+                    'path' => 'products/' . $filename,
+                    'url' => '/uploads/products/' . $filename,
+                    'size' => strlen($imageData),
+                    'type' => $mimeType
+                ]
+            ]);
         }
-        
-        echo json_encode([
-            'success' => true,
-            'message' => 'File uploaded successfully',
-            'data' => [
-                'filename' => $filename,
-                'path' => 'products/' . $filename,
-                'url' => '/uploads/products/' . $filename,
-                'size' => strlen($imageData),
-                'type' => $mimeType
-            ]
-        ]);
         exit;
     }
 }
 
 // Traditional multipart/form-data upload
-// Check if file was uploaded
 if (!isset($_FILES['image']) || $_FILES['image']['error'] !== UPLOAD_ERR_OK) {
     $errorMessage = 'No file uploaded';
     if (isset($_FILES['image'])) {
@@ -145,35 +176,55 @@ if (!in_array($mimeType, $allowedTypes)) {
     exit;
 }
 
-// Validate file size
 if ($file['size'] > $maxFileSize) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'File size exceeds 5MB limit']);
     exit;
 }
 
-// Generate unique filename - SECURITY: derive extension from validated MIME type
-$mimeToExtMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
-$extension = $mimeToExtMap[$mimeType] ?? 'jpg';
-$filename = uniqid('product_', true) . '.' . $extension;
-$destination = $uploadDir . $filename;
-
-// Move uploaded file
-if (!move_uploaded_file($file['tmp_name'], $destination)) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Failed to save file']);
-    exit;
+// Upload to Cloudinary or local
+if ($useCloudinary) {
+    $result = $cloudinary->uploadFile($file['tmp_name'], 'products');
+    
+    if ($result['success']) {
+        echo json_encode([
+            'success' => true,
+            'message' => 'File uploaded to Cloudinary',
+            'data' => [
+                'filename' => basename($result['url']),
+                'path' => $result['url'],
+                'url' => $result['url'],
+                'public_id' => $result['public_id'],
+                'size' => $file['size'],
+                'type' => $mimeType
+            ]
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Cloudinary upload failed: ' . ($result['error'] ?? 'Unknown')]);
+    }
+} else {
+    // Fallback: local filesystem
+    $mimeToExtMap = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+    $extension = $mimeToExtMap[$mimeType] ?? 'jpg';
+    $filename = uniqid('product_', true) . '.' . $extension;
+    $destination = $uploadDir . $filename;
+    
+    if (!move_uploaded_file($file['tmp_name'], $destination)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Failed to save file']);
+        exit;
+    }
+    
+    echo json_encode([
+        'success' => true,
+        'message' => 'File uploaded successfully',
+        'data' => [
+            'filename' => $filename,
+            'path' => 'products/' . $filename,
+            'url' => '/uploads/products/' . $filename,
+            'size' => $file['size'],
+            'type' => $mimeType
+        ]
+    ]);
 }
-
-// Return success response
-echo json_encode([
-    'success' => true,
-    'message' => 'File uploaded successfully',
-    'data' => [
-        'filename' => $filename,
-        'path' => 'products/' . $filename,
-        'url' => '/uploads/products/' . $filename,
-        'size' => $file['size'],
-        'type' => $mimeType
-    ]
-]);
