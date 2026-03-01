@@ -1,0 +1,9 @@
+# Exclude local upload files - images are served from Cloudinary in production
+uploads/products/**
+uploads/reviews/**
+uploads/tasks/**
+uploads/attendance/**
+
+# Exclude any .env files
+.env
+.env.*
