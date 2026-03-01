@@ -1,4 +1,4 @@
-name: Deploy Backend to InfinityFree
+name: Deploy Backend to Railway
 
 on:
   push:
@@ -11,32 +11,17 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Backend via FTP
+    name: Deploy Backend to Railway
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: List files to deploy
-        run: |
-          echo "Files in backend folder:"
-          ls -la ./backend/
-          echo "Files in backend/api:"
-          ls -la ./backend/api/
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-      - name: Deploy to InfinityFree via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ftpupload.net
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./backend/
-          server-dir: /htdocs/
-          log-level: verbose
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.env
-            **/uploads/products/**
-            **/uploads/tasks/**
+      - name: Deploy to Railway
+        working-directory: ./backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway up --detach --service api-backend
