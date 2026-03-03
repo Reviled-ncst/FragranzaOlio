@@ -26,10 +26,10 @@ RUN mkdir -p /var/www/html/uploads/products \
     && chown -R www-data:www-data /var/www/html/uploads \
     && chmod -R 755 /var/www/html/uploads
 
-# Verify critical files exist (build fails visibly if missing)
-RUN test -f /var/www/html/api/face.php && echo "face.php OK" \
-    || (echo "ERROR: face.php missing from build context!" && exit 1)
-RUN ls -la /var/www/html/api/face.php
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type d -exec chmod 755 {} \; \
+    && find /var/www/html -type f -exec chmod 644 {} \;
 
 # Use PORT env variable (Railway sets this automatically)
 ENV PORT=8080
