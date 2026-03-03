@@ -3,7 +3,7 @@
  * Fragranza Olio - Products from Local MySQL
  */
 
-import { API_BASE_URL, apiFetch, uploadFile } from './api';
+import { API_BASE_URL, apiFetch } from './api';
 import { getErrorMessage } from '../types/api';
 import { apiCache, CACHE_TTL, cacheKeys } from './apiCache';
 
@@ -315,18 +315,28 @@ export const productService = {
 
   /**
    * Upload product image.
-   * Uses FormData multipart upload directly to Railway (bypasses the
-   * Vercel proxy which has a 4.5 MB body limit).  The `uploadFile`
-   * helper in api.ts automatically hits the Railway URL in production
-   * and localhost in development.
+   * Converts to base64 and sends through the Vercel proxy (which forwards
+   * to Railway).  Direct XHR to Railway fails due to CORS on the current
+   * Railway deploy, so the proxy route is the reliable path.
+   * Vercel body limit ~4.5 MB → ~3.4 MB images after base64 overhead.
    */
   uploadImage: async (file: File): Promise<{ success: boolean; data?: { filename: string; path: string; url: string }; error?: string }> => {
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
 
-      // uploadFile sends directly to Railway (not through Vercel proxy)
-      const result = await uploadFile('/upload.php', formData) as { success: boolean; data?: { filename: string; path: string; url: string }; error?: string };
+      const response = await apiFetch(`${API_BASE_URL}/upload.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: base64, filename: file.name }),
+      });
+
+      const result = await response.json();
       return result;
     } catch (error: unknown) {
       console.error('Upload image error:', error);
