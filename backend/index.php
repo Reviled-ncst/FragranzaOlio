@@ -98,10 +98,7 @@ if (!empty($segments[0]) && $segments[0] === 'api' && isset($segments[1])) {
         case 'review_upload.php':
             require_once __DIR__ . '/api/review_upload.php';
             break;
-        case 'products':
-        case 'products.php':
-            require_once __DIR__ . '/api/products.php';
-            break;
+        default:
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Endpoint not found']);
     }
