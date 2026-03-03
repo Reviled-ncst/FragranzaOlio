@@ -1,10 +1,15 @@
 FROM php:8.2-apache
 
+# Cache bust to force fresh layers
+ARG CACHE_BUST=1
+
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Enable Apache modules (disable mpm_event first to avoid MPM conflict)
-RUN a2dismod mpm_event 2>/dev/null; a2enmod mpm_prefork rewrite headers
+# Fix MPM: remove all MPMs except prefork, then enable needed modules
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_event.conf \
+       /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_worker.conf \
+    && a2enmod mpm_prefork rewrite headers
 
 # Configure Apache: allow .htaccess overrides
 RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
