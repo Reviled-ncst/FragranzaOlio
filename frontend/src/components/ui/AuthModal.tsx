@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Eye, EyeOff, Calendar, Phone, MapPin, ChevronRight, ChevronLeft, Check, Loader2, AlertCircle, Building2, Briefcase, GraduationCap, UserCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import authService from '../../services/authServicePHP';
 import { firebaseEmailService } from '../../services/firebaseEmailService';
 import { useAuth } from '../../context/AuthContext';
@@ -88,6 +89,7 @@ const validators = {
 const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
   const { login, isAuthenticated } = useAuth();
   const { defaultMode } = useAuthModal();
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(defaultMode === 'login');
   const [showPassword, setShowPassword] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -302,7 +304,7 @@ const AuthModal = ({ isOpen, onClose }: AuthModalProps) => {
             onClose();
             // Navigate to appropriate dashboard based on role
             const targetPath = getDashboardForRole(userRole);
-            window.location.href = targetPath;
+            navigate(targetPath, { replace: true });
           }, 1000);
         } else {
           setError(result.message);

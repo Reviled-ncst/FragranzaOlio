@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Camera, AlertCircle, CheckCircle, Loader2, Scan } from 'lucide-react';
 import * as faceapi from 'face-api.js';
+import { useNavigate } from 'react-router-dom';
 import { apiFetch, API_BASE_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardForRole } from '../utils/RoleBasedRoute';
@@ -17,6 +18,7 @@ type Status = 'loading-models' | 'ready' | 'detecting' | 'match-found' | 'no-mat
 
 const FaceLoginModal = ({ isOpen, onClose }: FaceLoginModalProps) => {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -136,7 +138,7 @@ const FaceLoginModal = ({ isOpen, onClose }: FaceLoginModalProps) => {
         login(data.user, data.token);
         setTimeout(() => {
           handleClose();
-          window.location.href = getDashboardForRole(data.user.role);
+          navigate(getDashboardForRole(data.user.role), { replace: true });
         }, 1500);
       } else {
         setStatus('no-match');
