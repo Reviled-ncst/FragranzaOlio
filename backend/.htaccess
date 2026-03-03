@@ -1,19 +1,13 @@
-# CORS headers set at Apache level so they appear on ALL responses (including 404s)
-# This is required for direct cross-origin requests from the frontend (face.php, etc.)
+# CORS is handled by PHP middleware (cors.php) — NOT here.
+# Duplicate Apache-level CORS headers cause "multiple ACAO" errors in browsers.
 <IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin"
-    # Security headers
+    # Security headers only
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "DENY"
     Header always set X-XSS-Protection "1; mode=block"
 </IfModule>
 
-# Handle OPTIONS preflight requests immediately
 RewriteEngine On
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^(.*)$ - [R=200,L]
 
 # IMPORTANT: Preserve Authorization header through Apache rewrites
 # Without this, reverse proxies (Cloudflare tunnel) may lose the auth header

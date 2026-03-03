@@ -7,19 +7,12 @@
 // Get request origin
 $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
 
-// Allow any Vercel deployment or localhost
-if (strpos($origin, 'vercel.app') !== false || 
-    strpos($origin, 'localhost') !== false || 
-    strpos($origin, '127.0.0.1') !== false) {
-    header("Access-Control-Allow-Origin: $origin");
-} else {
-    // Allow all origins for API access (if no specific origin)
-    header("Access-Control-Allow-Origin: *");
-}
+// Allow any origin for API access
+// (We use Authorization header, not cookies, so credentials mode is not needed)
+header("Access-Control-Allow-Origin: *");
 
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-Admin-Email, Accept, Origin");
-header("Access-Control-Allow-Credentials: true");
 header("Access-Control-Max-Age: 86400");
 header("Content-Type: application/json; charset=UTF-8");
 
