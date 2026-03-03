@@ -3,7 +3,7 @@
  * Fragranza Olio - Products from Local MySQL
  */
 
-import { API_BASE_URL, apiFetch } from './api';
+import { API_BASE_URL, apiFetch, DIRECT_BACKEND_URL } from './api';
 import { getErrorMessage } from '../types/api';
 import { apiCache, CACHE_TTL, cacheKeys } from './apiCache';
 
@@ -315,25 +315,30 @@ export const productService = {
 
   /**
    * Upload product image.
-   * Converts to base64 and sends through the Vercel proxy (which forwards
-   * to Railway).  Direct XHR to Railway fails due to CORS on the current
-   * Railway deploy, so the proxy route is the reliable path.
-   * Vercel body limit ~4.5 MB → ~3.4 MB images after base64 overhead.
+   * Sends FormData directly to Railway (CORS is enabled on Railway).
+   * This avoids Vercel's 4.5MB body limit.
    */
   uploadImage: async (file: File): Promise<{ success: boolean; data?: { filename: string; path: string; url: string }; error?: string }> => {
     try {
-      // Convert file to base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+      const formData = new FormData();
+      formData.append('image', file);
 
-      const response = await apiFetch(`${API_BASE_URL}/upload.php`, {
+      const url = `${DIRECT_BACKEND_URL}/upload.php`;
+
+      // Get auth info
+      const token = localStorage.getItem('fragranza_session');
+      const userStr = localStorage.getItem('fragranza_user');
+      let email = '';
+      try { email = userStr ? JSON.parse(userStr)?.email || '' : ''; } catch { /* */ }
+
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      if (email) headers['X-Admin-Email'] = email;
+
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_base64: base64, filename: file.name }),
+        headers,       // Do NOT set Content-Type — browser will set multipart boundary
+        body: formData,
       });
 
       const result = await response.json();
