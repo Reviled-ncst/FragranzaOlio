@@ -18,11 +18,14 @@ import {
   Star,
   AlertCircle,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Scan,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
-import api from '../services/api';
+import api, { apiFetch, API_BASE_URL } from '../services/api';
+import FaceEnrollModal from '../components/ui/FaceEnrollModal';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -75,9 +78,19 @@ const OJTDashboard = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFaceEnroll, setShowFaceEnroll] = useState(false);
+  const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user?.id) return;
+    // Check face enrollment status
+    apiFetch(`${API_BASE_URL}/face.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'check-enrollment' }),
+    }).then(r => r.json()).then(d => {
+      if (d.success) setFaceEnrolled(d.enrolled);
+    }).catch(() => setFaceEnrolled(false));
     
     setIsLoading(true);
     setError(null);
@@ -562,7 +575,41 @@ const OJTDashboard = () => {
               <span className="text-sm text-gray-300 group-hover:text-white">Progress</span>
             </Link>
           </div>
+
+          {/* Face ID Setup Banner */}
+          <button
+            onClick={() => setShowFaceEnroll(true)}
+            className={`mt-4 w-full flex items-center gap-4 p-4 rounded-xl border transition-all group ${
+              faceEnrolled
+                ? 'bg-green-500/10 border-green-500/30 hover:bg-green-500/20'
+                : 'bg-gold-500/10 border-gold-500/30 hover:bg-gold-500/20 animate-pulse'
+            }`}
+          >
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+              faceEnrolled ? 'bg-green-500/20' : 'bg-gold-500/20'
+            }`}>
+              {faceEnrolled ? <Shield className="text-green-400" size={22} /> : <Scan className="text-gold-400" size={22} />}
+            </div>
+            <div className="text-left flex-1">
+              <p className={`font-semibold text-sm ${faceEnrolled ? 'text-green-300' : 'text-gold-300'}`}>
+                {faceEnrolled ? '✓ Face ID Active' : 'Set Up Face ID'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {faceEnrolled
+                  ? 'Your biometric clock-in is ready. Tap to update enrollment.'
+                  : 'Required for biometric clock-in/out. Tap to enroll your face.'}
+              </p>
+            </div>
+            <ChevronRight className="text-gray-600 group-hover:text-gold-400 transition-colors" size={18} />
+          </button>
         </div>
+
+        {/* Face Enroll Modal */}
+        <FaceEnrollModal
+          isOpen={showFaceEnroll}
+          onClose={() => setShowFaceEnroll(false)}
+          onSuccess={() => setFaceEnrolled(true)}
+        />
       </div>
     </OJTLayout>
   );

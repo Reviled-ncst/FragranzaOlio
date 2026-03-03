@@ -215,11 +215,66 @@ export const drawFaceOverlay = (
   }
 };
 
+/**
+ * Verify face identity against enrolled descriptor for clock-in/out.
+ * Calls the backend face.php verify-clock-in endpoint.
+ * Returns { verified, similarity, notEnrolled, message }
+ */
+export interface FaceVerifyResult {
+  verified: boolean;
+  similarity: number;
+  notEnrolled: boolean;
+  message: string;
+}
+
+export const verifyIdentityForClockIn = async (
+  videoElement: HTMLVideoElement,
+  traineeId: number,
+  apiBaseUrl: string,
+  apiFetchFn: (url: string, opts?: RequestInit) => Promise<Response>
+): Promise<FaceVerifyResult> => {
+  if (!modelsLoaded || !faceapi) {
+    return { verified: false, similarity: 0, notEnrolled: false, message: 'Face models not loaded yet.' };
+  }
+
+  try {
+    const detectionOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+    const detection = await faceapi
+      .detectSingleFace(videoElement, detectionOptions)
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (!detection) {
+      return { verified: false, similarity: 0, notEnrolled: false, message: 'No face detected. Look directly at the camera.' };
+    }
+
+    const descriptor = Array.from(detection.descriptor);
+
+    const res = await apiFetchFn(`${apiBaseUrl}/face.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify-clock-in', descriptor, trainee_id: traineeId }),
+    });
+    const data = await res.json();
+
+    return {
+      verified:    data.verified === true,
+      similarity:  data.similarity ?? 0,
+      notEnrolled: data.not_enrolled === true,
+      message:     data.message ?? (data.verified ? 'Face verified.' : 'Face not recognized.'),
+    };
+  } catch (err) {
+    console.error('Face verification error:', err);
+    return { verified: false, similarity: 0, notEnrolled: false, message: 'Verification error. Please try again.' };
+  }
+};
+
 export default {
   loadModels,
   areModelsLoaded,
   detectFace,
   getFaceDescriptor,
   compareFaces,
-  drawFaceOverlay
+  drawFaceOverlay,
+  verifyIdentityForClockIn,
 };

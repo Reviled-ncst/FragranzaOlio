@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { API_BASE_URL, apiFetch } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
-import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult } from '../services/faceRecognitionService';
+import { loadModels, detectFace, areModelsLoaded, FaceDetectionResult, verifyIdentityForClockIn } from '../services/faceRecognitionService';
 import { Shield, Loader2, CheckCircle, User, AlertTriangle, MapPin } from 'lucide-react';
 import AttendanceLocationMap, { AttendanceLocationData, LocationButton } from '../components/AttendanceLocationMap';
 
@@ -31,13 +31,14 @@ interface AttendanceRecord {
 
 interface CameraModalProps {
   isOpen: boolean;
-  onCapture: (photo: string) => void;
+  onCapture: (photo: string, faceVerified: boolean) => void;
   onClose: () => void;
   title: string;
+  traineeId: number;
 }
 
-// Camera Modal Component with Face Recognition
-function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
+// Camera Modal Component with Face Recognition + Identity Verification
+function CameraModal({ isOpen, onCapture, onClose, title, traineeId }: CameraModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,6 +58,10 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
   // Smoothing for confidence - rolling average of last 10 values
   const confidenceHistoryRef = useRef<number[]>([]);
   const smoothedConfidenceRef = useRef(0);
+  // Identity verification state
+  const [verifyState, setVerifyState] = useState<'idle' | 'verifying' | 'verified' | 'failed' | 'not-enrolled'>('idle');
+  const [verifyMessage, setVerifyMessage] = useState('');
+  const verificationRunningRef = useRef(false);
 
   // Load face detection models
   useEffect(() => {
@@ -205,32 +210,19 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
         const currentConfidence = smoothedConfidenceRef.current;
         
         // Auto-capture when smoothed confidence >= 90% for 5 consecutive frames
-        if (result.detected && currentConfidence >= 90 && !autoCaptureTriggeredRef.current) {
+        if (result.detected && currentConfidence >= 90 && !autoCaptureTriggeredRef.current && !verificationRunningRef.current) {
           highConfidenceCountRef.current++;
           if (highConfidenceCountRef.current >= 5) {
             autoCaptureTriggeredRef.current = true;
-            // Trigger auto-capture
-            if (videoRef.current && canvasRef.current) {
-              const canvas = canvasRef.current;
-              const video = videoRef.current;
-              canvas.width = video.videoWidth;
-              canvas.height = video.videoHeight;
-              const ctx = canvas.getContext('2d', { willReadFrequently: true });
-              if (ctx) {
-                ctx.drawImage(video, 0, 0);
-                const photoData = canvas.toDataURL('image/jpeg', 0.8);
-                // Stop detection and capture
-                if (animationFrameRef.current) {
-                  cancelAnimationFrame(animationFrameRef.current);
-                  animationFrameRef.current = null;
-                }
-                onCapture(photoData);
-                stopCamera();
-                return;
-              }
+            // Stop the detection loop and run identity verification
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current);
+              animationFrameRef.current = null;
             }
+            triggerVerification();
+            return;
           }
-        } else {
+        } else if (!autoCaptureTriggeredRef.current) {
           highConfidenceCountRef.current = 0;
         }
         
@@ -296,6 +288,74 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
     runDetection();
   };
 
+  // Run identity verification against the enrolled face descriptor
+  const triggerVerification = async () => {
+    if (verificationRunningRef.current || !videoRef.current) return;
+    verificationRunningRef.current = true;
+    setVerifyState('verifying');
+    setVerifyMessage('Verifying your identity...');
+
+    const result = await verifyIdentityForClockIn(
+      videoRef.current,
+      traineeId,
+      API_BASE_URL,
+      apiFetch
+    );
+
+    if (result.notEnrolled) {
+      setVerifyState('not-enrolled');
+      setVerifyMessage('No Face ID enrolled. Set up Face ID in your profile to enable biometric clock-in.');
+      verificationRunningRef.current = false;
+      autoCaptureTriggeredRef.current = false;
+      return;
+    }
+
+    if (result.verified) {
+      setVerifyState('verified');
+      setVerifyMessage(`Identity confirmed — ${result.similarity}% match`);
+      // Capture photo after brief confirmation display
+      setTimeout(() => {
+        if (videoRef.current && canvasRef.current) {
+          const canvas = canvasRef.current;
+          const video = videoRef.current;
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            ctx.drawImage(video, 0, 0);
+            const photoData = canvas.toDataURL('image/jpeg', 0.8);
+            stopCamera();
+            onCapture(photoData, true);
+          }
+        }
+        verificationRunningRef.current = false;
+      }, 800);
+    } else {
+      setVerifyState('failed');
+      setVerifyMessage(result.message);
+      verificationRunningRef.current = false;
+      autoCaptureTriggeredRef.current = false;
+      highConfidenceCountRef.current = 0;
+      // Restart detection loop after 2 seconds so intern can try again
+      setTimeout(() => {
+        setVerifyState('idle');
+        setVerifyMessage('');
+        startFaceDetection();
+      }, 2500);
+    }
+  };
+
+  // Manual capture with verification
+  const captureWithVerification = async () => {
+    if (!videoRef.current || verificationRunningRef.current) return;
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    autoCaptureTriggeredRef.current = true;
+    await triggerVerification();
+  };
+
   const stopCamera = () => {
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -315,22 +375,9 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
     highConfidenceCountRef.current = 0;
     confidenceHistoryRef.current = [];
     smoothedConfidenceRef.current = 0;
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const photoData = canvas.toDataURL('image/jpeg', 0.8);
-        onCapture(photoData);
-        stopCamera();
-      }
-    }
+    verificationRunningRef.current = false;
+    setVerifyState('idle');
+    setVerifyMessage('');
   };
 
   if (!isOpen) return null;
@@ -373,10 +420,30 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
               />
               {/* Face detection status badge */}
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 pointer-events-none">
-                {faceDetected && faceConfidence >= 90 ? (
+                {verifyState === 'verifying' ? (
+                  <div className="bg-blue-600 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg animate-pulse">
+                    <Loader2 className="animate-spin" size={16} />
+                    Verifying identity...
+                  </div>
+                ) : verifyState === 'verified' ? (
+                  <div className="bg-green-500 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                    <CheckCircle size={16} />
+                    {verifyMessage}
+                  </div>
+                ) : verifyState === 'failed' ? (
+                  <div className="bg-red-600 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                    <AlertTriangle size={16} />
+                    Face mismatch — retrying...
+                  </div>
+                ) : verifyState === 'not-enrolled' ? (
+                  <div className="bg-yellow-600 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
+                    <AlertTriangle size={16} />
+                    No Face ID enrolled
+                  </div>
+                ) : faceDetected && faceConfidence >= 90 ? (
                   <div className="bg-green-500 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg animate-pulse">
                     <Loader2 className="animate-spin" size={16} />
-                    Auto-capturing... ({faceConfidence}%)
+                    Hold still — verifying...
                   </div>
                 ) : faceDetected ? (
                   <div className="bg-green-500/90 text-white px-4 py-2 rounded-full text-sm flex items-center gap-2 shadow-lg">
@@ -393,39 +460,73 @@ function CameraModal({ isOpen, onCapture, onClose, title }: CameraModalProps) {
             </div>
             <canvas ref={canvasRef} className="hidden" />
             
-            {/* Face detection status - fixed height to prevent layout shifts */}
-            <div className="mb-4 h-12 flex items-center">
-              {modelsLoaded && cameraReady && !faceDetected ? (
+            {/* Identity verification status */}
+            <div className="mb-4 min-h-[48px] flex items-center">
+              {verifyState === 'verifying' && (
+                <div className="w-full p-3 bg-blue-500/20 border border-blue-500/30 rounded-lg flex items-center gap-2">
+                  <Loader2 className="text-blue-400 flex-shrink-0 animate-spin" size={16} />
+                  <span className="text-blue-400 text-sm font-semibold">Verifying your identity against enrolled Face ID...</span>
+                </div>
+              )}
+              {verifyState === 'verified' && (
+                <div className="w-full p-3 bg-green-500/20 border border-green-500/50 rounded-lg flex items-center gap-2">
+                  <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
+                  <span className="text-green-400 text-sm font-semibold">{verifyMessage} — capturing photo...</span>
+                </div>
+              )}
+              {verifyState === 'failed' && (
+                <div className="w-full p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="text-red-400 flex-shrink-0" size={16} />
+                  <span className="text-red-400 text-sm">{verifyMessage}</span>
+                </div>
+              )}
+              {verifyState === 'not-enrolled' && (
                 <div className="w-full p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
                   <AlertTriangle className="text-yellow-400 flex-shrink-0" size={16} />
-                  <span className="text-yellow-400 text-sm">No face detected - you can still capture</span>
+                  <span className="text-yellow-400 text-sm">{verifyMessage}</span>
                 </div>
-              ) : modelsLoaded && cameraReady && faceDetected && faceConfidence >= 90 ? (
-                <div className="w-full p-3 bg-green-500/30 border border-green-500/50 rounded-lg flex items-center gap-2 animate-pulse">
-                  <Loader2 className="text-green-400 flex-shrink-0 animate-spin" size={16} />
-                  <span className="text-green-400 text-sm font-semibold">Auto-capturing photo...</span>
+              )}
+              {verifyState === 'idle' && modelsLoaded && cameraReady && !faceDetected && (
+                <div className="w-full p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
+                  <AlertTriangle className="text-yellow-400 flex-shrink-0" size={16} />
+                  <span className="text-yellow-400 text-sm">No face detected — ensure good lighting</span>
                 </div>
-              ) : modelsLoaded && cameraReady && faceDetected ? (
+              )}
+              {verifyState === 'idle' && modelsLoaded && cameraReady && faceDetected && (
                 <div className="w-full p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center gap-2">
                   <CheckCircle className="text-green-400 flex-shrink-0" size={16} />
-                  <span className="text-green-400 text-sm">Face verified ({faceConfidence}%) - auto-capture at 90%</span>
+                  <span className="text-green-400 text-sm">Face detected ({faceConfidence}%) — hold still for auto-verify</span>
                 </div>
-              ) : null}
+              )}
             </div>
             
             <div className="flex gap-3">
-              <button
-                onClick={capturePhoto}
-                disabled={!cameraReady}
-                className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-                  faceDetected 
-                    ? 'bg-green-500 text-white hover:bg-green-400' 
-                    : 'bg-gold-500 text-black hover:bg-gold-400'
-                } disabled:opacity-50`}
-              >
-                {faceDetected && <CheckCircle size={18} />}
-                📸 Capture Photo
-              </button>
+              {verifyState === 'not-enrolled' ? (
+                <button
+                  onClick={() => { stopCamera(); onClose(); }}
+                  className="flex-1 py-3 rounded-xl font-semibold bg-yellow-600 hover:bg-yellow-500 text-white transition-colors"
+                >
+                  Set Up Face ID First
+                </button>
+              ) : (
+                <button
+                  onClick={captureWithVerification}
+                  disabled={!cameraReady || verifyState === 'verifying' || verifyState === 'verified'}
+                  className={`flex-1 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                    verifyState === 'verified'
+                      ? 'bg-green-500 text-white'
+                      : verifyState === 'verifying'
+                      ? 'bg-blue-600 text-white opacity-75'
+                      : faceDetected
+                      ? 'bg-green-500 text-white hover:bg-green-400'
+                      : 'bg-gold-500 text-black hover:bg-gold-400'
+                  } disabled:opacity-50`}
+                >
+                  {verifyState === 'verifying' ? <><Loader2 size={18} className="animate-spin" /> Verifying...</> :
+                   verifyState === 'verified' ? <><CheckCircle size={18} /> Verified!</> :
+                   faceDetected ? <><Shield size={18} /> Verify &amp; Capture</> : '📸 Capture Photo'}
+                </button>
+              )}
               <button
                 onClick={() => { stopCamera(); onClose(); }}
                 className="px-6 py-3 bg-black-800 rounded-xl font-semibold hover:bg-black-700 text-white"
@@ -634,7 +735,7 @@ export default function OJTTimesheet() {
     });
   };
 
-  const handleClockIn = async (photo: string) => {
+  const handleClockIn = async (photo: string, faceVerified = false) => {
     if (!user) return;
     setActionLoading(true);
     setShowCamera(false);
@@ -653,6 +754,7 @@ export default function OJTTimesheet() {
         body: JSON.stringify({
           trainee_id: user.id,
           photo: photo,
+          face_verified: faceVerified,
           late_minutes: lateMinutes,
           penalty_hours: penaltyHours,
           latitude: locationData?.latitude || null,
@@ -663,9 +765,10 @@ export default function OJTTimesheet() {
 
       const data = await res.json();
       if (data.success) {
+        const faceTag = faceVerified ? ' ✓ Face ID verified' : ' (no Face ID)';
         setMessage({ type: 'success', text: lateMinutes > 0 
-          ? `Clocked in! You are ${lateMinutes} min late. Penalty: ${penaltyHours}h`
-          : 'Clocked in successfully!' 
+          ? `Clocked in! You are ${lateMinutes} min late. Penalty: ${penaltyHours}h${faceTag}`
+          : `Clocked in successfully!${faceTag}` 
         });
         await fetchAttendance();
       } else {
@@ -679,7 +782,7 @@ export default function OJTTimesheet() {
   };
 
   // Clock Out
-  const handleClockOut = async (photo: string) => {
+  const handleClockOut = async (photo: string, faceVerified = false) => {
     if (!user || !todayAttendance) return;
     setActionLoading(true);
     setShowCamera(false);
@@ -694,6 +797,7 @@ export default function OJTTimesheet() {
         body: JSON.stringify({
           trainee_id: user.id,
           photo: photo,
+          face_verified: faceVerified,
           latitude: locationData?.latitude || null,
           longitude: locationData?.longitude || null,
           location: locationData?.location || null
@@ -702,7 +806,8 @@ export default function OJTTimesheet() {
 
       const data = await res.json();
       if (data.success) {
-        setMessage({ type: 'success', text: `Clocked out! Work hours: ${formatHours(data.data?.work_hours || 0)}` });
+        const faceTag = faceVerified ? ' ✓ Face ID verified' : '';
+        setMessage({ type: 'success', text: `Clocked out! Work hours: ${formatHours(data.data?.work_hours || 0)}${faceTag}` });
         await fetchAttendance();
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to clock out' });
@@ -1102,7 +1207,8 @@ export default function OJTTimesheet() {
         isOpen={showCamera}
         onCapture={cameraAction === 'in' ? handleClockIn : handleClockOut}
         onClose={() => setShowCamera(false)}
-        title={cameraAction === 'in' ? '📸 Clock In Photo' : '📸 Clock Out Photo'}
+        title={cameraAction === 'in' ? '📸 Clock In — Face Verify' : '📸 Clock Out — Face Verify'}
+        traineeId={Number(user?.id ?? 0)}
       />
 
       {/* Location Map Modal */}
