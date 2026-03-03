@@ -130,6 +130,11 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'enroll', descriptor: Array.from(avg) }),
       });
+      if (!res.ok) {
+        setStep('error');
+        setStatusMsg(`Server returned ${res.status}. Backend may still be deploying — please try again in a minute.`);
+        return;
+      }
       const data = await res.json();
 
       if (data.success) {
@@ -140,9 +145,11 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
         setStep('error');
         setStatusMsg(data.message || 'Failed to enroll face. Please try again.');
       }
-    } catch {
+    } catch (err) {
+      console.error('Face enroll error:', err);
+      const msg = err instanceof Error ? err.message : String(err);
       setStep('error');
-      setStatusMsg('Network error. Please check your connection and try again.');
+      setStatusMsg(`Server connection failed: ${msg}`);
     }
   };
 
