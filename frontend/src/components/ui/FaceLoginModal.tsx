@@ -76,7 +76,7 @@ const FaceLoginModal = ({ isOpen, onClose }: FaceLoginModalProps) => {
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch(() => { /* play() interrupted — safe to ignore */ });
       }
       startDetectionLoop();
     } catch {

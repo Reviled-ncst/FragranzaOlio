@@ -43,10 +43,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adminEmail = req.headers['x-admin-email'] || req.headers['X-Admin-Email'];
     
     // Prepare fetch options
+    const incomingCT = req.headers['content-type'] || 'application/json';
     const fetchOptions: RequestInit = {
       method: req.method,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': String(incomingCT),
         'Accept': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning
@@ -57,7 +58,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Add body for POST/PUT/PATCH requests
     if (req.body && ['POST', 'PUT', 'PATCH'].includes(req.method || '')) {
-      fetchOptions.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      // Vercel parses JSON bodies automatically; for non-JSON, pass raw
+      if (typeof req.body === 'string') {
+        fetchOptions.body = req.body;
+      } else if (Buffer.isBuffer(req.body)) {
+        fetchOptions.body = req.body;
+      } else {
+        fetchOptions.body = JSON.stringify(req.body);
+      }
     }
 
     // Make the request to backend

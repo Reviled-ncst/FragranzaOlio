@@ -67,7 +67,7 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch(() => { /* play() interrupted — safe to ignore */ });
       }
       setStep('capturing');
       setStatusMsg('Look directly at the camera and stay still...');

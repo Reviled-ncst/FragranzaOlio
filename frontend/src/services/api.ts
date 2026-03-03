@@ -252,17 +252,25 @@ api.interceptors.response.use(
 );
 
 /**
- * Upload files directly to backend (bypasses Vercel proxy size limits)
- * Use this for file uploads > 4MB
+ * Upload files via FormData.
+ * In production, routes through the Vercel proxy to avoid CORS.
+ * Supports progress tracking via XHR.
  */
 export const uploadFile = async (
   endpoint: string,
   formData: FormData,
   onProgress?: (percent: number) => void
 ): Promise<unknown> => {
-  const url = isProduction 
-    ? `${DIRECT_BACKEND_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`
-    : `${devApiUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  let url: string;
+  if (isProduction) {
+    // Route through Vercel proxy
+    const proxyUrl = new URL('/api/proxy', window.location.origin);
+    const cleanEndpoint = endpoint.replace(/^\//, '');
+    proxyUrl.searchParams.set('path', cleanEndpoint);
+    url = proxyUrl.toString();
+  } else {
+    url = `${devApiUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  }
   
   console.log('uploadFile: Starting upload to', url, 'isProduction:', isProduction);
   
