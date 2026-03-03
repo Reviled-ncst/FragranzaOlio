@@ -118,7 +118,7 @@ function handlePostRequests($db, $action) {
         $authUser = requireAuth($db);
         $data['_auth_user'] = $authUser;
     } elseif (in_array($action, $adminActions)) {
-        $authUser = requireRole($db, ['admin', 'ojt_supervisor']);
+        $authUser = requireRole($db, ['admin', 'ojt_supervisor', 'sales']);
         $data['_auth_user'] = $authUser;
     }
     
@@ -169,7 +169,7 @@ function handlePutRequests($db, $action) {
     // SECURITY: All PUT operations require authentication
     $adminActions = ['order', 'order-status', 'customer', 'invoice', 'invoice-status', 'complaint', 'complaint-status'];
     if (in_array($action, $adminActions)) {
-        $authUser = requireRole($db, ['admin', 'ojt_supervisor']);
+        $authUser = requireRole($db, ['admin', 'ojt_supervisor', 'sales']);
         $data['_auth_user'] = $authUser;
     } else {
         $authUser = requireAuth($db);
@@ -208,8 +208,8 @@ function handlePutRequests($db, $action) {
 }
 
 function handleDeleteRequests($db, $action) {
-    // SECURITY: All DELETE operations require admin role
-    requireRole($db, 'admin');
+    // SECURITY: DELETE operations require admin or sales role
+    requireRole($db, ['admin', 'sales']);
     
     $id = $_GET['id'] ?? null;
     
