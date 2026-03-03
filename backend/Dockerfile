@@ -24,4 +24,6 @@ RUN mkdir -p /var/www/html/uploads/products \
 
 ENV PORT=8080
 EXPOSE 8080
-CMD ["apache2-foreground"]
+
+# Fix MPM at runtime (build cache may leave stale mpm_event/worker enabled)
+CMD ["bash", "-c", "rm -f /etc/apache2/mods-enabled/mpm_event.* /etc/apache2/mods-enabled/mpm_worker.* && exec apache2-foreground"]
