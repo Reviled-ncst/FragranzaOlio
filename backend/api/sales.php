@@ -14,6 +14,17 @@ $db = Database::getInstance()->getConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
+// Auto-migration: ensure proof_of_delivery_url column exists
+try {
+    $checkCol = $db->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'proof_of_delivery_url'");
+    if ($checkCol->fetchColumn() == 0) {
+        $db->exec("ALTER TABLE orders ADD COLUMN proof_of_delivery_url TEXT DEFAULT NULL");
+        error_log("Auto-migration: Added proof_of_delivery_url column to orders table");
+    }
+} catch (Exception $e) {
+    error_log("Auto-migration check failed (non-fatal): " . $e->getMessage());
+}
+
 try {
     switch ($method) {
         case 'GET':
