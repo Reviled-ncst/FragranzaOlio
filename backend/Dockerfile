@@ -3,8 +3,8 @@ FROM php:8.2-apache
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
-# Enable Apache modules
-RUN a2enmod rewrite headers
+# Enable Apache modules (disable mpm_event first to avoid MPM conflict)
+RUN a2dismod mpm_event 2>/dev/null; a2enmod mpm_prefork rewrite headers
 
 # Configure Apache: allow .htaccess overrides
 RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/apache2/apache2.conf
