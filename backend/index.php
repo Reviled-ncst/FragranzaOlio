@@ -104,10 +104,12 @@ if (!empty($segments[0]) && $segments[0] === 'api' && isset($segments[1])) {
     }
 } else {
     // API documentation / health check
+    $apiFiles = array_map('basename', glob(__DIR__ . '/api/*.php') ?: []);
     echo json_encode([
         'success' => true,
         'message' => 'Fragranza Olio API',
         'version' => '1.0.0',
+        'api_files' => $apiFiles,
         'endpoints' => [
             'GET /api/products' => 'Get all products',
             'GET /api/products/:id' => 'Get single product',
