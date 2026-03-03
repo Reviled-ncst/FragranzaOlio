@@ -102,6 +102,7 @@ export interface Order {
   tracking_url?: string;      // Lalamove/courier tracking link
   courier_name?: string;      // e.g., "Lalamove", "LBC", etc.
   estimated_delivery?: string;
+  proof_of_delivery_url?: string; // Photo proof of delivery (Cloudinary URL)
   
   // Status history for timeline
   status_history?: Array<{
@@ -492,14 +493,15 @@ const orderService = {
   /**
    * Update order status (generic status update)
    */
-  async updateOrderStatus(orderId: number, status: OrderStatus, notes?: string): Promise<{ success: boolean; message?: string }> {
+  async updateOrderStatus(orderId: number, status: OrderStatus, notes?: string, extraData?: Record<string, unknown>): Promise<{ success: boolean; message?: string }> {
     try {
       console.log('📦 Updating order status:', orderId, 'to:', status);
       
       const response = await api.put<never, ApiResponse>('/sales.php?action=order-status', {
         id: orderId,
         status: status,
-        notes: notes
+        notes: notes,
+        ...extraData
       });
       
       console.log('📦 Update status response:', response);

@@ -33,7 +33,9 @@ import {
   ArrowLeft,
   Star,
   Sparkles,
-  Gift
+  Gift,
+  Camera,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -73,6 +75,161 @@ const STATUS_GROUPS: Record<StatusFilterGroup, OrderStatus[]> = {
   return_refund: ['return_requested', 'return_approved', 'refund_requested'],
   finalized: ['returned', 'refunded'],
   cancelled: ['cancelled'],
+};
+
+/** Order Status Timeline - Visual stepper showing order progress */
+const OrderStatusTimeline = ({ order }: { order: Order }) => {
+  const isPickup = order.shipping_method === 'store_pickup';
+  const isCancelled = order.status === 'cancelled';
+  
+  // Define the steps based on shipping method
+  const deliverySteps = [
+    { key: 'ordered', label: 'Ordered', icon: Package, statuses: ['ordered', 'paid_waiting_approval', 'cod_waiting_approval'] },
+    { key: 'processing', label: 'Processing', icon: RefreshCw, statuses: ['processing'] },
+    { key: 'in_transit', label: 'In Transit', icon: Truck, statuses: ['in_transit', 'waiting_client'] },
+    { key: 'delivered', label: 'Delivered', icon: PackageCheck, statuses: ['delivered'] },
+    { key: 'completed', label: 'Completed', icon: CheckCircle, statuses: ['completed'] },
+  ];
+  
+  const pickupSteps = [
+    { key: 'ordered', label: 'Ordered', icon: Package, statuses: ['ordered', 'paid_waiting_approval', 'cod_waiting_approval'] },
+    { key: 'processing', label: 'Preparing', icon: RefreshCw, statuses: ['processing'] },
+    { key: 'ready', label: 'Ready for Pickup', icon: Store, statuses: ['paid_ready_pickup'] },
+    { key: 'picked_up', label: 'Picked Up', icon: PackageCheck, statuses: ['picked_up'] },
+    { key: 'completed', label: 'Completed', icon: CheckCircle, statuses: ['completed'] },
+  ];
+  
+  const steps = isPickup ? pickupSteps : deliverySteps;
+  
+  // Calculate current step index
+  let currentStepIndex = -1;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i].statuses.includes(order.status)) {
+      currentStepIndex = i;
+      break;
+    }
+  }
+  // If status not found in steps (e.g. return_requested), find the last completed step
+  if (currentStepIndex === -1) {
+    const terminalStatuses = ['return_requested', 'return_approved', 'returned', 'refund_requested', 'refunded'];
+    if (terminalStatuses.includes(order.status)) {
+      currentStepIndex = steps.length - 1; // Show all steps as completed
+    }
+  }
+  
+  if (isCancelled) {
+    return (
+      <div className="flex items-center gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+        <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+          <XCircle className="w-5 h-5 text-red-400" />
+        </div>
+        <div>
+          <p className="text-red-400 font-medium text-sm">Order Cancelled</p>
+          <p className="text-gray-500 text-xs mt-0.5">This order has been cancelled</p>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="py-3">
+      {/* Horizontal stepper for desktop */}
+      <div className="hidden sm:flex items-center justify-between relative">
+        {/* Background line */}
+        <div className="absolute top-5 left-5 right-5 h-0.5 bg-black-700" />
+        {/* Progress line */}
+        <div 
+          className="absolute top-5 left-5 h-0.5 bg-gradient-to-r from-gold-500 to-gold-400 transition-all duration-500"
+          style={{ width: `${currentStepIndex >= 0 ? (currentStepIndex / (steps.length - 1)) * (100 - (10 / steps.length)) : 0}%` }}
+        />
+        
+        {steps.map((step, index) => {
+          const StepIcon = step.icon;
+          const isCompleted = index < currentStepIndex;
+          const isCurrent = index === currentStepIndex;
+          const isPending = index > currentStepIndex;
+          
+          return (
+            <div key={step.key} className="relative z-10 flex flex-col items-center" style={{ width: `${100 / steps.length}%` }}>
+              <motion.div
+                initial={false}
+                animate={{
+                  scale: isCurrent ? 1.15 : 1,
+                  backgroundColor: isCompleted ? 'rgba(212, 175, 95, 0.3)' : isCurrent ? 'rgba(212, 175, 95, 0.2)' : 'rgba(30, 30, 30, 1)',
+                }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                  isCompleted ? 'border-gold-500 bg-gold-500/30' :
+                  isCurrent ? 'border-gold-500 bg-gold-500/20 ring-4 ring-gold-500/10' :
+                  'border-gray-700 bg-black-900'
+                }`}
+              >
+                <StepIcon size={18} className={
+                  isCompleted ? 'text-gold-400' :
+                  isCurrent ? 'text-gold-400' :
+                  'text-gray-600'
+                } />
+              </motion.div>
+              <p className={`text-xs mt-2 font-medium text-center ${
+                isCompleted ? 'text-gold-400' :
+                isCurrent ? 'text-white' :
+                'text-gray-600'
+              }`}>
+                {step.label}
+              </p>
+              {isCurrent && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="absolute -bottom-5 w-1.5 h-1.5 bg-gold-500 rounded-full"
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Vertical stepper for mobile */}
+      <div className="sm:hidden space-y-0">
+        {steps.map((step, index) => {
+          const StepIcon = step.icon;
+          const isCompleted = index < currentStepIndex;
+          const isCurrent = index === currentStepIndex;
+          const isLast = index === steps.length - 1;
+          
+          return (
+            <div key={step.key} className="flex items-start gap-3">
+              <div className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 flex-shrink-0 ${
+                  isCompleted ? 'border-gold-500 bg-gold-500/30' :
+                  isCurrent ? 'border-gold-500 bg-gold-500/20' :
+                  'border-gray-700 bg-black-900'
+                }`}>
+                  <StepIcon size={14} className={
+                    isCompleted || isCurrent ? 'text-gold-400' : 'text-gray-600'
+                  } />
+                </div>
+                {!isLast && (
+                  <div className={`w-0.5 h-6 ${
+                    isCompleted ? 'bg-gold-500/50' : 'bg-gray-700'
+                  }`} />
+                )}
+              </div>
+              <div className={`pt-1 ${!isLast ? 'pb-2' : ''}`}>
+                <p className={`text-xs font-medium ${
+                  isCompleted ? 'text-gold-400' :
+                  isCurrent ? 'text-white' :
+                  'text-gray-600'
+                }`}>
+                  {step.label}
+                  {isCurrent && <span className="ml-1.5 text-gold-500/70">(Current)</span>}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 const Orders = () => {
@@ -854,6 +1011,11 @@ const Orders = () => {
                     )}
                   </div>
 
+                  {/* Status Timeline */}
+                  <div className="mb-4 bg-black-800/50 rounded-xl px-4 py-2 border border-gold-500/10">
+                    <OrderStatusTimeline order={order} />
+                  </div>
+
                   {/* Order Items Preview */}
                   <div className="flex gap-2.5 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {order.items?.slice(0, 4).map(item => (
@@ -1067,7 +1229,7 @@ const Orders = () => {
                 </div>
 
                 {/* Status Banner */}
-                <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-6 ${statusConfig[selectedOrder.status]?.bgColor}`}>
+                <div className={`flex items-center gap-2 px-4 py-3 rounded-lg mb-3 ${statusConfig[selectedOrder.status]?.bgColor}`}>
                   {(() => {
                     const StatusIcon = statusConfig[selectedOrder.status]?.icon || Clock;
                     return <StatusIcon size={20} className={statusConfig[selectedOrder.status]?.color} />;
@@ -1081,6 +1243,33 @@ const Orders = () => {
                     </span>
                   )}
                 </div>
+
+                {/* Status Timeline */}
+                <div className="mb-6 bg-black-800/50 rounded-xl px-4 py-2 border border-gold-500/10">
+                  <OrderStatusTimeline order={selectedOrder} />
+                </div>
+
+                {/* Proof of Delivery */}
+                {selectedOrder.proof_of_delivery_url && (
+                  <div className="mb-6 bg-black-800 rounded-lg p-4">
+                    <p className="text-gray-400 text-xs mb-2 flex items-center gap-1">
+                      <Camera size={12} />
+                      Proof of Delivery
+                    </p>
+                    <div className="rounded-lg overflow-hidden border border-green-500/30 max-h-48">
+                      <img 
+                        src={selectedOrder.proof_of_delivery_url} 
+                        alt="Proof of delivery" 
+                        className="w-full max-h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => window.open(selectedOrder.proof_of_delivery_url!, '_blank')}
+                      />
+                    </div>
+                    <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
+                      <CheckCircle size={12} />
+                      Delivery verified with photo proof
+                    </p>
+                  </div>
+                )}
 
                 {/* Shipping & Payment Info */}
                 <div className="grid sm:grid-cols-2 gap-4 mb-6">

@@ -26,7 +26,10 @@ import {
   Camera,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Upload,
+  Image as ImageIcon,
+  Store
 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useAuth } from '../context/AuthContext';
@@ -131,6 +134,21 @@ const SalesOrders = () => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   
+  // Proof of delivery state
+  const [showProofModal, setShowProofModal] = useState(false);
+  const [proofOrderId, setProofOrderId] = useState<number | null>(null);
+  const [proofOrderNumber, setProofOrderNumber] = useState<string>('');
+  const [proofImage, setProofImage] = useState<string | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const proofFileInputRef = useRef<HTMLInputElement>(null);
+  const proofCameraInputRef = useRef<HTMLInputElement>(null);
+  
+  // Cloudinary config for proof of delivery uploads
+  const CLOUDINARY_CLOUD_NAME = 'dht64xt1g';
+  const CLOUDINARY_UPLOAD_PRESET = 'weddingbazaarus';
+
   // Physical barcode scanner support
   const barcodeBufferRef = useRef<string>('');
   const barcodeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -695,12 +713,12 @@ const SalesOrders = () => {
     }
   };
 
-  const updateOrderStatus = async (orderId: number, newStatus: string) => {
+  const updateOrderStatus = async (orderId: number, newStatus: string, extraData?: Record<string, unknown>) => {
     try {
       const response = await apiFetch(`${API_BASE_URL}/sales.php?action=order-status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: orderId, status: newStatus })
+        body: JSON.stringify({ id: orderId, status: newStatus, ...extraData })
       });
       const data = await response.json();
       
@@ -714,6 +732,100 @@ const SalesOrders = () => {
       console.error('Error updating order:', err);
       alert('Failed to update order');
     }
+  };
+
+  // Handle status action with smart routing
+  const handleStatusAction = (orderId: number, newStatus: string, order?: Order | OrderDetail) => {
+    // If trying to mark as delivered, require proof of delivery
+    if (newStatus === 'delivered') {
+      const orderNum = order?.order_number || orders.find(o => o.id === orderId)?.order_number || '';
+      setProofOrderId(orderId);
+      setProofOrderNumber(orderNum);
+      setProofImage(null);
+      setProofFile(null);
+      setProofError(null);
+      setShowProofModal(true);
+      return;
+    }
+    
+    // For all other statuses, proceed normally
+    updateOrderStatus(orderId, newStatus);
+  };
+
+  // Upload proof image to Cloudinary and update order status
+  const uploadProofAndDeliver = async () => {
+    if (!proofOrderId || !proofFile) {
+      setProofError('Please capture or upload a proof of delivery photo');
+      return;
+    }
+    
+    setIsUploadingProof(true);
+    setProofError(null);
+    
+    try {
+      // Upload to Cloudinary
+      const formData = new FormData();
+      formData.append('file', proofFile);
+      formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      formData.append('folder', 'fragranza/proof_of_delivery');
+      
+      const cloudinaryResponse = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      
+      if (!cloudinaryResponse.ok) {
+        throw new Error('Failed to upload image');
+      }
+      
+      const cloudinaryData = await cloudinaryResponse.json();
+      const proofUrl = cloudinaryData.secure_url;
+      
+      // Update order status with proof URL
+      await updateOrderStatus(proofOrderId, 'delivered', {
+        proof_of_delivery_url: proofUrl,
+        user_id: user?.id
+      });
+      
+      // Close modal on success
+      setShowProofModal(false);
+      setProofOrderId(null);
+      setProofImage(null);
+      setProofFile(null);
+    } catch (err) {
+      console.error('Error uploading proof of delivery:', err);
+      setProofError('Failed to upload proof of delivery. Please try again.');
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
+
+  // Handle proof image selection (file or camera)
+  const handleProofImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setProofError('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setProofError('Image must be less than 10MB');
+      return;
+    }
+    
+    setProofFile(file);
+    setProofError(null);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setProofImage(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   if (authLoading) {
@@ -780,8 +892,8 @@ const SalesOrders = () => {
     }
   };
 
-  // Get quick action for a status
-  const getQuickAction = (status: string): { label: string; nextStatus: string; color: string } | null => {
+  // Get quick action for a status (shipping-method-aware)
+  const getQuickAction = (status: string, shippingMethod?: string): { label: string; nextStatus: string; color: string } | null => {
     switch (status) {
       case 'pending': // Pending needs confirmation first
         return { label: 'Confirm', nextStatus: 'confirmed', color: 'bg-green-500 hover:bg-green-600' };
@@ -792,6 +904,10 @@ const SalesOrders = () => {
       case 'cod_waiting_approval':
         return { label: 'Approve', nextStatus: 'processing', color: 'bg-green-500 hover:bg-green-600' };
       case 'processing':
+        // Auto-detect based on shipping method
+        if (shippingMethod === 'store_pickup') {
+          return { label: 'Ready for Pickup', nextStatus: 'paid_ready_pickup', color: 'bg-cyan-500 hover:bg-cyan-600' };
+        }
         return { label: 'Ship', nextStatus: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600' };
       case 'in_transit':
       case 'shipped': // Legacy
@@ -808,9 +924,9 @@ const SalesOrders = () => {
     }
   };
 
-  // Get all action buttons for a status
-  type ActionButton = { label: string; status: string; color: string; icon: 'check' | 'cancel' | 'truck' | 'package' | 'clock' | 'refresh' };
-  const getStatusActions = (status: string): ActionButton[] => {
+  // Get all action buttons for a status (shipping-method-aware)
+  type ActionButton = { label: string; status: string; color: string; icon: 'check' | 'cancel' | 'truck' | 'package' | 'clock' | 'refresh' | 'store' };
+  const getStatusActions = (status: string, shippingMethod?: string): ActionButton[] => {
     switch (status) {
       case 'pending':
         return [
@@ -837,9 +953,21 @@ const SalesOrders = () => {
         // No manual button - must scan barcode to complete pickup
         return [];
       case 'processing':
+        // Auto-detect: show only relevant action based on shipping method
+        if (shippingMethod === 'store_pickup') {
+          return [
+            { label: 'Ready for Pickup', status: 'paid_ready_pickup', color: 'bg-cyan-500 hover:bg-cyan-600', icon: 'store' }
+          ];
+        }
+        if (shippingMethod === 'delivery') {
+          return [
+            { label: 'Ship Order', status: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600', icon: 'truck' }
+          ];
+        }
+        // If shipping_method unknown, show both
         return [
           { label: 'Ship', status: 'in_transit', color: 'bg-indigo-500 hover:bg-indigo-600', icon: 'truck' },
-          { label: 'Ready Pickup', status: 'paid_ready_pickup', color: 'bg-cyan-500 hover:bg-cyan-600', icon: 'package' }
+          { label: 'Ready Pickup', status: 'paid_ready_pickup', color: 'bg-cyan-500 hover:bg-cyan-600', icon: 'store' }
         ];
       case 'in_transit':
       case 'shipped':
@@ -896,6 +1024,7 @@ const SalesOrders = () => {
       case 'package': return <Package size={14} />;
       case 'clock': return <Clock size={14} />;
       case 'refresh': return <RefreshCw size={14} />;
+      case 'store': return <Store size={14} />;
     }
   };
 
@@ -908,6 +1037,7 @@ const SalesOrders = () => {
       case 'package': return <Package size={16} />;
       case 'clock': return <Clock size={16} />;
       case 'refresh': return <RefreshCw size={16} />;
+      case 'store': return <Store size={16} />;
     }
   };
 
@@ -1333,6 +1463,153 @@ const SalesOrders = () => {
           )}
         </AnimatePresence>
 
+        {/* Proof of Delivery Modal */}
+        <AnimatePresence>
+          {showProofModal && (
+            <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4" onClick={() => !isUploadingProof && setShowProofModal(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="bg-gradient-to-b from-black-800 to-black-900 border border-gold-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header */}
+                <div className="p-4 border-b border-gold-500/20 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
+                      <Camera className="text-green-400" size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Proof of Delivery</h3>
+                      <p className="text-gray-500 text-xs">{proofOrderNumber}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => !isUploadingProof && setShowProofModal(false)} 
+                    className="text-gray-400 hover:text-white p-1"
+                    disabled={isUploadingProof}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                  {/* Info message */}
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex items-start gap-2">
+                    <AlertCircle size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-blue-300 text-xs">
+                      A photo proof is required to confirm delivery. Take a photo of the package at the delivery location or with the customer.
+                    </p>
+                  </div>
+
+                  {/* Image Preview */}
+                  <div className="relative">
+                    {proofImage ? (
+                      <div className="relative rounded-xl overflow-hidden border border-gold-500/30">
+                        <img 
+                          src={proofImage} 
+                          alt="Proof of delivery" 
+                          className="w-full h-48 object-cover"
+                        />
+                        <button
+                          onClick={() => { setProofImage(null); setProofFile(null); }}
+                          className="absolute top-2 right-2 w-8 h-8 bg-black/70 rounded-full flex items-center justify-center text-white hover:bg-red-500/80 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                        <div className="absolute bottom-2 left-2 bg-green-500/90 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                          <CheckCircle size={12} />
+                          Photo ready
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border-2 border-dashed border-gold-500/30 bg-black-800/50 p-8 text-center">
+                        <ImageIcon className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-400 text-sm mb-1">No photo captured yet</p>
+                        <p className="text-gray-600 text-xs">Use the buttons below to take or upload a photo</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Buttons */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => proofCameraInputRef.current?.click()}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 border border-blue-500/30 rounded-xl text-blue-400 font-medium hover:bg-blue-500/30 transition-colors"
+                      disabled={isUploadingProof}
+                    >
+                      <Camera size={18} />
+                      Take Photo
+                    </button>
+                    <button
+                      onClick={() => proofFileInputRef.current?.click()}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gold-500/20 border border-gold-500/30 rounded-xl text-gold-400 font-medium hover:bg-gold-500/30 transition-colors"
+                      disabled={isUploadingProof}
+                    >
+                      <Upload size={18} />
+                      Upload Image
+                    </button>
+                  </div>
+
+                  {/* Hidden file inputs */}
+                  <input
+                    ref={proofCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleProofImageSelect}
+                  />
+                  <input
+                    ref={proofFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleProofImageSelect}
+                  />
+
+                  {/* Error */}
+                  {proofError && (
+                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center gap-2">
+                      <XCircle size={14} className="text-red-400" />
+                      <p className="text-red-400 text-sm">{proofError}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="p-4 border-t border-gold-500/20 flex gap-3">
+                  <button
+                    onClick={() => setShowProofModal(false)}
+                    disabled={isUploadingProof}
+                    className="flex-1 px-4 py-3 bg-black-700 border border-gold-500/30 rounded-xl text-gray-300 font-semibold hover:bg-black-600 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={uploadProofAndDeliver}
+                    disabled={isUploadingProof || !proofFile}
+                    className="flex-1 px-4 py-3 bg-green-500 rounded-xl text-white font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {isUploadingProof ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle size={16} />
+                        Confirm Delivery
+                      </>
+                    )}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
         {/* Error State */}
         {error && (
           <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 flex items-center gap-3">
@@ -1410,11 +1687,18 @@ const SalesOrders = () => {
                             Scan Barcode to Complete
                           </span>
                         )}
+                        {/* Shipping method indicator */}
+                        {order.shipping_method && (
+                          <span className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${order.shipping_method === 'store_pickup' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-indigo-500/10 text-indigo-400'}`}>
+                            {order.shipping_method === 'store_pickup' ? <Store size={12} /> : <Truck size={12} />}
+                            {order.shipping_method === 'store_pickup' ? 'Pickup' : 'Delivery'}
+                          </span>
+                        )}
                         {/* Status-specific action buttons */}
-                        {getStatusActions(order.status).map((action, idx) => (
+                        {getStatusActions(order.status, order.shipping_method).map((action, idx) => (
                           <button 
                             key={idx}
-                            onClick={() => updateOrderStatus(order.id, action.status)}
+                            onClick={() => handleStatusAction(order.id, action.status, order)}
                             className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
                           >
                             {renderActionIcon(action.icon)}
@@ -1491,10 +1775,10 @@ const SalesOrders = () => {
                                 <Eye size={18} />
                               </button>
                               {/* Status-specific action buttons */}
-                              {getStatusActions(order.status).map((action, idx) => (
+                              {getStatusActions(order.status, order.shipping_method).map((action, idx) => (
                                 <button 
                                   key={idx}
-                                  onClick={() => updateOrderStatus(order.id, action.status)}
+                                  onClick={() => handleStatusAction(order.id, action.status, order)}
                                   className={`px-3 py-1.5 rounded-lg text-xs font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
                                   title={action.label}
                                 >
@@ -1620,13 +1904,13 @@ const SalesOrders = () => {
                         <Printer size={14} />
                         Print Invoice
                       </button>
-                      {getQuickAction(selectedOrder.status) && (
+                      {getQuickAction(selectedOrder.status, selectedOrder.shipping_method) && (
                         <button
-                          onClick={() => updateOrderStatus(selectedOrder.id, getQuickAction(selectedOrder.status)!.nextStatus)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-medium text-sm ${getQuickAction(selectedOrder.status)!.color}`}
+                          onClick={() => handleStatusAction(selectedOrder.id, getQuickAction(selectedOrder.status, selectedOrder.shipping_method)!.nextStatus, selectedOrder)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white font-medium text-sm ${getQuickAction(selectedOrder.status, selectedOrder.shipping_method)!.color}`}
                         >
                           <CheckCircle size={14} />
-                          {getQuickAction(selectedOrder.status)!.label}
+                          {getQuickAction(selectedOrder.status, selectedOrder.shipping_method)!.label}
                         </button>
                       )}
                     </div>
@@ -1656,6 +1940,20 @@ const SalesOrders = () => {
                         Shipping
                       </h4>
                       <div className="space-y-2 text-sm">
+                        {/* Shipping method badge */}
+                        <div className="flex items-center gap-2 mb-2">
+                          {selectedOrder.shipping_method === 'store_pickup' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-500/20 border border-cyan-500/30 rounded-full text-cyan-400 text-xs font-medium">
+                              <Store size={12} />
+                              Store Pickup
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-indigo-400 text-xs font-medium">
+                              <Truck size={12} />
+                              Delivery
+                            </span>
+                          )}
+                        </div>
                         <p className="text-gray-400">{selectedOrder.shipping_address}</p>
                         <p className="text-gray-400 flex items-center gap-1">
                           <CreditCard size={12} />
@@ -1727,10 +2025,10 @@ const SalesOrders = () => {
                     <p className="text-gray-400 text-sm mb-3">Order Actions</p>
                     <div className="flex flex-wrap gap-2">
                       {/* Dynamic action buttons based on status */}
-                      {getStatusActions(selectedOrder.status).map((action, idx) => (
+                      {getStatusActions(selectedOrder.status, selectedOrder.shipping_method).map((action, idx) => (
                         <button
                           key={idx}
-                          onClick={() => updateOrderStatus(selectedOrder.id, action.status)}
+                          onClick={() => handleStatusAction(selectedOrder.id, action.status, selectedOrder)}
                           className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium ${action.color} ${action.icon !== 'cancel' ? 'text-white' : ''}`}
                         >
                           {renderLargeActionIcon(action.icon)}
@@ -1753,6 +2051,28 @@ const SalesOrders = () => {
                     <div className="bg-black-800 rounded-lg p-4">
                       <p className="text-gray-500 text-xs mb-1">Order Notes</p>
                       <p className="text-gray-300 text-sm">{selectedOrder.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Proof of Delivery */}
+                  {(selectedOrder as OrderDetail & { proof_of_delivery_url?: string }).proof_of_delivery_url && (
+                    <div className="bg-black-800 rounded-lg p-4">
+                      <p className="text-gray-500 text-xs mb-2 flex items-center gap-1">
+                        <Camera size={12} />
+                        Proof of Delivery
+                      </p>
+                      <div className="rounded-lg overflow-hidden border border-green-500/30">
+                        <img 
+                          src={(selectedOrder as OrderDetail & { proof_of_delivery_url?: string }).proof_of_delivery_url!} 
+                          alt="Proof of delivery" 
+                          className="w-full max-h-48 object-cover cursor-pointer"
+                          onClick={() => window.open((selectedOrder as OrderDetail & { proof_of_delivery_url?: string }).proof_of_delivery_url!, '_blank')}
+                        />
+                      </div>
+                      <p className="text-green-400 text-xs mt-2 flex items-center gap-1">
+                        <CheckCircle size={12} />
+                        Delivery verified with photo proof
+                      </p>
                     </div>
                   )}
                 </div>

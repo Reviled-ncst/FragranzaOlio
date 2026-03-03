@@ -778,6 +778,12 @@ function updateOrderStatus($db, $data) {
         $params[':estimated_delivery'] = $data['estimated_delivery'];
     }
     
+    // Add proof of delivery URL if provided (photo evidence for delivery completion)
+    if (!empty($data['proof_of_delivery_url'])) {
+        $sql .= ", proof_of_delivery_url = :proof_of_delivery_url";
+        $params[':proof_of_delivery_url'] = $data['proof_of_delivery_url'];
+    }
+    
     // For COD/COP orders, auto-mark as paid when delivered/picked_up/completed
     if (in_array($newStatus, ['delivered', 'picked_up', 'completed']) && empty($data['payment_status'])) {
         $checkStmt = $db->prepare("SELECT payment_method FROM orders WHERE id = :id");
