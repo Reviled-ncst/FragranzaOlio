@@ -302,11 +302,37 @@ function CameraModal({ isOpen, onCapture, onClose, title, traineeId }: CameraMod
       apiFetch
     );
 
-    if (result.notEnrolled) {
-      setVerifyState('not-enrolled');
-      setVerifyMessage('No Face ID enrolled. Set up Face ID in your profile to enable biometric clock-in.');
+    // Helper: capture current frame and complete the clock-in
+    const captureAndFinish = (faceVerified: boolean) => {
+      if (videoRef.current && canvasRef.current) {
+        const canvas = canvasRef.current;
+        const video = videoRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          const photoData = canvas.toDataURL('image/jpeg', 0.8);
+          stopCamera();
+          onCapture(photoData, faceVerified);
+        }
+      }
       verificationRunningRef.current = false;
-      autoCaptureTriggeredRef.current = false;
+    };
+
+    // Not enrolled → allow clock-in with photo (no face gate for unenrolled users)
+    if (result.notEnrolled) {
+      setVerifyState('idle');
+      captureAndFinish(false);
+      return;
+    }
+
+    // API/network error → fall back to normal photo capture so infra issues
+    // don't block interns from clocking in
+    if (result.apiError) {
+      console.warn('Face verification API unavailable — falling back to photo-only clock-in');
+      setVerifyState('idle');
+      captureAndFinish(false);
       return;
     }
 
@@ -315,22 +341,10 @@ function CameraModal({ isOpen, onCapture, onClose, title, traineeId }: CameraMod
       setVerifyMessage(`Identity confirmed — ${result.similarity}% match`);
       // Capture photo after brief confirmation display
       setTimeout(() => {
-        if (videoRef.current && canvasRef.current) {
-          const canvas = canvasRef.current;
-          const video = videoRef.current;
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (ctx) {
-            ctx.drawImage(video, 0, 0);
-            const photoData = canvas.toDataURL('image/jpeg', 0.8);
-            stopCamera();
-            onCapture(photoData, true);
-          }
-        }
-        verificationRunningRef.current = false;
+        captureAndFinish(true);
       }, 800);
     } else {
+      // Genuine face mismatch — enrolled user but wrong face → retry
       setVerifyState('failed');
       setVerifyMessage(result.message);
       verificationRunningRef.current = false;

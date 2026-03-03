@@ -225,6 +225,8 @@ export interface FaceVerifyResult {
   similarity: number;
   notEnrolled: boolean;
   message: string;
+  /** True when the verification API call itself failed (network/server error) */
+  apiError?: boolean;
 }
 
 export const verifyIdentityForClockIn = async (
@@ -265,7 +267,7 @@ export const verifyIdentityForClockIn = async (
     };
   } catch (err) {
     console.error('Face verification error:', err);
-    return { verified: false, similarity: 0, notEnrolled: false, message: 'Verification error. Please try again.' };
+    return { verified: false, similarity: 0, notEnrolled: false, message: 'Verification error. Please try again.', apiError: true };
   }
 };
 
