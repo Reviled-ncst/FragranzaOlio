@@ -3,13 +3,9 @@
  * Fragranza Olio - Products from Local MySQL
  */
 
-import { API_BASE_URL, apiFetch } from './api';
+import { API_BASE_URL, apiFetch, uploadFile } from './api';
 import { getErrorMessage } from '../types/api';
 import { apiCache, CACHE_TTL, cacheKeys } from './apiCache';
-
-// Detect if we're on Vercel (production)
-const isProduction = typeof window !== 'undefined' && 
-  window.location.hostname.includes('vercel.app');
 
 export interface Category {
   id: number;
@@ -318,47 +314,20 @@ export const productService = {
   },
 
   /**
-   * Upload product image
-   * In production, uses base64 JSON (via proxy). In dev, uses multipart/form-data.
+   * Upload product image.
+   * Uses FormData multipart upload directly to Railway (bypasses the
+   * Vercel proxy which has a 4.5 MB body limit).  The `uploadFile`
+   * helper in api.ts automatically hits the Railway URL in production
+   * and localhost in development.
    */
   uploadImage: async (file: File): Promise<{ success: boolean; data?: { filename: string; path: string; url: string }; error?: string }> => {
     try {
-      if (isProduction) {
-        // Convert file to base64 for proxy upload
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+      const formData = new FormData();
+      formData.append('image', file);
 
-        // Send as JSON through the proxy
-        const response = await apiFetch(`${API_BASE_URL}/upload.php`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image_base64: base64,
-            filename: file.name,
-          }),
-        });
-
-        const result = await response.json();
-        return result;
-      } else {
-        // Development: use traditional multipart upload
-        const formData = new FormData();
-        formData.append('image', file);
-
-        const response = await fetch(`${API_BASE_URL}/upload.php`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        const result = await response.json();
-        return result;
-      }
+      // uploadFile sends directly to Railway (not through Vercel proxy)
+      const result = await uploadFile('/upload.php', formData) as { success: boolean; data?: { filename: string; path: string; url: string }; error?: string };
+      return result;
     } catch (error: unknown) {
       console.error('Upload image error:', error);
       return { success: false, error: getErrorMessage(error) };
