@@ -1,5 +1,5 @@
 import { apiFetch, API_BASE_URL } from '../services/api';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -180,10 +180,10 @@ const AdminAnalytics = () => {
 
   const categoryColors = ['bg-gold-500', 'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
 
-  // Build hourly heatmap data
+  // Build hourly heatmap data - full 24h
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const hourLabels = ['6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm'];
-  const hourValues = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+  const allHours = Array.from({ length: 24 }, (_, i) => i);
+  const hourTickLabels: Record<number, string> = { 0: '12a', 3: '3a', 6: '6a', 9: '9a', 12: '12p', 15: '3p', 18: '6p', 21: '9p' };
 
   const getHeatmapValue = (dayOfWeek: number, hour: number): number => {
     if (!analytics?.hourly) return 0;
@@ -202,13 +202,14 @@ const AdminAnalytics = () => {
     return Math.max(...analytics.hourly.map(h => h.order_count));
   };
 
-  const getHeatmapColor = (value: number, max: number): string => {
-    if (value === 0) return 'bg-black-700';
-    const intensity = value / max;
-    if (intensity > 0.75) return 'bg-gold-500';
-    if (intensity > 0.5) return 'bg-gold-600';
-    if (intensity > 0.25) return 'bg-gold-700';
-    return 'bg-gold-800';
+  const getHeatmapColor = (value: number, max: number): React.CSSProperties => {
+    if (value === 0 || max === 0) return { backgroundColor: 'rgba(31,31,31,0.8)' };
+    const t = value / max;
+    // Interpolate: dark grey → deep amber → bright gold
+    const r = Math.round(31 + t * (245 - 31));
+    const g = Math.round(31 + t * (158 - 31));
+    const b = Math.round(31 + t * (11 - 31));
+    return { backgroundColor: `rgb(${r},${g},${b})`, boxShadow: t > 0.6 ? `0 0 6px rgba(245,158,11,${t * 0.5})` : 'none' };
   };
 
   // Location heatmap helpers
@@ -553,57 +554,77 @@ const AdminAnalytics = () => {
                   <Clock size={20} className="text-gold-400" />
                   Order Activity Heatmap
                 </h3>
-                <p className="text-gray-500 text-xs mb-4">Frequent order times by day of week and hour</p>
-                {analytics.hourly && analytics.hourly.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[400px]">
-                      {/* Hour Labels */}
-                      <div className="flex mb-1">
-                        <div className="w-10 shrink-0" />
-                        {hourLabels.map((label) => (
-                          <div key={label} className="flex-1 text-center text-xs text-gray-500">
-                            {label}
-                          </div>
-                        ))}
-                      </div>
-                      {/* Day rows */}
-                      {dayLabels.map((day, dayIndex) => (
-                        <div key={day} className="flex items-center gap-1 mb-1">
-                          <div className="w-10 text-xs text-gray-400 shrink-0">{day}</div>
-                          {hourValues.map((hour) => {
-                            const value = getHeatmapValue(dayIndex + 1, hour);
-                            const revenue = getHeatmapRevenue(dayIndex + 1, hour);
-                            const max = getMaxHeatmapValue();
-                            return (
-                              <div
-                                key={hour}
-                                className={`flex-1 h-8 rounded ${getHeatmapColor(value, max)} transition-colors group relative cursor-default`}
-                                title={`${day} ${hour}:00 - ${value} orders`}
-                              >
-                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
-                                  <div className="bg-black-800 border border-gold-500/30 rounded px-2 py-1 text-center whitespace-nowrap text-xs">
-                                    <p><span className="text-gold-400 font-medium">{value}</span><span className="text-gray-400"> orders</span></p>
-                                    <p className="text-green-400">{formatCurrency(revenue)}</p>
+                <p className="text-gray-500 text-xs mb-4">Orders by day of week and time of day</p>
+                {analytics.hourly ? (() => {
+                  const max = getMaxHeatmapValue();
+                  // Find peak cell
+                  const peak = analytics.hourly.reduce((a, b) => a.order_count >= b.order_count ? a : b, analytics.hourly[0]);
+                  return (
+                    <div className="overflow-x-auto">
+                      <div style={{ minWidth: 520 }}>
+                        {/* Hour axis label */}
+                        <div className="flex items-center mb-1" style={{ marginLeft: 36 }}>
+                          {allHours.map(h => (
+                            <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9 }} className="text-gray-500">
+                              {hourTickLabels[h] ?? null}
+                            </div>
+                          ))}
+                        </div>
+                        {/* Day rows */}
+                        {dayLabels.map((day, dayIndex) => (
+                          <div key={day} className="flex items-center mb-0.5" style={{ gap: 2 }}>
+                            <div style={{ width: 34, fontSize: 11 }} className="text-gray-400 shrink-0 text-right pr-1">{day}</div>
+                            {allHours.map((hour) => {
+                              const value = getHeatmapValue(dayIndex + 1, hour);
+                              const revenue = getHeatmapRevenue(dayIndex + 1, hour);
+                              const isPeak = peak && peak.day_of_week === dayIndex + 1 && peak.hour === hour && value > 0;
+                              return (
+                                <div
+                                  key={hour}
+                                  style={{ flex: 1, height: 28, borderRadius: 4, position: 'relative', cursor: 'default', outline: isPeak ? '2px solid #F59E0B' : 'none', outlineOffset: 1, ...getHeatmapColor(value, max) }}
+                                  className="group transition-transform hover:scale-110 hover:z-10"
+                                >
+                                  {value > 0 && (
+                                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: value / max > 0.5 ? '#000' : '#F59E0B', fontWeight: 700, pointerEvents: 'none' }}>
+                                      {value}
+                                    </span>
+                                  )}
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-20 pointer-events-none">
+                                    <div className="bg-black-800 border border-gold-500/30 rounded px-2 py-1 text-center whitespace-nowrap" style={{ fontSize: 11 }}>
+                                      <p className="text-gray-300">{day} {hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`}</p>
+                                      <p><span className="text-gold-400 font-bold">{value}</span> <span className="text-gray-400">orders</span></p>
+                                      {revenue > 0 && <p className="text-green-400">{formatCurrency(revenue)}</p>}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              );
+                            })}
+                          </div>
+                        ))}
+                        {/* Legend */}
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            {peak && peak.order_count > 0 && (
+                              <span className="text-xs text-gold-400">
+                                ⚡ Peak: {dayLabels[peak.day_of_week - 1]} {peak.hour === 0 ? '12am' : peak.hour < 12 ? `${peak.hour}am` : peak.hour === 12 ? '12pm' : `${peak.hour - 12}pm`} ({peak.order_count} orders)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-500">0</span>
+                            {[0.1, 0.3, 0.55, 0.75, 1].map(t => {
+                              const r = Math.round(31 + t * (245 - 31));
+                              const g = Math.round(31 + t * (158 - 31));
+                              const b = Math.round(31 + t * (11 - 31));
+                              return <div key={t} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: t === 0.1 ? 'rgba(31,31,31,0.8)' : `rgb(${r},${g},${b})` }} />;
+                            })}
+                            <span className="text-xs text-gray-500">High</span>
+                          </div>
                         </div>
-                      ))}
-                      {/* Legend */}
-                      <div className="flex items-center justify-end gap-2 mt-3">
-                        <span className="text-xs text-gray-500">Less</span>
-                        <div className="w-4 h-4 rounded bg-black-700" />
-                        <div className="w-4 h-4 rounded bg-gold-800" />
-                        <div className="w-4 h-4 rounded bg-gold-700" />
-                        <div className="w-4 h-4 rounded bg-gold-600" />
-                        <div className="w-4 h-4 rounded bg-gold-500" />
-                        <span className="text-xs text-gray-500">More</span>
                       </div>
                     </div>
-                  </div>
-                ) : (
+                  );
+                })() : (
                   <div className="h-48 flex items-center justify-center text-gray-500">
                     <div className="text-center">
                       <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
