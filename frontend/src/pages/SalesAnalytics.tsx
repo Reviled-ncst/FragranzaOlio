@@ -1,6 +1,8 @@
 import { apiFetch, API_BASE_URL } from '../services/api';
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -14,7 +16,8 @@ import {
   ArrowDown,
   Download,
   BarChart3,
-  Clock
+  Clock,
+  MapPin
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
@@ -59,6 +62,12 @@ interface AnalyticsData {
     revenue: number;
   }>;
   newCustomers: number;
+  locationData?: Array<{
+    city: string;
+    province: string;
+    order_count: number;
+    total_revenue: number;
+  }>;
 }
 
 const SalesAnalytics = () => {
@@ -164,10 +173,10 @@ const SalesAnalytics = () => {
 
   const categoryColors = ['bg-gold-500', 'bg-blue-500', 'bg-purple-500', 'bg-green-500', 'bg-orange-500', 'bg-pink-500', 'bg-cyan-500'];
 
-  // Build hourly heatmap data
+  // Build hourly heatmap data - full 24h
   const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const hourLabels = ['6am', '8am', '10am', '12pm', '2pm', '4pm', '6pm', '8pm', '10pm'];
-  const hourValues = [6, 8, 10, 12, 14, 16, 18, 20, 22];
+  const allHours = Array.from({ length: 24 }, (_, i) => i);
+  const hourTickLabels: Record<number, string> = { 0: '12a', 3: '3a', 6: '6a', 9: '9a', 12: '12p', 15: '3p', 18: '6p', 21: '9p' };
 
   const getHeatmapValue = (dayOfWeek: number, hour: number): number => {
     if (!analytics?.hourly) return 0;
@@ -175,18 +184,64 @@ const SalesAnalytics = () => {
     return entry ? entry.order_count : 0;
   };
 
+  const getHeatmapRevenue = (dayOfWeek: number, hour: number): number => {
+    if (!analytics?.hourly) return 0;
+    const entry = analytics.hourly.find(h => h.day_of_week === dayOfWeek && h.hour === hour);
+    return entry ? parseFloat(String(entry.revenue)) : 0;
+  };
+
   const getMaxHeatmapValue = (): number => {
     if (!analytics?.hourly || analytics.hourly.length === 0) return 1;
     return Math.max(...analytics.hourly.map(h => h.order_count));
   };
 
-  const getHeatmapColor = (value: number, max: number): string => {
-    if (value === 0) return 'bg-black-700';
-    const intensity = value / max;
-    if (intensity > 0.75) return 'bg-gold-500';
-    if (intensity > 0.5) return 'bg-gold-600';
-    if (intensity > 0.25) return 'bg-gold-700';
-    return 'bg-gold-800';
+  const getHeatmapColor = (value: number, max: number): React.CSSProperties => {
+    if (value === 0 || max === 0) return { backgroundColor: 'rgba(31,31,31,0.8)' };
+    const t = value / max;
+    const r = Math.round(31 + t * (245 - 31));
+    const g = Math.round(31 + t * (158 - 31));
+    const b = Math.round(31 + t * (11 - 31));
+    return { backgroundColor: `rgb(${r},${g},${b})`, boxShadow: t > 0.6 ? `0 0 6px rgba(245,158,11,${t * 0.5})` : 'none' };
+  };
+
+  // Location map helpers
+  const getMaxLocationOrders = (): number => {
+    if (!analytics?.locationData || analytics.locationData.length === 0) return 1;
+    return Math.max(...analytics.locationData.map(l => l.order_count));
+  };
+
+  // Philippine city/province coordinates lookup (lat, lng)
+  const PH_COORDS: Record<string, [number, number]> = {
+    'Manila': [14.5995, 120.9842], 'Quezon City': [14.6760, 121.0437], 'Makati': [14.5547, 121.0244],
+    'Pasig': [14.5764, 121.0851], 'Taguig': [14.5243, 121.0792], 'Mandaluyong': [14.5794, 121.0359],
+    'Caloocan': [14.7500, 121.0167], 'Marikina': [14.6507, 121.1029], 'Parañaque': [14.4793, 121.0198],
+    'Pasay': [14.5378, 121.0014], 'Valenzuela': [14.7011, 120.9830], 'Las Piñas': [14.4453, 120.9830],
+    'Muntinlupa': [14.4082, 121.0437], 'Malabon': [14.6625, 120.9628], 'Navotas': [14.6667, 120.9500],
+    'San Juan': [14.6019, 121.0355], 'Pateros': [14.5447, 121.0681],
+    'Antipolo': [14.5865, 121.1764], 'Biñan': [14.3387, 121.0814], 'Bacoor': [14.4624, 120.9645],
+    'Santa Rosa': [14.3123, 121.1114], 'Batangas City': [13.7565, 121.0583], 'Lucena': [13.9317, 121.6179],
+    'Dasmariñas': [14.3294, 120.9367], 'Imus': [14.4297, 120.9367], 'General Trias': [14.3867, 120.8817],
+    'San Pedro': [14.3583, 121.0472], 'Lipa': [13.9411, 121.1608], 'Tanauan': [14.0859, 121.1508],
+    'Baguio': [16.4023, 120.5960], 'San Fernando': [15.0289, 120.6899], 'Angeles': [15.1450, 120.5887],
+    'Malolos': [14.8527, 120.8110], 'Meycauayan': [14.7356, 120.9597], 'San Jose del Monte': [14.8138, 121.0458],
+    'Cabanatuan': [15.4892, 120.9709], 'Olongapo': [14.8296, 120.2842], 'Laoag': [18.1977, 120.5936],
+    'Vigan': [17.5747, 120.3869], 'Tuguegarao': [17.6132, 121.7270], 'Legazpi': [13.1391, 123.7437],
+    'Naga': [13.6192, 123.1814], 'Cebu City': [10.3157, 123.8854], 'Mandaue': [10.3236, 123.9223],
+    'Lapu-Lapu': [10.3103, 123.9494], 'Talisay': [10.2443, 123.8495], 'Bacolod': [10.6767, 122.9570],
+    'Iloilo City': [10.7202, 122.5621], 'Tacloban': [11.2442, 125.0036], 'Dumaguete': [9.3068, 123.3054],
+    'Tagbilaran': [9.6500, 123.8500], 'Roxas City': [11.5858, 122.7514], 'Ormoc': [11.0054, 124.6079],
+    'Davao City': [7.1907, 125.4553], 'Cagayan de Oro': [8.4542, 124.6319], 'Zamboanga City': [6.9214, 122.0790],
+    'General Santos': [6.1164, 125.1716], 'Iligan': [8.2280, 124.2452], 'Butuan': [8.9475, 125.5406],
+    'Cotabato City': [7.2236, 124.2530], 'Pagadian': [7.8277, 123.4367], 'Tagum': [7.4478, 125.8078],
+    'Metro Manila': [14.5995, 120.9842], 'Cavite': [14.2456, 120.8786], 'Laguna': [14.2691, 121.4113],
+    'Rizal': [14.6037, 121.3084], 'Bulacan': [14.7942, 120.8796], 'Pampanga': [15.0794, 120.6200],
+    'Cebu': [10.3157, 123.8854], 'Iloilo': [10.7202, 122.5621], 'Negros Occidental': [10.6767, 122.9570],
+    'Negros Oriental': [9.3068, 123.3054], 'Leyte': [10.8620, 124.8811], 'Samar': [11.2442, 125.0036],
+    'Davao del Sur': [7.1907, 125.4553], 'Misamis Oriental': [8.4542, 124.6319], 'Lanao del Norte': [8.2280, 124.2452],
+  };
+
+  const getCoords = (city: string, province: string): [number, number] | null => {
+    return PH_COORDS[city] || PH_COORDS[province] || null;
   };
 
   const ChangeIndicator = ({ value }: { value?: number }) => {
@@ -467,63 +522,173 @@ const SalesAnalytics = () => {
               </div>
             </div>
 
-            {/* Hourly Heatmap */}
-            {analytics.hourly && analytics.hourly.length > 0 && (
+            {/* Heatmaps Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Hourly Order Activity Heatmap */}
               <div className="bg-black-900 border border-gold-500/20 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
                   <Clock size={20} className="text-gold-400" />
                   Order Activity Heatmap
                 </h3>
                 <p className="text-gray-500 text-xs mb-4">Orders by day of week and time of day</p>
-                <div className="overflow-x-auto">
-                  <div className="min-w-[500px]">
-                    {/* Hour Labels */}
-                    <div className="flex mb-1">
-                      <div className="w-10 shrink-0" />
-                      {hourLabels.map((label) => (
-                        <div key={label} className="flex-1 text-center text-xs text-gray-500">
-                          {label}
-                        </div>
-                      ))}
-                    </div>
-                    {/* Day rows */}
-                    {dayLabels.map((day, dayIndex) => (
-                      <div key={day} className="flex items-center gap-1 mb-1">
-                        <div className="w-10 text-xs text-gray-400 shrink-0">{day}</div>
-                        {hourValues.map((hour) => {
-                          const value = getHeatmapValue(dayIndex + 1, hour);
-                          const max = getMaxHeatmapValue();
-                          return (
-                            <div
-                              key={hour}
-                              className={`flex-1 h-8 rounded ${getHeatmapColor(value, max)} transition-colors group relative cursor-default`}
-                              title={`${day} ${hour}:00 - ${value} orders`}
-                            >
-                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
-                                <div className="bg-black-800 border border-gold-500/30 rounded px-2 py-1 text-center whitespace-nowrap text-xs">
-                                  <span className="text-gold-400 font-medium">{value}</span>
-                                  <span className="text-gray-400"> orders</span>
-                                </div>
-                              </div>
+                {analytics.hourly ? (() => {
+                  const max = getMaxHeatmapValue();
+                  const peak = analytics.hourly!.reduce((a, b) => a.order_count >= b.order_count ? a : b, analytics.hourly![0]);
+                  return (
+                    <div className="overflow-x-auto">
+                      <div style={{ minWidth: 520 }}>
+                        <div className="flex items-center mb-1" style={{ marginLeft: 36 }}>
+                          {allHours.map(h => (
+                            <div key={h} style={{ flex: 1, textAlign: 'center', fontSize: 9 }} className="text-gray-500">
+                              {hourTickLabels[h] ?? null}
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
+                        {dayLabels.map((day, dayIndex) => (
+                          <div key={day} className="flex items-center mb-0.5" style={{ gap: 2 }}>
+                            <div style={{ width: 34, fontSize: 11 }} className="text-gray-400 shrink-0 text-right pr-1">{day}</div>
+                            {allHours.map((hour) => {
+                              const value = getHeatmapValue(dayIndex + 1, hour);
+                              const revenue = getHeatmapRevenue(dayIndex + 1, hour);
+                              const isPeak = peak && peak.day_of_week === dayIndex + 1 && peak.hour === hour && value > 0;
+                              return (
+                                <div
+                                  key={hour}
+                                  style={{ flex: 1, height: 28, borderRadius: 4, position: 'relative', cursor: 'default', outline: isPeak ? '2px solid #F59E0B' : 'none', outlineOffset: 1, ...getHeatmapColor(value, max) }}
+                                  className="group transition-transform hover:scale-110 hover:z-10"
+                                >
+                                  {value > 0 && (
+                                    <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, color: value / max > 0.5 ? '#000' : '#F59E0B', fontWeight: 700, pointerEvents: 'none' }}>
+                                      {value}
+                                    </span>
+                                  )}
+                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-20 pointer-events-none">
+                                    <div className="bg-black-800 border border-gold-500/30 rounded px-2 py-1 text-center whitespace-nowrap" style={{ fontSize: 11 }}>
+                                      <p className="text-gray-300">{day} {hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`}</p>
+                                      <p><span className="text-gold-400 font-bold">{value}</span> <span className="text-gray-400">orders</span></p>
+                                      {revenue > 0 && <p className="text-green-400">{formatCurrency(revenue)}</p>}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between mt-3">
+                          <div className="flex items-center gap-2">
+                            {peak && peak.order_count > 0 && (
+                              <span className="text-xs text-gold-400">
+                                ⚡ Peak: {dayLabels[peak.day_of_week - 1]} {peak.hour === 0 ? '12am' : peak.hour < 12 ? `${peak.hour}am` : peak.hour === 12 ? '12pm' : `${peak.hour - 12}pm`} ({peak.order_count} orders)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs text-gray-500">0</span>
+                            {[0.1, 0.3, 0.55, 0.75, 1].map(t => {
+                              const r = Math.round(31 + t * (245 - 31));
+                              const g = Math.round(31 + t * (158 - 31));
+                              const b = Math.round(31 + t * (11 - 31));
+                              return <div key={t} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: t === 0.1 ? 'rgba(31,31,31,0.8)' : `rgb(${r},${g},${b})` }} />;
+                            })}
+                            <span className="text-xs text-gray-500">High</span>
+                          </div>
+                        </div>
                       </div>
-                    ))}
-                    {/* Legend */}
-                    <div className="flex items-center justify-end gap-2 mt-3">
-                      <span className="text-xs text-gray-500">Less</span>
-                      <div className="w-4 h-4 rounded bg-black-700" />
-                      <div className="w-4 h-4 rounded bg-gold-800" />
-                      <div className="w-4 h-4 rounded bg-gold-700" />
-                      <div className="w-4 h-4 rounded bg-gold-600" />
-                      <div className="w-4 h-4 rounded bg-gold-500" />
-                      <span className="text-xs text-gray-500">More</span>
+                    </div>
+                  );
+                })() : (
+                  <div className="h-48 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <Clock className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No order activity data yet</p>
+                      <p className="text-xs mt-1">Data will appear as orders come in</p>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
+
+              {/* Frequent Order Locations (Map) */}
+              <div className="bg-black-900 border border-gold-500/20 rounded-xl p-6">
+                <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                  <MapPin size={20} className="text-gold-400" />
+                  Frequent Order Locations
+                </h3>
+                <p className="text-gray-500 text-xs mb-4">Order volume by city — bubble size reflects order count</p>
+                {analytics.locationData && analytics.locationData.length > 0 ? (() => {
+                  const maxOrders = getMaxLocationOrders();
+                  const mappable = (analytics.locationData ?? [])
+                    .map(loc => ({ ...loc, coords: getCoords(loc.city, loc.province) }))
+                    .filter(loc => loc.coords !== null) as Array<{ city: string; province: string; order_count: number; total_revenue: number; coords: [number, number] }>;
+                  return (
+                    <div className="space-y-3">
+                      <div className="rounded-xl overflow-hidden" style={{ height: 300 }}>
+                        <MapContainer
+                          center={[12.5, 122.0]}
+                          zoom={6}
+                          style={{ height: '100%', width: '100%', background: '#111' }}
+                          scrollWheelZoom={false}
+                          attributionControl={false}
+                        >
+                          <TileLayer
+                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                            attribution='&copy; <a href="https://carto.com">CARTO</a>'
+                          />
+                          {mappable.map((loc) => {
+                            const intensity = loc.order_count / maxOrders;
+                            const radius = 8 + intensity * 22;
+                            const color = intensity > 0.75 ? '#F59E0B' : intensity > 0.5 ? '#B45309' : intensity > 0.25 ? '#92400E' : '#78350F';
+                            return (
+                              <CircleMarker
+                                key={`${loc.city}-${loc.province}`}
+                                center={loc.coords}
+                                radius={radius}
+                                pathOptions={{ color, fillColor: color, fillOpacity: 0.7, weight: 1.5 }}
+                              >
+                                <Tooltip direction="top" offset={[0, -radius]} opacity={0.95}>
+                                  <div className="text-xs leading-tight" style={{ minWidth: 130 }}>
+                                    <p className="font-bold text-sm">{loc.city}</p>
+                                    <p className="text-gray-300">{loc.province}</p>
+                                    <p className="mt-1">🛒 {loc.order_count} orders</p>
+                                    <p>💰 ₱{parseFloat(String(loc.total_revenue)).toLocaleString()}</p>
+                                  </div>
+                                </Tooltip>
+                              </CircleMarker>
+                            );
+                          })}
+                        </MapContainer>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-yellow-800 opacity-80" />
+                          <div className="w-4 h-4 rounded-full bg-yellow-600 opacity-80" />
+                          <div className="w-5 h-5 rounded-full bg-yellow-500 opacity-80" />
+                          <span className="text-xs text-gray-500 ml-1">Low → High volume</span>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto max-w-full pb-1">
+                          {analytics.locationData.slice(0, 5).map((loc, i) => (
+                            <div key={i} className="flex items-center gap-1 whitespace-nowrap">
+                              <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
+                                i === 0 ? 'bg-gold-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-orange-600 text-white' : 'bg-black-700 text-gray-400'
+                              }`}>{i + 1}</span>
+                              <span className="text-xs text-gray-300">{loc.city}</span>
+                              <span className="text-xs text-gold-400 font-medium">·{loc.order_count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="h-48 flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No location data yet</p>
+                      <p className="text-xs mt-1">Location data comes from order shipping addresses</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Top Products */}
             <div className="bg-black-900 border border-gold-500/20 rounded-xl p-6">
