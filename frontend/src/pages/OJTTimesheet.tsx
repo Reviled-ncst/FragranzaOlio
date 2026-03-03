@@ -297,9 +297,7 @@ function CameraModal({ isOpen, onCapture, onClose, title, traineeId }: CameraMod
 
     const result = await verifyIdentityForClockIn(
       videoRef.current,
-      traineeId,
-      API_BASE_URL,
-      apiFetch
+      traineeId
     );
 
     // Helper: capture current frame and complete the clock-in

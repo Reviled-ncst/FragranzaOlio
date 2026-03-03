@@ -11,9 +11,10 @@ const isProduction = typeof window !== 'undefined' && (
 // For development only - never use in production
 const devApiUrl = 'http://localhost/FragranzaWeb/backend/api';
 
-// Direct backend URL for file uploads (bypasses Vercel proxy size limits)
-// This gets updated automatically by the tunnel script
-const DIRECT_BACKEND_URL = 'https://api-backend-production-8751.up.railway.app/api';
+// Direct backend URL — bypasses Vercel proxy (used for uploads + face.php)
+export const DIRECT_BACKEND_URL = isProduction
+  ? 'https://api-backend-production-8751.up.railway.app/api'
+  : devApiUrl;
 
 // API and image base URLs - in production, always use proxy (no external URLs)
 export const API_BASE_URL = isProduction ? '' : devApiUrl;
@@ -109,6 +110,36 @@ export const apiFetch = async (url: string, options?: RequestInit): Promise<Resp
     
     return fetch(proxyUrl.toString(), mergedOptions);
   }
+  return fetch(url, mergedOptions);
+};
+
+/**
+ * Like apiFetch but always hits Railway directly, bypassing the Vercel proxy.
+ * Use for face.php and any endpoint that the proxy can't serve.
+ */
+export const directApiFetch = async (path: string, options?: RequestInit): Promise<Response> => {
+  const url = `${DIRECT_BACKEND_URL}/${path.replace(/^\//, '')}`;
+  const mergedOptions = { ...options };
+  const existingHeaders = new Headers(mergedOptions.headers || {});
+  if (!existingHeaders.has('Authorization')) {
+    try {
+      const token = localStorage.getItem('fragranza_session');
+      if (token) existingHeaders.set('Authorization', `Bearer ${token}`);
+    } catch { /* ignore */ }
+  }
+  if (!existingHeaders.has('X-Admin-Email')) {
+    try {
+      const userStr = localStorage.getItem('fragranza_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user?.email) existingHeaders.set('X-Admin-Email', user.email);
+      }
+    } catch { /* ignore */ }
+  }
+  if (!existingHeaders.has('Content-Type')) {
+    existingHeaders.set('Content-Type', 'application/json');
+  }
+  mergedOptions.headers = existingHeaders;
   return fetch(url, mergedOptions);
 };
 

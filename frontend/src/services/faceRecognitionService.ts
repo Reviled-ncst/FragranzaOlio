@@ -217,7 +217,7 @@ export const drawFaceOverlay = (
 
 /**
  * Verify face identity against enrolled descriptor for clock-in/out.
- * Calls the backend face.php verify-clock-in endpoint.
+ * Calls the backend face.php verify-clock-in endpoint directly (bypasses proxy).
  * Returns { verified, similarity, notEnrolled, message }
  */
 export interface FaceVerifyResult {
@@ -231,9 +231,7 @@ export interface FaceVerifyResult {
 
 export const verifyIdentityForClockIn = async (
   videoElement: HTMLVideoElement,
-  traineeId: number,
-  apiBaseUrl: string,
-  apiFetchFn: (url: string, opts?: RequestInit) => Promise<Response>
+  traineeId: number
 ): Promise<FaceVerifyResult> => {
   if (!modelsLoaded || !faceapi) {
     return { verified: false, similarity: 0, notEnrolled: false, message: 'Face models not loaded yet.' };
@@ -252,7 +250,9 @@ export const verifyIdentityForClockIn = async (
 
     const descriptor = Array.from(detection.descriptor);
 
-    const res = await apiFetchFn(`${apiBaseUrl}/face.php`, {
+    // Import directApiFetch lazily to avoid circular dep issues
+    const { directApiFetch } = await import('./api');
+    const res = await directApiFetch('face.php', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'verify-clock-in', descriptor, trainee_id: traineeId }),

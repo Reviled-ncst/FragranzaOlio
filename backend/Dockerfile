@@ -1,5 +1,8 @@
 FROM php:8.2-apache
 
+# Cache-bust: 2026-03-03 (force fresh COPY to pick up new api files like face.php)
+ARG CACHE_BUST=2026-03-03
+
 # Install PHP extensions needed for the project
 RUN docker-php-ext-install pdo pdo_mysql mysqli
 
