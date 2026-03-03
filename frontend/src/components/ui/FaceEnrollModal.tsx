@@ -82,8 +82,10 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
 
   const captureLoop = () => {
     let count = 0;
+    let enrolling = false;
     const interval = setInterval(async () => {
       if (!videoRef.current || videoRef.current.readyState < 2) return;
+      if (enrolling) return; // prevent duplicate enrollFace calls
       try {
         const detection = await faceapi
           .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.6 }))
@@ -101,6 +103,7 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
         setStatusMsg(`Captured sample ${count}/${CAPTURE_COUNT}... Keep still!`);
 
         if (count >= CAPTURE_COUNT) {
+          enrolling = true;
           clearInterval(interval);
           stopCamera();
           await enrollFace();
