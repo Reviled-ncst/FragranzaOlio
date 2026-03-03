@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Camera, AlertCircle, CheckCircle, Loader2, Scan } from 'lucide-react';
 import * as faceapi from 'face-api.js';
-import { directApiFetch } from '../../services/api';
+import { apiFetch, API_BASE_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { getDashboardForRole } from '../utils/RoleBasedRoute';
 
@@ -123,7 +123,7 @@ const FaceLoginModal = ({ isOpen, onClose }: FaceLoginModalProps) => {
 
   const attemptFaceLogin = async (descriptor: number[]) => {
     try {
-      const res = await directApiFetch('face.php', {
+      const res = await apiFetch(`${API_BASE_URL}/face.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'face-login', descriptor }),

@@ -250,9 +250,9 @@ export const verifyIdentityForClockIn = async (
 
     const descriptor = Array.from(detection.descriptor);
 
-    // Import directApiFetch lazily to avoid circular dep issues
-    const { directApiFetch } = await import('./api');
-    const res = await directApiFetch('face.php', {
+    // Import apiFetch lazily to avoid circular dep issues
+    const { apiFetch, API_BASE_URL } = await import('./api');
+    const res = await apiFetch(`${API_BASE_URL}/face.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'verify-clock-in', descriptor, trainee_id: traineeId }),

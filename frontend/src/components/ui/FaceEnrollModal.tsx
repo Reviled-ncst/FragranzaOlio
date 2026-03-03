@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Camera, CheckCircle, Loader2, Scan, AlertCircle, RefreshCw } from 'lucide-react';
 import * as faceapi from 'face-api.js';
-import { directApiFetch } from '../../services/api';
+import { apiFetch, API_BASE_URL } from '../../services/api';
 
 const MODEL_URL = '/models';
 
@@ -125,7 +125,7 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
       }
       for (let i = 0; i < 128; i++) avg[i] /= descriptorsRef.current.length;
 
-      const res = await directApiFetch('face.php', {
+      const res = await apiFetch(`${API_BASE_URL}/face.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'enroll', descriptor: Array.from(avg) }),

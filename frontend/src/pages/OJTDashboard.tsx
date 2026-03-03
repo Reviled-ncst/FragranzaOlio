@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import OJTLayout from '../components/layout/OJTLayout';
-import api, { directApiFetch } from '../services/api';
+import api, { apiFetch, API_BASE_URL } from '../services/api';
 import FaceEnrollModal from '../components/ui/FaceEnrollModal';
 
 interface ApiResponse<T> {
@@ -84,7 +84,7 @@ const OJTDashboard = () => {
   const fetchDashboardData = useCallback(async () => {
     if (!user?.id) return;
     // Check face enrollment status
-    directApiFetch('face.php', {
+    apiFetch(`${API_BASE_URL}/face.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'check-enrollment' }),
