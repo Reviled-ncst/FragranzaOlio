@@ -225,17 +225,16 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
                 </div>
               )}
 
-              {/* Capturing */}
-              {step === 'capturing' && (
-                <div>
-                  <div className="relative bg-black rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '4/3' }}>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className="w-full h-full object-cover scale-x-[-1]"
-                    />
+              {/* Video always mounted so videoRef is never null when startCapture() runs */}
+              <div className={step === 'capturing' ? 'block' : 'hidden'}>
+                <div className="relative bg-black rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '4/3' }}>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
                     {/* Guide frame */}
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                       <div className="relative w-40 h-48">
@@ -267,8 +266,7 @@ const FaceEnrollModal = ({ isOpen, onClose, onSuccess }: FaceEnrollModalProps) =
                   </div>
 
                   <p className="text-gray-400 text-xs text-center">{statusMsg}</p>
-                </div>
-              )}
+              </div>
 
               {/* Processing */}
               {step === 'processing' && (
