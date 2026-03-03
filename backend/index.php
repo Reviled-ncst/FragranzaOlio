@@ -50,7 +50,58 @@ if (!empty($segments[0]) && $segments[0] === 'api' && isset($segments[1])) {
         case 'admin_users':
             require_once __DIR__ . '/api/admin_users.php';
             break;
-        default:
+        case 'face':
+        case 'face.php':
+            require_once __DIR__ . '/api/face.php';
+            break;
+        case 'hr':
+        case 'hr.php':
+            require_once __DIR__ . '/api/hr.php';
+            break;
+        case 'supervisor':
+        case 'supervisor.php':
+            require_once __DIR__ . '/api/supervisor.php';
+            break;
+        case 'admin_logs':
+        case 'admin_logs.php':
+            require_once __DIR__ . '/api/admin_logs.php';
+            break;
+        case 'ojt_timesheets':
+        case 'ojt_timesheets.php':
+            require_once __DIR__ . '/api/ojt_timesheets.php';
+            break;
+        case 'ojt_tasks':
+        case 'ojt_tasks.php':
+            require_once __DIR__ . '/api/ojt_tasks.php';
+            break;
+        case 'ojt_notifications':
+        case 'ojt_notifications.php':
+            require_once __DIR__ . '/api/ojt_notifications.php';
+            break;
+        case 'ojt_modules':
+        case 'ojt_modules.php':
+            require_once __DIR__ . '/api/ojt_modules.php';
+            break;
+        case 'ojt_documents':
+        case 'ojt_documents.php':
+            require_once __DIR__ . '/api/ojt_documents.php';
+            break;
+        case 'ojt_attendance':
+        case 'ojt_attendance.php':
+            require_once __DIR__ . '/api/ojt_attendance.php';
+            break;
+        case 'ojt_achievements':
+        case 'ojt_achievements.php':
+            require_once __DIR__ . '/api/ojt_achievements.php';
+            break;
+        case 'review_upload':
+        case 'review_upload.php':
+            require_once __DIR__ . '/api/review_upload.php';
+            break;
+        case 'products':
+        case 'products.php':
+            require_once __DIR__ . '/api/products.php';
+            break;
             http_response_code(404);
             echo json_encode(['success' => false, 'message' => 'Endpoint not found']);
     }
