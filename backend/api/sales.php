@@ -663,15 +663,16 @@ function createOrder($db, $data) {
         $invoiceStmt = $db->prepare("
             INSERT INTO invoices (
                 invoice_number, order_id, customer_id, subtotal, discount_amount,
-                tax_amount, total_amount, status, issue_date, due_date,
-                billing_name, billing_email, billing_phone, billing_address
+                tax_amount, total_amount, amount_due, amount_paid, status, issue_date, due_date,
+                payment_method, billing_name, billing_email, billing_phone, billing_address
             ) VALUES (
                 :invoice_number, :order_id, :customer_id, :subtotal, :discount_amount,
-                :tax_amount, :total_amount, :status, :issue_date, :due_date,
-                :billing_name, :billing_email, :billing_phone, :billing_address
+                :tax_amount, :total_amount, :amount_due, :amount_paid, :status, :issue_date, :due_date,
+                :payment_method, :billing_name, :billing_email, :billing_phone, :billing_address
             )
         ");
         
+        $totalAmount = $data['total_amount'] ?? 0;
         $invoiceStmt->execute([
             ':invoice_number' => $invoiceNumber,
             ':order_id' => $orderId,
@@ -679,10 +680,13 @@ function createOrder($db, $data) {
             ':subtotal' => $data['subtotal'] ?? 0,
             ':discount_amount' => $data['discount_amount'] ?? 0,
             ':tax_amount' => $data['tax_amount'] ?? 0,
-            ':total_amount' => $data['total_amount'] ?? 0,
+            ':total_amount' => $totalAmount,
+            ':amount_due' => $totalAmount,
+            ':amount_paid' => 0,
             ':status' => 'sent',
             ':issue_date' => date('Y-m-d'),
             ':due_date' => date('Y-m-d', strtotime('+7 days')),
+            ':payment_method' => $data['payment_method'] ?? 'cod',
             ':billing_name' => trim($firstName . ' ' . $lastName),
             ':billing_email' => $customerEmail,
             ':billing_phone' => $customerPhone,
