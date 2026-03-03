@@ -13,8 +13,8 @@ RUN sed -i '/<Directory \/var\/www\/>/,/<\/Directory>/ s/AllowOverride None/Allo
 RUN sed -i 's/Listen 80/Listen ${PORT}/' /etc/apache2/ports.conf \
     && sed -i 's/:80/:${PORT}/' /etc/apache2/sites-available/000-default.conf
 
-# Copy backend files
-COPY . /var/www/html/
+# Copy backend files (Railway builds from git root, so copy backend/ contents)
+COPY backend/ /var/www/html/
 
 # Create upload dirs
 RUN mkdir -p /var/www/html/uploads/products \
