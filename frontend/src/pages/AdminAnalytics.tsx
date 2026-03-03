@@ -1,6 +1,8 @@
 import { apiFetch, API_BASE_URL } from '../services/api';
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { MapContainer, TileLayer, CircleMarker, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -221,6 +223,48 @@ const AdminAnalytics = () => {
     if (intensity > 0.5) return 'from-gold-500 to-gold-600';
     if (intensity > 0.25) return 'from-gold-600 to-gold-700';
     return 'from-gold-700 to-gold-800';
+  };
+
+  // Philippine city/province coordinates lookup (lat, lng)
+  const PH_COORDS: Record<string, [number, number]> = {
+    // Metro Manila
+    'Manila': [14.5995, 120.9842], 'Quezon City': [14.6760, 121.0437], 'Makati': [14.5547, 121.0244],
+    'Pasig': [14.5764, 121.0851], 'Taguig': [14.5243, 121.0792], 'Mandaluyong': [14.5794, 121.0359],
+    'Caloocan': [14.7500, 121.0167], 'Marikina': [14.6507, 121.1029], 'Parañaque': [14.4793, 121.0198],
+    'Pasay': [14.5378, 121.0014], 'Valenzuela': [14.7011, 120.9830], 'Las Piñas': [14.4453, 120.9830],
+    'Muntinlupa': [14.4082, 121.0437], 'Malabon': [14.6625, 120.9628], 'Navotas': [14.6667, 120.9500],
+    'San Juan': [14.6019, 121.0355], 'Pateros': [14.5447, 121.0681],
+    // Luzon
+    'Antipolo': [14.5865, 121.1764], 'Biñan': [14.3387, 121.0814], 'Bacoor': [14.4624, 120.9645],
+    'Santa Rosa': [14.3123, 121.1114], 'Batangas City': [13.7565, 121.0583], 'Lucena': [13.9317, 121.6179],
+    'Dasmariñas': [14.3294, 120.9367], 'Imus': [14.4297, 120.9367], 'General Trias': [14.3867, 120.8817],
+    'San Pedro': [14.3583, 121.0472], 'Lipa': [13.9411, 121.1608], 'Tanauan': [14.0859, 121.1508],
+    'Baguio': [16.4023, 120.5960], 'San Fernando': [15.0289, 120.6899], 'Angeles': [15.1450, 120.5887],
+    'Malolos': [14.8527, 120.8110], 'Meycauayan': [14.7356, 120.9597], 'San Jose del Monte': [14.8138, 121.0458],
+    'Cabanatuan': [15.4892, 120.9709], 'Olongapo': [14.8296, 120.2842], 'Batac': [18.0552, 120.5648],
+    'Laoag': [18.1977, 120.5936], 'Vigan': [17.5747, 120.3869], 'Tuguegarao': [17.6132, 121.7270],
+    'Legazpi': [13.1391, 123.7437], 'Naga': [13.6192, 123.1814],
+    // Visayas
+    'Cebu City': [10.3157, 123.8854], 'Mandaue': [10.3236, 123.9223], 'Lapu-Lapu': [10.3103, 123.9494],
+    'Talisay': [10.2443, 123.8495], 'Bacolod': [10.6767, 122.9570], 'Iloilo City': [10.7202, 122.5621],
+    'Tacloban': [11.2442, 125.0036], 'Dumaguete': [9.3068, 123.3054], 'Tagbilaran': [9.6500, 123.8500],
+    'Roxas City': [11.5858, 122.7514], 'Ormoc': [11.0054, 124.6079],
+    // Mindanao
+    'Davao City': [7.1907, 125.4553], 'Cagayan de Oro': [8.4542, 124.6319], 'Zamboanga City': [6.9214, 122.0790],
+    'General Santos': [6.1164, 125.1716], 'Iligan': [8.2280, 124.2452], 'Butuan': [8.9475, 125.5406],
+    'Cotabato City': [7.2236, 124.2530], 'Pagadian': [7.8277, 123.4367], 'Tagum': [7.4478, 125.8078],
+    'Digos': [6.7497, 125.3572], 'Koronadal': [6.5069, 124.8468], 'Marawi': [7.9986, 124.2928],
+    // Provinces as fallback
+    'Metro Manila': [14.5995, 120.9842], 'Cavite': [14.2456, 120.8786], 'Laguna': [14.2691, 121.4113],
+    'Rizal': [14.6037, 121.3084], 'Bulacan': [14.7942, 120.8796], 'Pampanga': [15.0794, 120.6200],
+    'Bataan': [14.6416, 120.4818], 'Nueva Ecija': [15.5128, 121.0019], 'Tarlac': [15.4755, 120.5960],
+    'Cebu': [10.3157, 123.8854], 'Iloilo': [10.7202, 122.5621], 'Negros Occidental': [10.6767, 122.9570],
+    'Negros Oriental': [9.3068, 123.3054], 'Leyte': [10.8620, 124.8811], 'Samar': [11.2442, 125.0036],
+    'Davao del Sur': [7.1907, 125.4553], 'Misamis Oriental': [8.4542, 124.6319], 'Lanao del Norte': [8.2280, 124.2452],
+  };
+
+  const getCoords = (city: string, province: string): [number, number] | null => {
+    return PH_COORDS[city] || PH_COORDS[province] || null;
   };
 
   const ChangeIndicator = ({ value }: { value?: number }) => {
@@ -570,59 +614,79 @@ const AdminAnalytics = () => {
                 )}
               </div>
 
-              {/* Frequent Order Locations (Geographic Heatmap) */}
+              {/* Frequent Order Locations (Map) */}
               <div className="bg-black-900 border border-gold-500/20 rounded-xl p-6">
                 <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
                   <MapPin size={20} className="text-gold-400" />
                   Frequent Order Locations
                 </h3>
-                <p className="text-gray-500 text-xs mb-4">Top cities and provinces by order volume</p>
-                {analytics.locationData && analytics.locationData.length > 0 ? (
-                  <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
-                    {analytics.locationData.map((loc, index) => {
-                      const max = getMaxLocationOrders();
-                      const percentage = (loc.order_count / max) * 100;
-                      return (
-                        <motion.div
-                          key={`${loc.city}-${loc.province}`}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="group"
+                <p className="text-gray-500 text-xs mb-4">Order volume by city — bubble size reflects order count</p>
+                {analytics.locationData && analytics.locationData.length > 0 ? (() => {
+                  const maxOrders = getMaxLocationOrders();
+                  const mappable = analytics.locationData
+                    .map(loc => ({ ...loc, coords: getCoords(loc.city, loc.province) }))
+                    .filter(loc => loc.coords !== null) as Array<typeof analytics.locationData[0] & { coords: [number, number] }>;
+                  return (
+                    <div className="space-y-3">
+                      <div className="rounded-xl overflow-hidden" style={{ height: 300 }}>
+                        <MapContainer
+                          center={[12.5, 122.0]}
+                          zoom={6}
+                          style={{ height: '100%', width: '100%', background: '#111' }}
+                          scrollWheelZoom={false}
+                          attributionControl={false}
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold ${
-                                index === 0 ? 'bg-gold-500 text-black' :
-                                index === 1 ? 'bg-gray-400 text-black' :
-                                index === 2 ? 'bg-orange-600 text-white' :
-                                'bg-black-700 text-gray-400'
-                              }`}>
-                                {index + 1}
-                              </span>
-                              <div>
-                                <span className="text-white text-sm font-medium">{loc.city}</span>
-                                <span className="text-gray-500 text-xs ml-1">({loc.province})</span>
-                              </div>
+                          <TileLayer
+                            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                            attribution='&copy; <a href="https://carto.com">CARTO</a>'
+                          />
+                          {mappable.map((loc) => {
+                            const intensity = loc.order_count / maxOrders;
+                            const radius = 8 + intensity * 22;
+                            const color = intensity > 0.75 ? '#F59E0B' : intensity > 0.5 ? '#B45309' : intensity > 0.25 ? '#92400E' : '#78350F';
+                            return (
+                              <CircleMarker
+                                key={`${loc.city}-${loc.province}`}
+                                center={loc.coords}
+                                radius={radius}
+                                pathOptions={{ color, fillColor: color, fillOpacity: 0.7, weight: 1.5 }}
+                              >
+                                <Tooltip direction="top" offset={[0, -radius]} opacity={0.95}>
+                                  <div className="text-xs leading-tight" style={{ minWidth: 130 }}>
+                                    <p className="font-bold text-sm">{loc.city}</p>
+                                    <p className="text-gray-300">{loc.province}</p>
+                                    <p className="mt-1">🛒 {loc.order_count} orders</p>
+                                    <p>💰 ₱{parseFloat(String(loc.total_revenue)).toLocaleString()}</p>
+                                  </div>
+                                </Tooltip>
+                              </CircleMarker>
+                            );
+                          })}
+                        </MapContainer>
+                      </div>
+                      {/* Legend + summary row */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-yellow-800 opacity-80" />
+                          <div className="w-4 h-4 rounded-full bg-yellow-600 opacity-80" />
+                          <div className="w-5 h-5 rounded-full bg-yellow-500 opacity-80" />
+                          <span className="text-xs text-gray-500 ml-1">Low → High volume</span>
+                        </div>
+                        <div className="flex gap-3 overflow-x-auto max-w-full pb-1">
+                          {analytics.locationData.slice(0, 5).map((loc, i) => (
+                            <div key={i} className="flex items-center gap-1 whitespace-nowrap">
+                              <span className={`w-5 h-5 rounded flex items-center justify-center text-xs font-bold shrink-0 ${
+                                i === 0 ? 'bg-gold-500 text-black' : i === 1 ? 'bg-gray-400 text-black' : i === 2 ? 'bg-orange-600 text-white' : 'bg-black-700 text-gray-400'
+                              }`}>{i + 1}</span>
+                              <span className="text-xs text-gray-300">{loc.city}</span>
+                              <span className="text-xs text-gold-400 font-medium">·{loc.order_count}</span>
                             </div>
-                            <div className="text-right">
-                              <span className="text-gold-400 text-sm font-medium">{loc.order_count} orders</span>
-                              <span className="text-gray-500 text-xs ml-2">{formatCurrency(loc.total_revenue)}</span>
-                            </div>
-                          </div>
-                          <div className="h-2 bg-black-700 rounded-full overflow-hidden">
-                            <motion.div
-                              initial={{ width: 0 }}
-                              animate={{ width: `${percentage}%` }}
-                              transition={{ delay: index * 0.05 + 0.2 }}
-                              className={`h-full rounded-full bg-gradient-to-r ${getLocationBarColor(loc.order_count, max)}`}
-                            />
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                ) : (
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })() : (
                   <div className="h-48 flex items-center justify-center text-gray-500">
                     <div className="text-center">
                       <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" />
